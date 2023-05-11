@@ -299,7 +299,8 @@ public class TrackSelectionView extends LinearLayout {
         CheckedTextView trackView =
             (CheckedTextView) inflater.inflate(trackViewLayoutId, this, false);
         trackView.setBackgroundResource(selectableItemBackgroundResourceId);
-        trackView.setText(trackNameProvider.getTrackName(trackInfos[trackIndex].getFormat()));
+        String playbackFlag = trackGroup.isPlaybackTrack(trackInfos[trackIndex].trackIndex) ? ">>> " : "";
+        trackView.setText(playbackFlag + trackNameProvider.getTrackName(trackInfos[trackIndex].getFormat()));
         trackView.setTag(trackInfos[trackIndex]);
         if (trackGroup.isTrackSupported(trackIndex)) {
           trackView.setFocusable(true);

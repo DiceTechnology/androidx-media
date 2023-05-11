@@ -111,7 +111,7 @@ public final class TrackSelectionDialog extends DialogFragment {
         R.string.track_selection_title,
         player.getCurrentTracks(),
         player.getTrackSelectionParameters(),
-        /* allowAdaptiveSelections= */ true,
+        /* allowAdaptiveSelections= */ false,
         /* allowMultipleOverrides= */ false,
         player::setTrackSelectionParameters,
         onDismissListener);
@@ -343,6 +343,7 @@ public final class TrackSelectionDialog extends DialogFragment {
       trackSelectionView.setShowDisableOption(true);
       trackSelectionView.setAllowMultipleOverrides(allowMultipleOverrides);
       trackSelectionView.setAllowAdaptiveSelections(allowAdaptiveSelections);
+      trackSelectionView.setTrackNameProvider(new DemoTrackNameProvider(getResources()));
       trackSelectionView.init(
           trackGroups,
           isDisabled,

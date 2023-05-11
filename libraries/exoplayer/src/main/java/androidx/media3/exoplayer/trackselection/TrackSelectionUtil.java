@@ -181,6 +181,7 @@ public final class TrackSelectionUtil {
                 != RendererCapabilities.ADAPTIVE_NOT_SUPPORTED;
         @C.FormatSupport int[] trackSupport = new int[trackGroup.length];
         boolean[] selected = new boolean[trackGroup.length];
+        int playbackTrack = C.INDEX_UNSET - 1;
         for (int trackIndex = 0; trackIndex < trackGroup.length; trackIndex++) {
           trackSupport[trackIndex] =
               mappedTrackInfo.getTrackSupport(rendererIndex, groupIndex, trackIndex);
@@ -190,12 +191,18 @@ public final class TrackSelectionUtil {
             if (trackSelection.getTrackGroup().equals(trackGroup)
                 && trackSelection.indexOf(trackIndex) != C.INDEX_UNSET) {
               isTrackSelected = true;
+              // Above set all tracks of selection to selected, so for adaptive selection all tracks is selected.
+              // Here we append one field to specify the current playback track.
+              if (trackSelection instanceof BaseTrackSelection
+                  && trackIndex == ((BaseTrackSelection) trackSelection).getSelectedIndexInTrackGroup()) {
+                playbackTrack = trackIndex;
+              }
               break;
             }
           }
           selected[trackIndex] = isTrackSelected;
         }
-        trackGroups.add(new Tracks.Group(trackGroup, adaptiveSupported, trackSupport, selected));
+        trackGroups.add(new Tracks.Group(trackGroup, adaptiveSupported, trackSupport, selected).setPlaybackTrack(playbackTrack));
       }
     }
     TrackGroupArray unmappedTrackGroups = mappedTrackInfo.getUnmappedTrackGroups();

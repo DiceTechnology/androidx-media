@@ -25,6 +25,7 @@ import androidx.media3.common.TrackGroup;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
+import androidx.media3.exoplayer.endeavor.TrackCollector;
 import androidx.media3.exoplayer.source.chunk.MediaChunk;
 import java.util.Arrays;
 import java.util.List;
@@ -49,6 +50,8 @@ public abstract class BaseTrackSelection implements ExoTrackSelection {
 
   // Lazily initialized hashcode.
   private int hashCode;
+
+  protected TrackCollector trackCollector;
 
   /**
    * @param group The {@link TrackGroup}. Must not be null.
@@ -169,6 +172,10 @@ public abstract class BaseTrackSelection implements ExoTrackSelection {
   public boolean blacklist(int index, long exclusionDurationMs) {
     long nowMs = SystemClock.elapsedRealtime();
     boolean canExclude = isBlacklisted(index, nowMs);
+    // For group constraint it is also allowed to block it even if there is only one track in this group.
+    if (!canExclude && trackCollector != null && !trackCollector.isNoGroupConstraint()) {
+      canExclude = true;
+    }
     for (int i = 0; i < length && !canExclude; i++) {
       canExclude = i != index && !isBlacklisted(i, nowMs);
     }
@@ -179,12 +186,21 @@ public abstract class BaseTrackSelection implements ExoTrackSelection {
         max(
             excludeUntilTimes[index],
             Util.addWithOverflowDefault(nowMs, exclusionDurationMs, Long.MAX_VALUE));
+    // Notify the blacklist event to update the blacklist list for global.
+    if (trackCollector != null) {
+      trackCollector.setBlacklist(getFormat(index), excludeUntilTimes[index]);
+    }
     return true;
   }
 
   @Override
   public boolean isBlacklisted(int index, long nowMs) {
     return excludeUntilTimes[index] > nowMs;
+  }
+
+  @Override
+  public void setTrackCollector(TrackCollector trackCollector) {
+    this.trackCollector = trackCollector;
   }
 
   // Object overrides.

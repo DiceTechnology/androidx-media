@@ -1,5 +1,240 @@
 [
   {
+    "name": "Low Latency Test",
+    "samples": [
+      {
+        "name": "Lion Joe m3u8",
+        "uri": "https://llhlstest01.akamaized.net/clear/nba/as/live/nlncp/t594_hd_ipad.m3u8"
+      },
+      {
+        "name": "Lion 4.152 TS m3u8",
+        "uri": "http://172.16.4.152:8505/clear1/nba/as/live/nlncp/t594_hd.m3u8"
+      },
+      {
+        "name": "Lion 4.152 CMAF m3u8",
+        "uri": "http://172.16.4.152:8505/clear2/nba/as/live/nlncp/t594_hd2.m3u8"
+      },
+      {
+        "name": "Lion 4.127 TS h2 m3u8",
+        "uri": "https://172.16.4.127/clear1/nba/as/live/nlncp/t594_hd.m3u8"
+      },
+      {
+        "name": "Lion 4.127 TS m3u8",
+        "uri": "http://172.16.4.127:8055/clear1/nba/as/live/nlncp/t594_hd.m3u8"
+      },
+      {
+        "name": "Lion 4.127 CMAF h2 m3u8",
+        "uri": "https://172.16.4.127/clear2/nba/as/live/nlncp/t594_hd_cmaf.m3u8"
+      },
+      {
+        "name": "Lion 4.127 CMAF m3u8",
+        "uri": "http://172.16.4.127:8055/clear2/nba/as/live/nlncp/t594_hd_cmaf.m3u8"
+      },
+      {
+        "name": "Lion 0.112 TS m3u8",
+        "uri": "http://172.16.0.112:9055/clear1/nba/as/live/nlncp/t594_hd.m3u8"
+      },
+      {
+        "name": "Lion 0.112 CMAF m3u8",
+        "uri": "http://172.16.0.112:9055/clear2/nba/as/live/nlncp/t594_hd_cmaf.m3u8"
+      },
+      {
+        "name": "Akamai DASH-ULL sbr",
+        "uri": "https://akamaibroadcasteruseast.akamaized.net/cmaf/live/657078/akasource/out.mpd"
+      },
+      {
+        "name": "Akamai DASH-ULL mbr",
+        "uri": "https://cmafref.akamaized.net/cmaf/live-ull/2006350/akambr/out.mpd"
+      },
+      {
+        "name": "dashif DASH-ULL sbr",
+        "uri": "https://livesim.dashif.org/livesim-chunked/chunkdur_1/ato_7/testpic4_8s/Manifest300.mpd"
+      },
+      {
+        "name": "Apple CMAF emdia1 sbr",
+        "uri": "https://ll-hls-test.apple.com/cmaf/media1/lowLatencyHLS.m3u8"
+      },
+      {
+        "name": "Apple CMAF emdia0 sbr",
+        "uri": "https://ll-hls-test.apple.com/cmaf/media0/lowLatencyHLS.m3u8"
+      },
+      {
+        "name": "Apple TS h2 mbr",
+        "uri": "https://ll-hls-test.apple.com/master.m3u8"
+      },
+      {
+        "name": "Apple CMAF h2 mbr",
+        "uri": "https://ll-hls-test.apple.com/cmaf/master.m3u8"
+      },
+      {
+        "name": "broadpeak h2 sbr",
+        "uri": "https://pf5.broadpeak-vcdn.com/bpk-tv/tvrll/llcmaf/index.m3u8"
+      },
+      {
+        "name": "streamlock h2 sbr",
+        "uri": "https://5d6e17f1ca731.streamlock.net/LowLatencyBBB/myStream/playlist.m3u8"
+      },
+      {
+        "name": "cloudfront h2 mbr",
+        "uri": "https://d18lkalz24uryj.cloudfront.net/LLHLS.m3u8"
+      },
+      {
+        "name": "softvelum h2 sbr",
+        "uri": "https://ll-hls.softvelum.com/sldp/bbloop/playlist.m3u8"
+      },
+      {
+        "name": "sob h2 mbr",
+        "uri": "https://stream.sob.m-dn.net/live/sb1-ll/index.m3u8"
+      },
+      {
+        "name": "mux.com h2 mbr",
+        "uri": "https://stream.mux.com/v69RSHhFelSm4701snP22dYz2jICy4E4FUyk02rW4gxRM.m3u8"
+      }
+    ]
+  },
+  {
+    "name": "Normal Test",
+    "samples": [
+      {
+        "name": "HLS TS,AAC,level-audio pair,multi-audio,redundant",
+        "uri": "http://172.16.0.237/examples/DiCE/master_redundant_multiaudios.m3u8"
+      },
+      {
+        "name": "origin DASH",
+        "uri": "https://nldsmsltest01.akamaized.net/dash/live/2011714/2022120801-87261/manifest.mpd",
+        "drm_scheme": "widevine",
+        "drm_license_uri": "https://shield-twoproxy.imggaming.com/proxy",
+        "drm_key_request_properties":
+        {
+          "Authorization": "https://nlds249.neulion.com/poctoken"
+        }
+      },
+      {
+        "name": "Google DAI DASH",
+        "uri": "https://dai.google.com/linear/dash/event/TYUl04PUS860eyfsHfaXZg/manifest.mpd",
+        "drm_scheme": "widevine",
+        "drm_license_uri": "https://shield-twoproxy.imggaming.com/proxy",
+        "drm_key_request_properties":
+        {
+          "Authorization": "https://nlds249.neulion.com/poctoken"
+        }
+      },
+      {
+        "name": "scte35 172.16.4.152:8505",
+        "uri": "http://172.16.4.152:8505/clear1/exchangestaging_210811002.mpd"
+      },
+      {
+        "name": "scte35 172.16.4.152:8506",
+        "uri": "http://172.16.4.152:8506/clear1/exchangestaging_210811002.mpd"
+      },
+      {
+        "name": "scte35 shanghaimsltest01 number-time",
+        "uri": "http://shanghaimsltest01.akamaized.net/cmaf/live/2006306/number-time/dash/manifest.mpd"
+      },
+      {
+        "name": "scte35 unified-streaming",
+        "uri": "https://demo.unified-streaming.com/k8s/live/scte35.isml/.mpd"
+      },
+      {
+        "name": "Sintel.mp4",
+        "uri": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"
+      },
+      {
+        "name": "BBB.mp4",
+        "uri": "https://sample-videos-zyrkp2nj.s3-eu-west-1.amazonaws.com/big-buck-bunny/hls/master.m3u8"
+      },
+      {
+        "name": "hls live ttml",
+        "uri": "http://172.16.0.237:8506/clear_fmp4_number_subtitle/teststage/t594_hd_shortnothumb.m3u8"
+      },
+      {
+        "name": "hls vod ttml",
+        "uri": "http://172.16.0.237/examples/chopper/hls_fmp4_clear_ad/hls/chicago.mp4.m3u8"
+      },
+      {
+        "name": "dash live ttml",
+        "uri": "https://livesim.dashif.org/livesim/testpic_2s/cea608_and_segs.mpd"
+      },
+      {
+        "name": "dash live ttml2",
+        "uri": "https://dash.akamaized.net/dash264/CTA/imsc1/IT1-20171027_dash.mpd"
+      },
+      {
+        "name": "HLS TS,CC",
+        "uri": "http://172.16.0.237:8506/clear_ts_time/teststage/t594_hd_shortnothumb.m3u8"
+      },
+      {
+        "name": "HLS TS,CC VOD",
+        "uri": "http://172.16.0.237/examples/cc/main.m3u8"
+      },
+      {
+        "name": "DASH time,CC",
+        "uri": "http://172.16.0.237:8506/clear_ts_time/teststage/t594_hd_shortnothumb.mpd"
+      },
+      {
+        "name": "HLS CMAF,CC",
+        "uri": "http://172.16.0.237:8506/clear_fmp4_number/teststage/t594_hd_shortnothumb.m3u8"
+      },
+      {
+        "name": "DASH number,CC",
+        "uri": "http://172.16.0.237:8506/clear_fmp4_number/teststage/t594_hd_shortnothumb.mpd"
+      },
+      {
+        "name": "Test Lion HEVC mpd",
+        "uri": "http://172.16.1.60:8301/clear1/nba/as/live/nlncp/t594_hd.mpd"
+      },
+      {
+        "name": "Test Lion HEVC m3u8",
+        "uri": "http://172.16.1.60:8301/clear1/nba/as/live/nlncp/t594_hd.m3u8"
+      },
+      {
+        "name": "Test mux ao dice1",
+        "uri": "https://dice-live-staging-eu.akamaized.net/hls/live/2000577/10080189-81109/playlist.m3u8?hdnea=st=1636365418~exp=1636538228~acl=/hls/live/2000577/10080189-81109/*~id=47d43fc6-c94f-4ed3-a631-1f7222437c51~data=47d43fc6-c94f-4ed3-a631-1f7222437c51~hmac=d34a861fe8948d5d6b387a4bbbf0260fe72ed64c86a84c05110547bc06f9d0e2&opId=-1&cc=CN&ua=TW96aWxsYS81LjAgKE1hY2ludG9zaDsgSW50ZWwgTWFjIE9TIFggMTBfMTVfNykgQXBwbGVXZWJLaXQvNTM3LjM2IChLSFRNTCwgbGlrZSBHZWNrbykgQ2hyb21lLzk1LjAuNDYzOC42OSBTYWZhcmkvNTM3LjM2"
+      },
+      {
+        "name": "Test mux ao lion1",
+        "uri": "http://172.16.0.237/examples/DORIS-1082/playlist.m3u8"
+      },
+      {
+        "name": "Test mux lion1",
+        "uri": "http://172.16.0.112:8505/nlds/dice/drm/nlncp/dal_hd/dal_hd_pc.m3u8"
+      },
+      {
+        "name": "HLS TS,subtitle",
+        "uri": "http://172.16.0.237:8506/clear_ts_time_subtitle/teststage/t594_hd_shortnothumb.m3u8"
+      },
+      {
+        "name": "DASH time,subtitle",
+        "uri": "http://172.16.0.237:8506/clear_ts_time_subtitle/teststage/t594_hd_shortnothumb.mpd"
+      },
+      {
+        "name": "HLS CMAF,subtitle",
+        "uri": "http://172.16.0.237:8506/clear_fmp4_number_subtitle/teststage/t594_hd_shortnothumb.m3u8"
+      },
+      {
+        "name": "DASH number,subtitle",
+        "uri": "http://172.16.0.237:8506/clear_fmp4_number_subtitle/teststage/t594_hd_shortnothumb.mpd"
+      }
+    ]
+  },
+  {
+    "name": "Dice Test",
+    "samples": [
+      {
+        "name": "WWE live, sandbox",
+        "uri": "https://dummy.imggaming.com/video?id=111449&live=true&dash=&realm=dce.sandbox&usr=&pwd="
+      },
+      {
+        "name": "WWE live, wwe",
+        "uri": "https://dummy.imggaming.com/video?id=111449&live=true&dash=&realm=dce.wwe&usr=&pwd="
+      },
+      {
+        "name": "450830 DRM, adjara",
+        "uri": "https://dummy.imggaming.com/video?id=450830&live=&dash=true&realm=dce.adjara&usr=&pwd="
+      }
+    ]
+  },
+  {
     "name": "Clear DASH",
     "samples": [
       {
@@ -191,6 +426,20 @@
     "name": "60fps DASH",
     "samples": [
       {
+        "name": "Lion 8M 50fps mpd, clear",
+        "uri": "http://172.16.4.152:8509/nlds/wnba/35397-16305/clear/exchangeqa35397asvfx_35397.mpd"
+      },
+      {
+        "name": "Lion 8M 50fps mpd, drm",
+        "uri": "http://172.16.4.152:8509/nlds/wnba/35397-16305/drm/exchangeqa35397asvfx_35397.mpd",
+        "drm_scheme": "widevine",
+        "drm_license_uri": "https://shield-twoproxy-qa.imggaming.com/proxy",
+        "drm_key_request_properties":
+        {
+          "Authorization": "http://172.16.0.188:8889/token?ls=v3_qa&client=nl:testclient:1&eid=jack0810&offline=false"
+        }
+      },
+      {
         "name": "HD (MP4, H264, Clear)",
         "uri": "https://storage.googleapis.com/exoplayer-test-media-1/60fps/bbb-clear-1080/manifest.mpd"
       },
@@ -276,6 +525,11 @@
       {
         "name": "Single inline linear",
         "uri": "https://storage.googleapis.com/exoplayer-test-media-1/mkv/android-screens-lavf-56.36.100-aac-avc-main-1280x720.mkv",
+        "ad_tag_uri": "https://pubads.g.doubleclick.net/gampad/ads?sz=640x480&iu=/124319096/external/single_ad_samples&ciu_szs=300x250&impl=s&gdfp_req=1&env=vp&output=vast&unviewed_position_start=1&cust_params=deployment%3Ddevsite%26sample_ct%3Dlinear&correlator="
+      },
+      {
+        "name": "Single inline linear MULTIPERIOD",
+        "uri": "https://dash.akamaized.net/dash264/TestCases/5a/nomor/1.mpd",
         "ad_tag_uri": "https://pubads.g.doubleclick.net/gampad/ads?sz=640x480&iu=/124319096/external/single_ad_samples&ciu_szs=300x250&impl=s&gdfp_req=1&env=vp&output=vast&unviewed_position_start=1&cust_params=deployment%3Ddevsite%26sample_ct%3Dlinear&correlator="
       },
       {

@@ -27,6 +27,7 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaItem.ClippingConfiguration;
 import androidx.media3.common.MediaItem.SubtitleConfiguration;
 import androidx.media3.common.MediaMetadata;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Util;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -174,7 +175,11 @@ public class IntentUtil {
         intent.getStringArrayExtra(DRM_KEY_REQUEST_PROPERTIES_EXTRA + extrasKeySuffix);
     if (keyRequestPropertiesArray != null) {
       for (int i = 0; i < keyRequestPropertiesArray.length; i += 2) {
-        headers.put(keyRequestPropertiesArray[i], keyRequestPropertiesArray[i + 1]);
+        String value = keyRequestPropertiesArray[i + 1];
+        if (value.startsWith("http")) {
+          value = WebUtil.loadToken(value);
+        }
+        headers.put(keyRequestPropertiesArray[i], value);
       }
     }
     @Nullable UUID drmUuid = Util.getDrmUuid(drmSchemeExtra);

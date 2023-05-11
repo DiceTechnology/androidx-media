@@ -26,6 +26,7 @@ import androidx.annotation.Size;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
@@ -436,7 +437,9 @@ import java.util.List;
         MappedTrackInfo mappedTrackInfo,
         int[][][] rendererFormatSupports,
         int[] rendererMixedMimeTypeAdaptationSupports,
-        Parameters parameters) {
+        Parameters parameters,
+        MediaSource.MediaPeriodId mediaPeriodId,
+        Timeline timeline) {
       Assertions.checkState(
           mappedTrackInfo.getRendererType(VIDEO_RENDERER_INDEX) == C.TRACK_TYPE_VIDEO);
       Assertions.checkState(

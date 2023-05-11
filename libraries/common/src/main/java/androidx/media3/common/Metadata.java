@@ -56,6 +56,46 @@ public final class Metadata implements Parcelable {
      * @param builder The builder to be updated.
      */
     default void populateMediaMetadata(MediaMetadata.Builder builder) {}
+
+    /**
+     * Returns the NAME value of this track, if the track is derived from an EXT-X-MEDIA tag. Null if the
+     * track is not derived from an HLS EXT-X-MEDIA TAG. Null if the track is from DASH streaming.
+     */
+    default String getTrackName() {
+      return null;
+    }
+
+    /**
+     * Returns the GROUP-ID value of this track, if the track is derived from an EXT-X-MEDIA tag. Null if the
+     * track is not derived from an HLS EXT-X-MEDIA TAG. Null if the track is from DASH streaming.
+     */
+    default String getTrackGroupId() {
+      return null;
+    }
+
+    /**
+     * Returns the AUDIO value as defined in the EXT-X-STREAM-INF tag, or null if the AUDIO attribute is not
+     * present. Null if the track is from DASH streaming.
+     */
+    default String getAudioGroupId() {
+      return null;
+    }
+
+    /**
+     * Returns the SUBTITLES value as defined in the EXT-X-STREAM-INF tag, or null if the SUBTITLES
+     * attribute is not present. Null if the track is from DASH streaming.
+     */
+    default String getSubtitleGroupId() {
+      return null;
+    }
+
+    /**
+     * Returns the CLOSED-CAPTIONS value as defined in the EXT-X-STREAM-INF tag, or null if the CLOSED-CAPTIONS
+     * attribute is not present. Null if the track is from DASH streaming.
+     */
+    default String getCaptionGroupId() {
+      return null;
+    }
   }
 
   private final Entry[] entries;

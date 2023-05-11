@@ -28,6 +28,7 @@ import androidx.media3.datasource.cache.NoOpCacheEvictor;
 import androidx.media3.datasource.cache.SimpleCache;
 import androidx.media3.datasource.cronet.CronetDataSource;
 import androidx.media3.datasource.cronet.CronetUtil;
+import androidx.media3.datasource.okhttp.OkHttpDataSource;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.RenderersFactory;
 import androidx.media3.exoplayer.offline.DownloadManager;
@@ -37,6 +38,8 @@ import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.util.concurrent.Executors;
+import okhttp3.Call;
+import okhttp3.OkHttpClient;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.chromium.net.CronetEngine;
@@ -54,6 +57,7 @@ public final class DemoUtil {
    * configured in {@link #getHttpDataSourceFactory}.
    */
   private static final boolean USE_CRONET_FOR_NETWORKING = true;
+  private static final boolean USE_OKHTTP_FOR_NETWORKING = true;
 
   private static final String TAG = "DemoUtil";
   private static final String DOWNLOAD_CONTENT_DIRECTORY = "downloads";
@@ -88,7 +92,10 @@ public final class DemoUtil {
 
   public static synchronized DataSource.Factory getHttpDataSourceFactory(Context context) {
     if (httpDataSourceFactory == null) {
-      if (USE_CRONET_FOR_NETWORKING) {
+      if (USE_OKHTTP_FOR_NETWORKING) {
+        OkHttpClient.Builder okHttpBuilder = new OkHttpClient.Builder();
+        httpDataSourceFactory = new OkHttpDataSource.Factory((Call.Factory) okHttpBuilder.build());
+      } else if (USE_CRONET_FOR_NETWORKING) {
         context = context.getApplicationContext();
         @Nullable CronetEngine cronetEngine = CronetUtil.buildCronetEngine(context);
         if (cronetEngine != null) {

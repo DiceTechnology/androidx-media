@@ -22,6 +22,7 @@ import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
+import androidx.media3.exoplayer.endeavor.TrackCollector;
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId;
 import androidx.media3.exoplayer.source.chunk.Chunk;
 import androidx.media3.exoplayer.source.chunk.MediaChunk;
@@ -137,6 +138,22 @@ public interface ExoTrackSelection extends TrackSelection {
   /** Returns optional data associated with the current track selection. */
   @Nullable
   Object getSelectionData();
+
+  // Two-phase switch, mainly for AdaptiveTrackSelection
+
+  /**
+   * Use two phase switch or not. For example, when we start switching because of bandwidth,
+   * we will really complete the switching only when some conditions are met.
+   */
+  default void useTwoPhaseSwitch() {}
+
+  /** Returns the index in the track group of the individual selecting track. */
+  default int getSelectingIndexInTrackGroup() {
+    return getSelectedIndexInTrackGroup();
+  }
+
+  /** Complete the switching. */
+  default void completeTwoPhaseSwitch() {}
 
   // Adaptation.
 
@@ -263,6 +280,12 @@ public interface ExoTrackSelection extends TrackSelection {
       long playbackPositionUs, Chunk loadingChunk, List<? extends MediaChunk> queue) {
     return false;
   }
+
+  /**
+   * Set the trackCollector to apply the group constraint, sometimes we should reselect tracks.
+   * @param trackCollector The track collector.
+   */
+  default void setTrackCollector(TrackCollector trackCollector) {}
 
   /**
    * Attempts to exclude the track at the specified index in the selection, making it ineligible for
