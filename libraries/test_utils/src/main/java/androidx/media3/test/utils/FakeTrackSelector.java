@@ -60,7 +60,9 @@ public class FakeTrackSelector extends DefaultTrackSelector {
       MappedTrackInfo mappedTrackInfo,
       @Capabilities int[][][] rendererFormatSupports,
       @AdaptiveSupport int[] rendererMixedMimeTypeAdaptationSupports,
-      Parameters params) {
+      Parameters params,
+      MediaPeriodId mediaPeriodId,
+      Timeline timeline) {
     int rendererCount = mappedTrackInfo.getRendererCount();
     ExoTrackSelection.@NullableType Definition[] definitions =
         new ExoTrackSelection.Definition[rendererCount];

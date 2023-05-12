@@ -33,12 +33,14 @@ import androidx.media3.common.Player.PlaybackSuppressionReason;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.VideoSize;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.DecoderCounters;
 import androidx.media3.exoplayer.DecoderReuseEvaluation;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.drm.DrmSession;
+import androidx.media3.exoplayer.endeavor.TrackCollector;
 import androidx.media3.exoplayer.source.LoadEventInfo;
 import androidx.media3.exoplayer.source.MediaLoadData;
 import androidx.media3.exoplayer.trackselection.MappingTrackSelector;
@@ -120,6 +122,7 @@ public class EventLogger implements AnalyticsListener {
   @UnstableApi
   @Override
   public void onPlaybackStateChanged(EventTime eventTime, @Player.State int state) {
+    Log.d(WebUtil.DEBUG, "onPlaybackStateChanged " + getStateString(state));
     logd(eventTime, "state", getStateString(state));
   }
 
@@ -146,6 +149,7 @@ public class EventLogger implements AnalyticsListener {
   @UnstableApi
   @Override
   public void onIsPlayingChanged(EventTime eventTime, boolean isPlaying) {
+    Log.d(WebUtil.DEBUG, "onIsPlayingChanged " + isPlaying);
     logd(eventTime, "isPlaying", Boolean.toString(isPlaying));
   }
 
@@ -206,6 +210,7 @@ public class EventLogger implements AnalyticsListener {
           .append(newPosition.adIndexInAdGroup);
     }
     builder.append("]");
+    Log.d(WebUtil.DEBUG, "onPositionDiscontinuity " + builder.toString());
     logd(eventTime, "positionDiscontinuity", builder.toString());
   }
 
@@ -276,6 +281,7 @@ public class EventLogger implements AnalyticsListener {
   @UnstableApi
   @Override
   public void onTracksChanged(EventTime eventTime, Tracks tracks) {
+    Log.d(WebUtil.DEBUG, "onTracksChanged ");
     logd("tracks [" + getEventTimeString(eventTime));
     // Log tracks associated to renderers.
     ImmutableList<Tracks.Group> trackGroups = tracks.getGroups();
@@ -342,6 +348,7 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onAudioInputFormatChanged(
       EventTime eventTime, Format format, @Nullable DecoderReuseEvaluation decoderReuseEvaluation) {
+    Log.d(WebUtil.DEBUG, "onAudioInputFormatChanged " + (format == null ? "-" : format.label + ", " + TrackCollector.getFormatGroupId(format)));
     logd(eventTime, "audioInputFormat", Format.toLogString(format));
   }
 
@@ -418,12 +425,14 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onVideoInputFormatChanged(
       EventTime eventTime, Format format, @Nullable DecoderReuseEvaluation decoderReuseEvaluation) {
+    Log.d(WebUtil.DEBUG, "onVideoInputFormatChanged " + (format == null ? "-" : format.bitrate + ", " + TrackCollector.getAudioGroupId(format)));
     logd(eventTime, "videoInputFormat", Format.toLogString(format));
   }
 
   @UnstableApi
   @Override
   public void onDroppedVideoFrames(EventTime eventTime, int droppedFrames, long elapsedMs) {
+    Log.d(WebUtil.DEBUG, "droppedFrames " + droppedFrames + ", " + elapsedMs);
     logd(eventTime, "droppedFrames", Integer.toString(droppedFrames));
   }
 
@@ -480,6 +489,18 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onLoadCompleted(
       EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData) {
+
+    String loadUri = (loadEventInfo != null && loadEventInfo.uri != null ? loadEventInfo.uri.toString() : null);
+    if (loadUri != null) {
+      Log.d(WebUtil.DEBUG, String.format("loadCompleted [%.3f, %.3f kb, %.3f s], play %.3f s, buff %.3f s\n%s",
+          System.currentTimeMillis() / 1000f,
+          loadEventInfo.bytesLoaded / 1000f,
+          loadEventInfo.loadDurationMs / 1000f,
+          eventTime.currentPlaybackPositionMs / 1000f,
+          eventTime.totalBufferedDurationMs / 1000f,
+          loadUri));
+    }
+
     // Do nothing.
   }
 
@@ -487,6 +508,7 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onBandwidthEstimate(
       EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
+    // Log.d(WebUtil.DEBUG, "onBandwidthEstimate [" + totalLoadTimeMs + " ms, " + (totalBytesLoaded / 1000f) + "], " + (bitrateEstimate / 1000f));
     // Do nothing.
   }
 

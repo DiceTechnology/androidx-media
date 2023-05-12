@@ -48,6 +48,8 @@ public final class Tracks implements Bundleable {
     private final @C.FormatSupport int[] trackSupport;
     private final boolean[] trackSelected;
 
+    public int playbackTrack = C.INDEX_UNSET;
+
     /**
      * Constructs an instance.
      *
@@ -184,6 +186,25 @@ public final class Tracks implements Bundleable {
      */
     public boolean isTrackSelected(int trackIndex) {
       return trackSelected[trackIndex];
+    }
+
+    public boolean isPlaybackTrack(int trackIndex) {
+      if (playbackTrack == C.INDEX_UNSET) {
+        int playbackTrack = C.INDEX_UNSET - 1;
+        for (int index = 0; index < length; index++) {
+          if (isTrackSelected(index)) {
+            playbackTrack = index;
+            break;
+          }
+        }
+        this.playbackTrack = playbackTrack;
+      }
+      return playbackTrack == trackIndex;
+    }
+
+    public Group setPlaybackTrack(int trackIndex) {
+      playbackTrack = trackIndex;
+      return this;
     }
 
     /** Returns the {@link C.TrackType} of the group. */

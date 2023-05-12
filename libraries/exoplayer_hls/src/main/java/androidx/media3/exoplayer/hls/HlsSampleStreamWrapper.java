@@ -33,6 +33,7 @@ import androidx.media3.common.Metadata;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.ParserException;
 import androidx.media3.common.TrackGroup;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.ParsableByteArray;
@@ -130,7 +131,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private final Callback callback;
   private final HlsChunkSource chunkSource;
   private final Allocator allocator;
-  @Nullable private final Format muxedAudioFormat;
+  @Nullable private final List<Format> muxedAudioFormats;
   private final DrmSessionManager drmSessionManager;
   private final DrmSessionEventListener.EventDispatcher drmEventDispatcher;
   private final LoadErrorHandlingPolicy loadErrorHandlingPolicy;
@@ -197,8 +198,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
    *     stream's {@link DrmInitData} will be overridden.
    * @param allocator An {@link Allocator} from which to obtain media buffer allocations.
    * @param positionUs The position from which to start loading media.
-   * @param muxedAudioFormat Optional muxed audio {@link Format} as defined by the multivariant
-   *     playlist.
+   * @param muxedAudioFormats Optional list of muxed audio {@link Format} as defined by the multivariant playlist.
    * @param drmSessionManager The {@link DrmSessionManager} to acquire {@link DrmSession
    *     DrmSessions} with.
    * @param drmEventDispatcher A dispatcher to notify of {@link DrmSessionEventListener} events.
@@ -214,7 +214,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       Map<String, DrmInitData> overridingDrmInitData,
       Allocator allocator,
       long positionUs,
-      @Nullable Format muxedAudioFormat,
+      @Nullable List<Format> muxedAudioFormats,
       DrmSessionManager drmSessionManager,
       DrmSessionEventListener.EventDispatcher drmEventDispatcher,
       LoadErrorHandlingPolicy loadErrorHandlingPolicy,
@@ -226,7 +226,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     this.chunkSource = chunkSource;
     this.overridingDrmInitData = overridingDrmInitData;
     this.allocator = allocator;
-    this.muxedAudioFormat = muxedAudioFormat;
+    this.muxedAudioFormats = muxedAudioFormats;
     this.drmSessionManager = drmSessionManager;
     this.drmEventDispatcher = drmEventDispatcher;
     this.loadErrorHandlingPolicy = loadErrorHandlingPolicy;
@@ -1408,11 +1408,17 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     for (int i = 0; i < extractorTrackCount; i++) {
       Format sampleFormat = Assertions.checkStateNotNull(sampleQueues[i].getUpstreamFormat());
       if (i == primaryExtractorTrackIndex) {
+        @Nullable List<Format> muxedAudioFormats = this.muxedAudioFormats;
+        int muxedAudioFormatCount = (muxedAudioFormats == null ? 0 : muxedAudioFormats.size());
+        Format firstMuxedAudioFormat = (muxedAudioFormatCount > 0 ? muxedAudioFormats.get(0) : null);
         Format[] formats = new Format[chunkSourceTrackCount];
         for (int j = 0; j < chunkSourceTrackCount; j++) {
           Format playlistFormat = chunkSourceTrackGroup.getFormat(j);
-          if (primaryExtractorTrackType == C.TRACK_TYPE_AUDIO && muxedAudioFormat != null) {
-            playlistFormat = playlistFormat.withManifestFormatInfo(muxedAudioFormat);
+          if (primaryExtractorTrackType == C.TRACK_TYPE_AUDIO && muxedAudioFormatCount > 0) {
+            Format muxedAudioFormat = HlsMediaPeriod.getMuxedAudioFormat(muxedAudioFormats, playlistFormat);
+            // The format.language may be miss if use playlistFormat.withManifestFormatInfo(muxedAudioFormat)
+            // because of the playlistFormat.sampleMimeType is null.
+            playlistFormat = muxedAudioFormat;
           }
           // If there's only a single variant (chunkSourceTrackCount == 1) then we can safely
           // retain all fields from sampleFormat. Else we need to use deriveFormat to retain only
@@ -1426,16 +1432,20 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         primaryTrackGroupIndex = i;
       } else {
         @Nullable
-        Format playlistFormat =
+        List<Format> muxedAudioFormats =
             primaryExtractorTrackType == C.TRACK_TYPE_VIDEO
                     && MimeTypes.isAudio(sampleFormat.sampleMimeType)
-                ? muxedAudioFormat
+                ? this.muxedAudioFormats
                 : null;
         String muxedTrackGroupId = uid + ":muxed:" + (i < primaryExtractorTrackIndex ? i : i - 1);
-        trackGroups[i] =
-            new TrackGroup(
-                muxedTrackGroupId,
-                deriveFormat(playlistFormat, sampleFormat, /* propagateBitrates= */ false));
+        int muxedAudioFormatCount = (muxedAudioFormats == null ? 0 : muxedAudioFormats.size());
+        Format firstMuxedAudioFormat = (muxedAudioFormatCount > 0 ? muxedAudioFormats.get(0) : null);
+        Format[] formats = new Format[muxedAudioFormatCount > 0 ? muxedAudioFormatCount : 1];
+        for (int j = 0; j < formats.length; j++) {
+          Format playlistFormat = (j < muxedAudioFormatCount ? muxedAudioFormats.get(j) : firstMuxedAudioFormat);
+          formats[j] = deriveFormat(playlistFormat, sampleFormat, false);
+        }
+        trackGroups[i] = new TrackGroup(muxedTrackGroupId, formats);
       }
     }
     this.trackGroups = createTrackGroupArrayWithDrmInfo(trackGroups);

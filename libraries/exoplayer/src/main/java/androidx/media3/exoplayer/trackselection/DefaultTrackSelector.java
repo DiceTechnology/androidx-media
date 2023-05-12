@@ -48,6 +48,7 @@ import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.TrackSelectionParameters;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.BundleableUtil;
 import androidx.media3.common.util.Log;
@@ -59,6 +60,7 @@ import androidx.media3.exoplayer.RendererCapabilities;
 import androidx.media3.exoplayer.RendererCapabilities.AdaptiveSupport;
 import androidx.media3.exoplayer.RendererCapabilities.Capabilities;
 import androidx.media3.exoplayer.RendererConfiguration;
+import androidx.media3.exoplayer.endeavor.TrackCollector;
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId;
 import androidx.media3.exoplayer.source.TrackGroupArray;
 import com.google.common.base.Predicate;
@@ -2174,6 +2176,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
   @Nullable public final Context context;
   private final ExoTrackSelection.Factory trackSelectionFactory;
   private final boolean deviceIsTV;
+  private final TrackCollector trackCollector;
 
   @GuardedBy("lock")
   private Parameters parameters;
@@ -2270,6 +2273,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
     if (this.parameters.constrainAudioChannelCountToDeviceCapabilities && context == null) {
       Log.w(TAG, AUDIO_CHANNEL_COUNT_CONSTRAINTS_WARN_MESSAGE);
     }
+    trackCollector = new TrackCollector(this);
   }
 
   @Override
@@ -2383,15 +2387,20 @@ public class DefaultTrackSelector extends MappingTrackSelector {
       }
     }
     int rendererCount = mappedTrackInfo.getRendererCount();
+    // May update status of track collector for the preferredAudioName, blacklistUntilTimes and so on.
+    trackCollector.onMappedTrackInfoChanged(mappedTrackInfo, getOverrideDefinitions(mappedTrackInfo, parameters));
     ExoTrackSelection.@NullableType Definition[] definitions =
         selectAllTracks(
             mappedTrackInfo,
             rendererFormatSupports,
             rendererMixedMimeTypeAdaptationSupport,
-            parameters);
+            parameters,
+            mediaPeriodId,
+            timeline);
+    parameters = getParameters();
 
-    applyTrackSelectionOverrides(mappedTrackInfo, parameters, definitions);
-    applyLegacyRendererOverrides(mappedTrackInfo, parameters, definitions);
+    applyTrackSelectionOverrides(mappedTrackInfo, parameters, C.TRACK_TYPE_CUSTOM_BASE, definitions);
+    applyLegacyRendererOverrides(mappedTrackInfo, parameters, C.TRACK_TYPE_CUSTOM_BASE, definitions);
 
     // Disable renderers if needed.
     for (int i = 0; i < rendererCount; i++) {
@@ -2422,6 +2431,9 @@ public class DefaultTrackSelector extends MappingTrackSelector {
       rendererConfigurations[i] = rendererEnabled ? RendererConfiguration.DEFAULT : null;
     }
 
+    // May update status of track collector for the videoTrackSelection, preferredAudioName and so on.
+    trackCollector.onTrackSelectionsChanged(rendererTrackSelections);
+
     // Configure audio and video renderers to use tunneling if appropriate.
     if (parameters.tunnelingEnabled) {
       maybeConfigureRenderersForTunneling(
@@ -2446,7 +2458,10 @@ public class DefaultTrackSelector extends MappingTrackSelector {
    *     renderer, track group and track (in that order).
    * @param rendererMixedMimeTypeAdaptationSupports The {@link AdaptiveSupport} for mixed MIME type
    *     adaptation for the renderer.
-   * @param params The parameters to use for the track selection.
+   * @param params The selector's current constraint parameters.
+   * @param mediaPeriodId The {@link MediaPeriodId} of the period for which tracks are to be
+   *     selected.
+   * @param timeline The {@link Timeline} holding the period for which tracks are to be selected.
    * @return The {@link ExoTrackSelection.Definition}s for the renderers. A null entry indicates no
    *     selection was made.
    * @throws ExoPlaybackException If an error occurs while selecting the tracks.
@@ -2455,7 +2470,9 @@ public class DefaultTrackSelector extends MappingTrackSelector {
       MappedTrackInfo mappedTrackInfo,
       @Capabilities int[][][] rendererFormatSupports,
       @AdaptiveSupport int[] rendererMixedMimeTypeAdaptationSupports,
-      Parameters params)
+      Parameters params,
+      MediaPeriodId mediaPeriodId,
+      Timeline timeline)
       throws ExoPlaybackException {
     int rendererCount = mappedTrackInfo.getRendererCount();
     ExoTrackSelection.@NullableType Definition[] definitions =
@@ -2468,8 +2485,10 @@ public class DefaultTrackSelector extends MappingTrackSelector {
             rendererFormatSupports,
             rendererMixedMimeTypeAdaptationSupports,
             params);
+    Format selectedVideoFormat = null;
     if (selectedVideo != null) {
       definitions[selectedVideo.second] = selectedVideo.first;
+      selectedVideoFormat = getVideoSelectedFormat(definitions, selectedVideo.second, mappedTrackInfo, params, mediaPeriodId, timeline);
     }
 
     @Nullable
@@ -2478,9 +2497,14 @@ public class DefaultTrackSelector extends MappingTrackSelector {
             mappedTrackInfo,
             rendererFormatSupports,
             rendererMixedMimeTypeAdaptationSupports,
-            params);
+            params,
+            selectedVideoFormat);
     if (selectedAudio != null) {
       definitions[selectedAudio.second] = selectedAudio.first;
+      // We need to update the fact audio override to params because of the group constraint.
+      if (!trackCollector.isNoGroupConstraint()) {
+        updateOverride(selectedAudio.second, selectedVideoFormat, selectedAudio.first, mappedTrackInfo, params);
+      }
     }
 
     @Nullable
@@ -2490,9 +2514,13 @@ public class DefaultTrackSelector extends MappingTrackSelector {
             : selectedAudio.first.group.getFormat(selectedAudio.first.tracks[0]).language;
     @Nullable
     Pair<ExoTrackSelection.Definition, Integer> selectedText =
-        selectTextTrack(mappedTrackInfo, rendererFormatSupports, params, selectedAudioLanguage);
+        selectTextTrack(mappedTrackInfo, rendererFormatSupports, params, selectedVideoFormat, selectedAudioLanguage);
     if (selectedText != null) {
       definitions[selectedText.second] = selectedText.first;
+      // We need to update the fact text override to params because of the group constraint.
+      if (!trackCollector.isNoGroupConstraint()) {
+        updateOverride(selectedText.second, selectedVideoFormat, selectedText.first, mappedTrackInfo, params);
+      }
     }
 
     for (int i = 0; i < rendererCount; i++) {
@@ -2509,10 +2537,138 @@ public class DefaultTrackSelector extends MappingTrackSelector {
     return definitions;
   }
 
+  private ExoTrackSelection.Definition[] getOverrideDefinitions(MappedTrackInfo mappedTrackInfo, Parameters params) {
+    int rendererCount = mappedTrackInfo.getRendererCount();
+    ExoTrackSelection.@NullableType Definition[] definitions = new ExoTrackSelection.Definition[rendererCount];
+    // Apply per track type overrides.
+    applyTrackSelectionOverrides(mappedTrackInfo, params, C.TRACK_TYPE_CUSTOM_BASE, definitions);
+    // Apply legacy per renderer overrides.
+    applyLegacyRendererOverrides(mappedTrackInfo, params, C.TRACK_TYPE_CUSTOM_BASE, definitions);
+    return definitions;
+  }
+
+  // Get the current selected video even if the selection is adaptive.
+  private Format getVideoSelectedFormat(
+      ExoTrackSelection.Definition[] definitions,
+      int videoRendererIndex,
+      MappedTrackInfo mappedTrackInfo,
+      Parameters params,
+      MediaPeriodId mediaPeriodId,
+      Timeline timeline) {
+    if (trackCollector.isNoGroupConstraint() || definitions[videoRendererIndex] == null) {
+      return null;
+    }
+
+    // Apply video definition from track type overrides.
+    applyTrackSelectionOverrides(mappedTrackInfo, params, C.TRACK_TYPE_VIDEO, definitions);
+    // Apply video definition from legacy renderer overrides.
+    applyLegacyRendererOverrides(mappedTrackInfo, params, C.TRACK_TYPE_VIDEO, definitions);
+
+    // Try to get the selected video track with current bandwidth, and then we can find the relative audio group.
+    ExoTrackSelection videoTrackSelection = trackSelectionFactory.createTrackSelections(
+        new ExoTrackSelection.Definition[] {definitions[videoRendererIndex]}, getBandwidthMeter(), mediaPeriodId, timeline)[0];
+    trackCollector.setVideoTrackSelection(videoTrackSelection);
+    videoTrackSelection.setTrackCollector(trackCollector);
+    return videoTrackSelection.getSelectedFormat();
+  }
+
+  // Update the override to params for the specified renderer selection.
+  private void updateOverride(int rendererIndex, Format selectedVideoFormat, ExoTrackSelection.Definition definition, MappedTrackInfo mappedTrackInfo, Parameters params) {
+    if (definition == null) {
+      return;
+    }
+
+    // May update track type overrides.
+    HashMap<@C.TrackType Integer, TrackSelectionOverride> overridesByType = new HashMap<>();
+    collectTrackSelectionOverrides(mappedTrackInfo.getTrackGroups(rendererIndex), params, overridesByType);
+    collectTrackSelectionOverrides(mappedTrackInfo.getUnmappedTrackGroups(), params, overridesByType);
+    int trackType = mappedTrackInfo.getRendererType(rendererIndex);
+    @Nullable TrackSelectionOverride existingTrackOverride = overridesByType.get(trackType);
+    if (existingTrackOverride != null) {
+      TrackGroup overrideGroup = existingTrackOverride.mediaTrackGroup;
+      int[] overrideTracks = Ints.toArray(existingTrackOverride.trackIndices);
+      if (shouldUpdateOverride(selectedVideoFormat, trackType, overrideGroup, overrideTracks)) {
+        if (overrideGroup != definition.group || !Arrays.equals(overrideTracks, definition.tracks)) {
+          TrackSelectionOverride updated = new TrackSelectionOverride(definition.group, Ints.asList(definition.tracks));
+          synchronized (lock) {
+            this.parameters = this.parameters.buildUpon().setOverrideForType(updated).build();
+          }
+        }
+      }
+    }
+
+    // May update legacy renderer overrides.
+    TrackGroupArray trackGroups = mappedTrackInfo.getTrackGroups(rendererIndex);
+    SelectionOverride override = params.getSelectionOverride(rendererIndex, trackGroups);
+    if (override != null) {
+      TrackGroup overrideGroup = trackGroups.get(override.groupIndex);
+      int[] overrideTracks = override.tracks;
+      if (shouldUpdateOverride(selectedVideoFormat, trackType, overrideGroup, overrideTracks)) {
+        int groupIndex = trackGroups.indexOf(definition.group);
+        int[] tracks = definition.tracks;
+        if (override.groupIndex != groupIndex || !Arrays.equals(override.tracks, tracks)) {
+          Map<TrackGroupArray, SelectionOverride> overrides = params.selectionOverrides.get(rendererIndex);
+          overrides.put(trackGroups, new SelectionOverride(groupIndex, tracks));
+        }
+      }
+    }
+  }
+
+  private boolean shouldUpdateOverride(Format selectedVideoFormat, int trackType, TrackGroup overrideGroup, int[] overrideTracks) {
+    if (overrideTracks == null || overrideTracks.length != 1) {
+      return true;
+    }
+    if (trackType == C.TRACK_TYPE_AUDIO) {
+      Format audioFormat = overrideGroup.getFormat(overrideTracks[0]);
+      return !matchAudioGroup(selectedVideoFormat, audioFormat);
+    } else if (trackType == C.TRACK_TYPE_TEXT) {
+      Format textFormat = overrideGroup.getFormat(overrideTracks[0]);
+      return !matchTextGroup(selectedVideoFormat, textFormat);
+    }
+    return true;
+  }
+
+  private boolean matchAudioGroup(Format selectedVideoFormat, Format audioFormat) {
+    String selectedAudioName = trackCollector.getPreferredAudioName();
+    if (!WebUtil.empty(selectedAudioName)) {
+      String audioName = TrackCollector.getFormatName(audioFormat);
+      if (!audioName.equals(selectedAudioName)) {
+        return false;
+      }
+    }
+    String selectedAudioGroupId = TrackCollector.getAudioGroupId(selectedVideoFormat);
+    if (!WebUtil.empty(selectedAudioGroupId)) {
+      String audioGroupId = TrackCollector.getFormatGroupId(audioFormat);
+      if (!audioGroupId.equals(selectedAudioGroupId)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private boolean matchTextGroup(Format selectedVideoFormat, Format textFormat) {
+    String selectedTextName = trackCollector.getPreferredTextName();
+    if (!WebUtil.empty(selectedTextName)) {
+      String textName = TrackCollector.getFormatName(textFormat);
+      if (!textName.equals(selectedTextName)) {
+        return false;
+      }
+    }
+    String selectedSubtitleGroupId = TrackCollector.getSubtitleGroupId(selectedVideoFormat);
+    String selectedCaptionGroupId = TrackCollector.getCaptionGroupId(selectedVideoFormat);
+    if (!WebUtil.empty(selectedSubtitleGroupId) || !WebUtil.empty(selectedCaptionGroupId)) {
+      String textGroupId = TrackCollector.getFormatGroupId(textFormat);
+      if (!textGroupId.equals(selectedSubtitleGroupId) && !textGroupId.equals(selectedCaptionGroupId)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   // Video track selection implementation.
 
   /**
-   * Called by {@link #selectAllTracks(MappedTrackInfo, int[][][], int[], Parameters)} to create a
+   * Called by {@link #selectAllTracks(MappedTrackInfo, int[][][], int[], Parameters, MediaPeriodId, Timeline)} to create a
    * {@link ExoTrackSelection.Definition} for a video track selection.
    *
    * @param mappedTrackInfo Mapped track information.
@@ -2545,7 +2701,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
   // Audio track selection implementation.
 
   /**
-   * Called by {@link #selectAllTracks(MappedTrackInfo, int[][][], int[], Parameters)} to create a
+   * Called by {@link #selectAllTracks(MappedTrackInfo, int[][][], int[], Parameters, MediaPeriodId, Timeline)} to create a
    * {@link ExoTrackSelection.Definition} for an audio track selection.
    *
    * @param mappedTrackInfo Mapped track information.
@@ -2554,6 +2710,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
    * @param rendererMixedMimeTypeAdaptationSupports The {@link AdaptiveSupport} for mixed MIME type
    *     adaptation for the renderer.
    * @param params The selector's current constraint parameters.
+   * @param selectedVideoFormat The audio group need to match.
    * @return A pair of the selected {@link ExoTrackSelection.Definition} and the corresponding
    *     renderer index, or null if no selection was made.
    * @throws ExoPlaybackException If an error occurs while selecting the tracks.
@@ -2563,7 +2720,8 @@ public class DefaultTrackSelector extends MappingTrackSelector {
       MappedTrackInfo mappedTrackInfo,
       @Capabilities int[][][] rendererFormatSupports,
       @AdaptiveSupport int[] rendererMixedMimeTypeAdaptationSupports,
-      Parameters params)
+      Parameters params,
+      Format selectedVideoFormat)
       throws ExoPlaybackException {
     boolean hasVideoRendererWithMappedTracks = false;
     for (int i = 0; i < mappedTrackInfo.getRendererCount(); i++) {
@@ -2584,6 +2742,8 @@ public class DefaultTrackSelector extends MappingTrackSelector {
                 group,
                 params,
                 support,
+                this, 
+                selectedVideoFormat, 
                 hasVideoRendererWithMappedTracksFinal,
                 this::isAudioFormatWithinAudioChannelCountConstraints),
         AudioTrackInfo::compareSelections);
@@ -2627,13 +2787,14 @@ public class DefaultTrackSelector extends MappingTrackSelector {
   // Text track selection implementation.
 
   /**
-   * Called by {@link #selectAllTracks(MappedTrackInfo, int[][][], int[], Parameters)} to create a
+   * Called by {@link #selectAllTracks(MappedTrackInfo, int[][][], int[], Parameters, MediaPeriodId, Timeline)} to create a
    * {@link ExoTrackSelection.Definition} for a text track selection.
    *
    * @param mappedTrackInfo Mapped track information.
    * @param rendererFormatSupports The {@link Capabilities} for each mapped track, indexed by
    *     renderer, track group and track (in that order).
    * @param params The selector's current constraint parameters.
+   * @param selectedVideoFormat The text group need to match.
    * @param selectedAudioLanguage The language of the selected audio track. May be null if the
    *     selected audio track declares no language or no audio track was selected.
    * @return A pair of the selected {@link ExoTrackSelection.Definition} and the corresponding
@@ -2645,6 +2806,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
       MappedTrackInfo mappedTrackInfo,
       @Capabilities int[][][] rendererFormatSupports,
       Parameters params,
+      Format selectedVideoFormat,
       @Nullable String selectedAudioLanguage)
       throws ExoPlaybackException {
     return selectTracksForType(
@@ -2653,14 +2815,14 @@ public class DefaultTrackSelector extends MappingTrackSelector {
         rendererFormatSupports,
         (int rendererIndex, TrackGroup group, @Capabilities int[] support) ->
             TextTrackInfo.createForTrackGroup(
-                rendererIndex, group, params, support, selectedAudioLanguage),
+                rendererIndex, group, params, support, this, selectedVideoFormat, selectedAudioLanguage),
         TextTrackInfo::compareSelections);
   }
 
   // Generic track selection methods.
 
   /**
-   * Called by {@link #selectAllTracks(MappedTrackInfo, int[][][], int[], Parameters)} to create a
+   * Called by {@link #selectAllTracks(MappedTrackInfo, int[][][], int[], Parameters, MediaPeriodId, Timeline)} to create a
    * {@link ExoTrackSelection} for a renderer whose type is neither video, audio or text.
    *
    * @param trackType The type of the renderer.
@@ -2777,6 +2939,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
   private static void applyTrackSelectionOverrides(
       MappedTrackInfo mappedTrackInfo,
       TrackSelectionParameters params,
+      int applyTrackType,
       ExoTrackSelection.@NullableType Definition[] outDefinitions) {
     int rendererCount = mappedTrackInfo.getRendererCount();
 
@@ -2792,6 +2955,9 @@ public class DefaultTrackSelector extends MappingTrackSelector {
     // Apply the overrides.
     for (int rendererIndex = 0; rendererIndex < rendererCount; rendererIndex++) {
       @C.TrackType int trackType = mappedTrackInfo.getRendererType(rendererIndex);
+      if (applyTrackType != C.TRACK_TYPE_CUSTOM_BASE && trackType != applyTrackType) {
+        continue;
+      }
       @Nullable TrackSelectionOverride overrideForType = overridesByType.get(trackType);
       if (overrideForType == null) {
         continue;
@@ -2841,9 +3007,14 @@ public class DefaultTrackSelector extends MappingTrackSelector {
   private static void applyLegacyRendererOverrides(
       MappedTrackInfo mappedTrackInfo,
       Parameters params,
+      int applyTrackType,
       ExoTrackSelection.@NullableType Definition[] outDefinitions) {
     int rendererCount = mappedTrackInfo.getRendererCount();
     for (int rendererIndex = 0; rendererIndex < rendererCount; rendererIndex++) {
+      @C.TrackType int trackType = mappedTrackInfo.getRendererType(rendererIndex);
+      if (applyTrackType != C.TRACK_TYPE_CUSTOM_BASE && trackType != applyTrackType) {
+        continue;
+      }
       TrackGroupArray trackGroups = mappedTrackInfo.getTrackGroups(rendererIndex);
       if (!params.hasSelectionOverride(rendererIndex, trackGroups)) {
         continue;
@@ -3362,10 +3533,14 @@ public class DefaultTrackSelector extends MappingTrackSelector {
         TrackGroup trackGroup,
         Parameters params,
         @Capabilities int[] formatSupport,
+        DefaultTrackSelector selector,
+        Format selectedVideoFormat,
         boolean hasMappedVideoTracks,
         Predicate<Format> withinAudioChannelCountConstraints) {
       ImmutableList.Builder<AudioTrackInfo> listBuilder = ImmutableList.builder();
       for (int i = 0; i < trackGroup.length; i++) {
+        Format format = trackGroup.getFormat(i);
+        int matchGroupScore = selector.matchAudioGroup(selectedVideoFormat, format) ? 1 : 0;
         listBuilder.add(
             new AudioTrackInfo(
                 rendererIndex,
@@ -3374,7 +3549,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
                 params,
                 formatSupport[i],
                 hasMappedVideoTracks,
-                withinAudioChannelCountConstraints));
+                withinAudioChannelCountConstraints).setMatchGroupScore(matchGroupScore));
       }
       return listBuilder.build();
     }
@@ -3397,6 +3572,8 @@ public class DefaultTrackSelector extends MappingTrackSelector {
     private final int preferredMimeTypeMatchIndex;
     private final boolean usesPrimaryDecoder;
     private final boolean usesHardwareAcceleration;
+
+    private int matchGroupScore;
 
     public AudioTrackInfo(
         int rendererIndex,
@@ -3472,6 +3649,11 @@ public class DefaultTrackSelector extends MappingTrackSelector {
       selectionEligibility = evaluateSelectionEligibility(formatSupport, hasMappedVideoTracks);
     }
 
+    public AudioTrackInfo setMatchGroupScore(int matchGroupScore) {
+      this.matchGroupScore = matchGroupScore;
+      return this;
+    }
+
     @Override
     public @SelectionEligibility int getSelectionEligibility() {
       return selectionEligibility;
@@ -3503,6 +3685,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
               : FORMAT_VALUE_ORDERING.reverse();
       return ComparisonChain.start()
           .compareFalseFirst(this.isWithinRendererCapabilities, other.isWithinRendererCapabilities)
+          .compare(this.matchGroupScore, other.matchGroupScore)
           // 1. Compare match with specific content preferences set by the parameters.
           .compare(
               this.preferredLanguageIndex,
@@ -3574,9 +3757,13 @@ public class DefaultTrackSelector extends MappingTrackSelector {
         TrackGroup trackGroup,
         Parameters params,
         @Capabilities int[] formatSupport,
+        DefaultTrackSelector selector,
+        Format selectedVideoFormat,
         @Nullable String selectedAudioLanguage) {
       ImmutableList.Builder<TextTrackInfo> listBuilder = ImmutableList.builder();
       for (int i = 0; i < trackGroup.length; i++) {
+        Format format = trackGroup.getFormat(i);
+        int matchGroupScore = selector.matchTextGroup(selectedVideoFormat, format) ? 1 : 0;
         listBuilder.add(
             new TextTrackInfo(
                 rendererIndex,
@@ -3584,7 +3771,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
                 /* trackIndex= */ i,
                 params,
                 formatSupport[i],
-                selectedAudioLanguage));
+                selectedAudioLanguage).setMatchGroupScore(matchGroupScore));
       }
       return listBuilder.build();
     }
@@ -3598,6 +3785,8 @@ public class DefaultTrackSelector extends MappingTrackSelector {
     private final int preferredRoleFlagsScore;
     private final int selectedAudioLanguageScore;
     private final boolean hasCaptionRoleFlags;
+
+    private int matchGroupScore;
 
     public TextTrackInfo(
         int rendererIndex,
@@ -3652,6 +3841,11 @@ public class DefaultTrackSelector extends MappingTrackSelector {
               : SELECTION_ELIGIBILITY_NO;
     }
 
+    public TextTrackInfo setMatchGroupScore(int matchGroupScore) {
+      this.matchGroupScore = matchGroupScore;
+      return this;
+    }
+
     @Override
     public @SelectionEligibility int getSelectionEligibility() {
       return selectionEligibility;
@@ -3668,6 +3862,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
           ComparisonChain.start()
               .compareFalseFirst(
                   this.isWithinRendererCapabilities, other.isWithinRendererCapabilities)
+              .compare(this.matchGroupScore, other.matchGroupScore)
               // 1. Compare match with specific content preferences set by the parameters.
               .compare(
                   this.preferredLanguageIndex,

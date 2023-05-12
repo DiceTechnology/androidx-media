@@ -62,6 +62,7 @@ public final class SeiReader {
               .setLanguage(channelFormat.language)
               .setAccessibilityChannel(channelFormat.accessibilityChannel)
               .setInitializationData(channelFormat.initializationData)
+              .setMetadata(channelFormat.metadata)
               .build());
       outputs[i] = output;
     }

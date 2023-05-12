@@ -78,6 +78,10 @@ public final class C {
   /** Represents an unset or unknown percentage. */
   @UnstableApi public static final int PERCENTAGE_UNSET = -1;
 
+  public static final long DCE_UNSET = POSITION_UNSET;
+  public static final long DCE_INVALID = DCE_UNSET - 1;
+  public static final long DCE_TIME_AS_VOD = 10 * 24 * 3600_000; // 10 days
+
   /** The number of milliseconds in one second. */
   @UnstableApi public static final long MILLIS_PER_SECOND = 1000L;
 

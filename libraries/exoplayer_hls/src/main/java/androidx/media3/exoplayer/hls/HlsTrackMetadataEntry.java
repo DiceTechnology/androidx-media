@@ -201,6 +201,40 @@ public final class HlsTrackMetadataEntry implements Metadata.Entry {
   }
 
   @Override
+  public String getTrackName() {
+    return name;
+  }
+
+  @Override
+  public String getTrackGroupId() {
+    return groupId;
+  }
+
+  @Override
+  public String getAudioGroupId() {
+    if (variantInfos.size() < 1) {
+      return null;
+    }
+    return variantInfos.get(0).audioGroupId;
+  }
+
+  @Override
+  public String getSubtitleGroupId() {
+    if (variantInfos.size() < 1) {
+      return null;
+    }
+    return variantInfos.get(0).subtitleGroupId;
+  }
+
+  @Override
+  public String getCaptionGroupId() {
+    if (variantInfos.size() < 1) {
+      return null;
+    }
+    return variantInfos.get(0).captionGroupId;
+  }
+
+  @Override
   public String toString() {
     return "HlsTrackMetadataEntry" + (groupId != null ? (" [" + groupId + ", " + name + "]") : "");
   }

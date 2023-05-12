@@ -526,13 +526,9 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
             }
           }
           formatBuilder.setSampleMimeType(sampleMimeType);
-          if (uri != null) {
-            formatBuilder.setMetadata(metadata);
-            audios.add(new Rendition(uri, formatBuilder.build(), groupId, name));
-          } else if (variant != null) {
-            // TODO: Remove muxedAudioFormat and add a Rendition with a null uri to audios.
-            muxedAudioFormat = formatBuilder.build();
-          }
+          // Remove muxedAudioFormat and add a Rendition with a null uri to audios.
+          formatBuilder.setMetadata(metadata);
+          audios.add(new Rendition(uri, formatBuilder.build(), groupId, name));
           break;
         case TYPE_SUBTITLES:
           sampleMimeType = null;
@@ -569,6 +565,7 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
           formatBuilder
               .setSampleMimeType(sampleMimeType)
               .setAccessibilityChannel(accessibilityChannel);
+          formatBuilder.setMetadata(metadata);
           muxedCaptionFormats.add(formatBuilder.build());
           // TODO: Remove muxedCaptionFormats and add a Rendition with a null uri to closedCaptions.
           break;
@@ -660,6 +657,7 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
     int relativeDiscontinuitySequence = 0;
     long playlistStartTimeUs = 0;
     long segmentStartTimeUs = 0;
+    long segmentStartTimeUtcUs = 0;
     boolean preciseStart = false;
     long segmentByteRangeOffset = 0;
     long segmentByteRangeLength = C.LENGTH_UNSET;
@@ -682,6 +680,7 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
     TreeMap<String, SchemeData> currentSchemeDatas = new TreeMap<>();
     @Nullable String encryptionScheme = null;
     @Nullable DrmInitData cachedDrmInitData = null;
+    boolean discontinuityAfterSkip = false;
 
     String line;
     while (iterator.hasNext()) {
@@ -777,8 +776,8 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
         }
         for (int i = startIndex; i < endIndex; i++) {
           Segment segment = previousMediaPlaylist.segments.get(i);
-          if (mediaSequence != previousMediaPlaylist.mediaSequence) {
-            // If the media sequences of the playlists are not the same, we need to recreate the
+          if (mediaSequence != previousMediaPlaylist.mediaSequence || playlistDiscontinuitySequence != previousMediaPlaylist.discontinuitySequence) {
+            // If the media sequences or discontinuity sequences of the playlists are not the same, we need to recreate the
             // object with the updated relative start time and the relative discontinuity
             // sequence. With identical playlist media sequences these values do not change.
             int newRelativeDiscontinuitySequence =
@@ -802,6 +801,15 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
             fullSegmentEncryptionIV = segment.encryptionIV;
           }
           segmentMediaSequence++;
+        }
+
+        // polish the process of the first #EXT-X-DISCONTINUITY after the #EXT-X-SKIP, sometime miss this tag
+        if (endIndex < previousMediaPlaylist.segments.size()) {
+          Segment segment = previousMediaPlaylist.segments.get(endIndex);
+          if (segment.relativeDiscontinuitySequence != relativeDiscontinuitySequence) {
+            discontinuityAfterSkip = true;
+            relativeDiscontinuitySequence = previousMediaPlaylist.discontinuitySequence - playlistDiscontinuitySequence + segment.relativeDiscontinuitySequence;
+          }
         }
       } else if (line.startsWith(TAG_KEY)) {
         String method = parseStringAttr(line, REGEX_METHOD, variableDefinitions);
@@ -843,14 +851,13 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
       } else if (line.startsWith(TAG_DISCONTINUITY_SEQUENCE)) {
         hasDiscontinuitySequence = true;
         playlistDiscontinuitySequence = Integer.parseInt(line.substring(line.indexOf(':') + 1));
-      } else if (line.equals(TAG_DISCONTINUITY)) {
+      } else if (line.equals(TAG_DISCONTINUITY) && !discontinuityAfterSkip) {
         relativeDiscontinuitySequence++;
       } else if (line.startsWith(TAG_PROGRAM_DATE_TIME)) {
-        if (playlistStartTimeUs == 0) {
-          long programDatetimeUs =
-              Util.msToUs(Util.parseXsDateTime(line.substring(line.indexOf(':') + 1)));
-          playlistStartTimeUs = programDatetimeUs - segmentStartTimeUs;
-        }
+        segmentStartTimeUtcUs = Util.msToUs(Util.parseXsDateTime(line.substring(line.indexOf(':') + 1)));
+        // Calc playlist start time with latest value of #EXT-X-PROGRAM-DATE-TIME tag, instead first value.
+        // The value of #EXT-X-PROGRAM-DATE-TIME may have gap because of the #EXT-X-DISCONTINUITY tag.
+        playlistStartTimeUs = segmentStartTimeUtcUs - segmentStartTimeUs;
       } else if (line.equals(TAG_GAP)) {
         hasGapTag = true;
       } else if (line.equals(TAG_INDEPENDENT_SEGMENTS)) {
@@ -1007,6 +1014,9 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
                 segmentByteRangeLength,
                 hasGapTag,
                 trailingParts));
+        if (segmentStartTimeUtcUs > 0) {
+          segmentStartTimeUtcUs += segmentDurationUs;
+        }
         segmentStartTimeUs += segmentDurationUs;
         partStartTimeUs = segmentStartTimeUs;
         segmentDurationUs = 0;
@@ -1017,6 +1027,7 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
         }
         segmentByteRangeLength = C.LENGTH_UNSET;
         hasGapTag = false;
+        discontinuityAfterSkip = false;
       }
     }
 

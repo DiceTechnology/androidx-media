@@ -672,4 +672,8 @@ public final class HlsMediaSource extends BaseMediaSource
             segments, positionUs, /* inclusive= */ true, /* stayInBounds= */ true);
     return segments.get(segmentIndex);
   }
+
+  public HlsPlaylistTracker getPlaylistTracker() {
+    return playlistTracker;
+  }
 }

@@ -25,6 +25,7 @@ import androidx.media3.common.Metadata;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.TrackGroup;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -35,6 +36,7 @@ import androidx.media3.exoplayer.analytics.PlayerId;
 import androidx.media3.exoplayer.drm.DrmSession;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
+import androidx.media3.exoplayer.endeavor.TrackCollector;
 import androidx.media3.exoplayer.hls.playlist.HlsMultivariantPlaylist;
 import androidx.media3.exoplayer.hls.playlist.HlsMultivariantPlaylist.Rendition;
 import androidx.media3.exoplayer.hls.playlist.HlsMultivariantPlaylist.Variant;
@@ -623,6 +625,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
                 || (numberOfAudioCodecs == 0 && multivariantPlaylist.audios.isEmpty()))
             && numberOfVideoCodecs <= 1
             && numberOfAudioCodecs + numberOfVideoCodecs > 0;
+    @Nullable List<Format> muxedAudioFormats = getMuxedAudioFormats(multivariantPlaylist);
     @C.TrackType
     int trackType =
         !useVideoVariantsOnly && numberOfAudioCodecs > 0
@@ -635,7 +638,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
             trackType,
             selectedPlaylistUrls,
             selectedPlaylistFormats,
-            multivariantPlaylist.muxedAudioFormat,
+            muxedAudioFormats,
             multivariantPlaylist.muxedCaptionFormats,
             overridingDrmInitData,
             positionUs);
@@ -643,6 +646,8 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
     manifestUrlIndicesPerWrapper.add(selectedVariantIndices);
     if (allowChunklessPreparation && codecsStringAllowsChunklessPreparation) {
       List<TrackGroup> muxedTrackGroups = new ArrayList<>();
+      int muxedAudioFormatCount = (muxedAudioFormats == null ? 0 : muxedAudioFormats.size());
+      Format firstMuxedAudioFormat = (muxedAudioFormatCount > 0 ? muxedAudioFormats.get(0) : null);
       if (numberOfVideoCodecs > 0) {
         Format[] videoFormats = new Format[selectedVariantsCount];
         for (int i = 0; i < videoFormats.length; i++) {
@@ -651,15 +656,17 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
         muxedTrackGroups.add(new TrackGroup(sampleStreamWrapperUid, videoFormats));
 
         if (numberOfAudioCodecs > 0
-            && (multivariantPlaylist.muxedAudioFormat != null
-                || multivariantPlaylist.audios.isEmpty())) {
+            && (muxedAudioFormats != null || multivariantPlaylist.audios.isEmpty())) {
+          Format variantFormat = selectedPlaylistFormats[0];
+          Format[] formats = new Format[muxedAudioFormatCount > 0 ? muxedAudioFormatCount : 1];
+          for (int i = 0; i < formats.length; i++) {
+            Format mediaTagFormat = (i < muxedAudioFormatCount ? muxedAudioFormats.get(i) : firstMuxedAudioFormat);
+            formats[i] = deriveAudioFormat(variantFormat, mediaTagFormat, false);
+          }
           muxedTrackGroups.add(
               new TrackGroup(
                   /* id= */ sampleStreamWrapperUid + ":audio",
-                  deriveAudioFormat(
-                      selectedPlaylistFormats[0],
-                      multivariantPlaylist.muxedAudioFormat,
-                      /* isPrimaryTrackInVariant= */ false)));
+                  formats));
         }
         List<Format> ccFormats = multivariantPlaylist.muxedCaptionFormats;
         if (ccFormats != null) {
@@ -672,10 +679,11 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
         // Variants only contain audio.
         Format[] audioFormats = new Format[selectedVariantsCount];
         for (int i = 0; i < audioFormats.length; i++) {
+          Format muxedAudioFormat = getMuxedAudioFormat(muxedAudioFormats, selectedPlaylistFormats[i]);
           audioFormats[i] =
               deriveAudioFormat(
                   /* variantFormat= */ selectedPlaylistFormats[i],
-                  multivariantPlaylist.muxedAudioFormat,
+                  muxedAudioFormat,
                   /* isPrimaryTrackInVariant= */ true);
         }
         muxedTrackGroups.add(new TrackGroup(sampleStreamWrapperUid, audioFormats));
@@ -714,8 +722,9 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
         renditionByNameIndex < audioRenditions.size();
         renditionByNameIndex++) {
       String name = audioRenditions.get(renditionByNameIndex).name;
-      if (!alreadyGroupedNames.add(name)) {
-        // This name already has a corresponding group.
+      Uri url = audioRenditions.get(renditionByNameIndex).url;
+      if (!alreadyGroupedNames.add(name) || url == null) {
+        // This name already has a corresponding group. Or it is one muxed audio rendition.
         continue;
       }
 
@@ -763,7 +772,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
       @C.TrackType int trackType,
       Uri[] playlistUrls,
       Format[] playlistFormats,
-      @Nullable Format muxedAudioFormat,
+      @Nullable List<Format> muxedAudioFormats,
       @Nullable List<Format> muxedCaptionFormats,
       Map<String, DrmInitData> overridingDrmInitData,
       long positionUs) {
@@ -786,12 +795,63 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
         overridingDrmInitData,
         allocator,
         positionUs,
-        muxedAudioFormat,
+        muxedAudioFormats,
         drmSessionManager,
         drmEventDispatcher,
         loadErrorHandlingPolicy,
         eventDispatcher,
         metadataType);
+  }
+
+  @Nullable
+  private static List<Format> getMuxedAudioFormats(HlsMultivariantPlaylist multivariantPlaylist) {
+    List<Format> muxedAudioFormats = new ArrayList<>();
+    for (int i = 0; i < multivariantPlaylist.variants.size(); i++) {
+      Format muxedAudioFormat = getMuxedAudioFormat(multivariantPlaylist.audios, multivariantPlaylist.variants.get(i));
+      if (muxedAudioFormat == null) {
+        continue;
+      }
+      boolean exist = false;
+      for (int j = 0; j < muxedAudioFormats.size(); j++) {
+        if (muxedAudioFormats.get(j) == muxedAudioFormat) {
+          exist = true;
+          break;
+        }
+      }
+      if (!exist) {
+        muxedAudioFormats.add(muxedAudioFormat);
+      }
+    }
+    return muxedAudioFormats.size() > 0 ? muxedAudioFormats : null;
+  }
+
+  @Nullable
+  private static Format getMuxedAudioFormat(List<HlsMultivariantPlaylist.Rendition> audioRenditions, HlsMultivariantPlaylist.Variant variant) {
+    if (variant.audioGroupId == null) {
+      return null;
+    }
+    for (int i = 0; i < audioRenditions.size(); i++) {
+      HlsMultivariantPlaylist.Rendition audio = audioRenditions.get(i);
+      if (audio.url == null && variant.audioGroupId.equals(audio.groupId)) {
+        return audio.format;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  public static Format getMuxedAudioFormat(List<Format> muxedAudioFormats, Format variantFormat) {
+    String audioGroupId = TrackCollector.getAudioGroupId(variantFormat);
+    if (muxedAudioFormats == null || WebUtil.empty(audioGroupId)) {
+      return null;
+    }
+    for (int i = 0; i < muxedAudioFormats.size(); i++) {
+      Format audio = muxedAudioFormats.get(i);
+      if (audioGroupId.equals(TrackCollector.getFormatGroupId(audio))) {
+        return audio;
+      }
+    }
+    return null;
   }
 
   private static Map<String, DrmInitData> deriveOverridingDrmInitData(

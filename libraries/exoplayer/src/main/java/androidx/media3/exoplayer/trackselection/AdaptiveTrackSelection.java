@@ -24,10 +24,13 @@ import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackGroup;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Clock;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
+import androidx.media3.exoplayer.endeavor.DebugUtil;
+import androidx.media3.exoplayer.endeavor.TrackCollector;
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId;
 import androidx.media3.exoplayer.source.chunk.MediaChunk;
 import androidx.media3.exoplayer.source.chunk.MediaChunkIterator;
@@ -320,6 +323,10 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
   private long lastBufferEvaluationMs;
   @Nullable private MediaChunk lastBufferEvaluationMediaChunk;
 
+  private boolean useTwoPhaseSwitch;
+  private int selectingIndex;
+  private String effectiveBitrateStr = "";
+
   /**
    * @param group The {@link TrackGroup}.
    * @param tracks The indices of the selected tracks within the {@link TrackGroup}. Must not be
@@ -417,6 +424,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
   public void enable() {
     lastBufferEvaluationMs = C.TIME_UNSET;
     lastBufferEvaluationMediaChunk = null;
+    useTwoPhaseSwitch = false;
   }
 
   @CallSuper
@@ -424,6 +432,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
   public void disable() {
     // Avoid keeping a reference to a MediaChunk in case it prevents garbage collection.
     lastBufferEvaluationMediaChunk = null;
+    useTwoPhaseSwitch = false;
   }
 
   @Override
@@ -468,7 +477,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
         // The selected track is a higher quality, but we have insufficient buffer to safely switch
         // up. Defer switching up for now.
         newSelectedIndex = previousSelectedIndex;
-      } else if (selectedFormat.bitrate < currentFormat.bitrate
+      } else if (selectedFormat.bitrate < currentFormat.bitrate && noTrackSwitcher()
           && bufferedDurationUs >= maxDurationForQualityDecreaseUs) {
         // The selected track is a lower quality, but we have sufficient buffer to defer switching
         // down for now.
@@ -478,7 +487,95 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
     // If we adapted, update the trigger.
     reason =
         newSelectedIndex == previousSelectedIndex ? previousReason : C.SELECTION_REASON_ADAPTIVE;
+    selectingIndex = newSelectedIndex;
+    if (!useTwoPhaseSwitch) {
+      applySelectedIndex(selectedIndex, newSelectedIndex);
+    }
+  }
+
+  // May need to reselect tracks because the audio group constraint is changed.
+  private void applySelectedIndex(int prevSelectedIndex, int newSelectedIndex) {
+    if (newSelectedIndex != prevSelectedIndex) {
+      if (DebugUtil.debug_track) {
+        Log.d(WebUtil.DEBUG, String.format("adaptiveTrackChanged, apply!!!, %d -> %d", prevSelectedIndex, newSelectedIndex));
+      }
+      if (trackCollector != null) {
+        trackCollector.onAdaptiveTrackChanged(getSelectedFormat(), getFormat(newSelectedIndex));
+      }
+    }
     selectedIndex = newSelectedIndex;
+  }
+
+  private boolean noTrackSwitcher() {
+    return trackCollector == null || trackCollector.getTrackSwitcher() == null;
+  }
+
+  private int switchIndex(int indexFromBandwidth) {
+    if (noTrackSwitcher()) {
+      return indexFromBandwidth;
+    }
+    int indexPlaying = (reason == C.SELECTION_REASON_UNKNOWN ? C.INDEX_UNSET: selectedIndex);
+    return trackCollector.getTrackSwitcher().random(indexFromBandwidth, indexPlaying);
+  }
+
+  private List<Format> applyGroupConstraint(String overrideAudioGroupId) {
+    if (overrideAudioGroupId == null) {
+      return null;
+    }
+    List<Format> formats = new ArrayList<>();
+    for (int i = 0; i < length(); i++) {
+      if (overrideAudioGroupId.equals(TrackCollector.getAudioGroupId(getFormat(i)))) {
+        formats.add(getFormat(i));
+      }
+    }
+    return (formats.size() > 0 ? formats : null);
+  }
+
+  @Override
+  public void setTrackCollector(TrackCollector trackCollector) {
+    this.trackCollector = trackCollector;
+
+    // Make initial selection
+    if (reason == C.SELECTION_REASON_UNKNOWN && trackCollector != null) {
+      int index = C.INDEX_UNSET;
+      // Apply the previous selected format.
+      Format videoSelected = trackCollector.getVideoSelectedFormat();
+      if (videoSelected != null) {
+        for (int i = 0; i < length(); i++) {
+          if (getFormat(i) == videoSelected) {
+            index = i;
+            break;
+          }
+        }
+        Log.d(WebUtil.DEBUG,
+            String.format("Initial video selection (%d), selected format [%d, %s] %s",
+                tracks.length,
+                videoSelected.bitrate,
+                TrackCollector.getAudioGroupId(videoSelected),
+                (index == C.INDEX_UNSET ? "not found!!!" : "used")));
+      }
+      // Apply the bandwidth constraint.
+      if (index == C.INDEX_UNSET) {
+        index = determineIdealSelectedIndex(clock.elapsedRealtime(), C.TIME_UNSET);
+      }
+      reason = C.SELECTION_REASON_INITIAL;
+      selectedIndex = index;
+    }
+  }
+
+  @Override
+  public void useTwoPhaseSwitch() {
+    this.useTwoPhaseSwitch = true;
+  }
+
+  @Override
+  public int getSelectingIndexInTrackGroup() {
+    return tracks[selectingIndex];
+  }
+
+  @Override
+  public void completeTwoPhaseSwitch() {
+    applySelectedIndex(selectedIndex, selectingIndex);
   }
 
   @Override
@@ -590,18 +687,27 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
    */
   private int determineIdealSelectedIndex(long nowMs, long chunkDurationUs) {
     long effectiveBitrate = getAllocatedBandwidth(chunkDurationUs);
+    if (effectiveBitrate < 1) {
+      return selectedIndex;
+    }
+    effectiveBitrateStr = String.format(", estBitrate %.2fM", effectiveBitrate / 1000000f);
     int lowestBitrateAllowedIndex = 0;
     for (int i = 0; i < length; i++) {
-      if (nowMs == Long.MIN_VALUE || !isBlacklisted(i, nowMs)) {
+      if (nowMs == Long.MIN_VALUE || !isGlobalBlacklisted(i, nowMs)) {
         Format format = getFormat(i);
         if (canSelectFormat(format, format.bitrate, effectiveBitrate)) {
-          return i;
+          return switchIndex(i);
         } else {
           lowestBitrateAllowedIndex = i;
         }
       }
     }
-    return lowestBitrateAllowedIndex;
+    return switchIndex(lowestBitrateAllowedIndex);
+  }
+
+  // Override the isBlacklisted() to apply group constraint.
+  private boolean isGlobalBlacklisted(int index, long nowMs) {
+    return (trackCollector == null ? isBlacklisted(index, nowMs) : trackCollector.isBlacklisted(getFormat(index), nowMs));
   }
 
   private long minDurationForQualityIncreaseUs(long availableDurationUs, long chunkDurationUs) {
