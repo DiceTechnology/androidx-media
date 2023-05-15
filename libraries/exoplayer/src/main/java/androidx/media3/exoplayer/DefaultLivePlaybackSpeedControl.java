@@ -22,9 +22,12 @@ import static java.lang.Math.max;
 import android.os.SystemClock;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem.LiveConfiguration;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
+import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
+import androidx.media3.exoplayer.endeavor.DebugUtil;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 
 /**
@@ -92,6 +95,9 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
    * milliseconds, for which unit speed (1.0f) is used.
    */
   public static final long DEFAULT_MAX_LIVE_OFFSET_ERROR_MS_FOR_UNIT_SPEED = 20;
+
+  public static final boolean DEBUG_DETAIL = false;
+  public static final String TAG = "PlaybackSpeedControl";
 
   /** Builder for a {@link DefaultLivePlaybackSpeedControl}. */
   public static final class Builder {
@@ -359,14 +365,42 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
     }
     lastPlaybackSpeedUpdateMs = SystemClock.elapsedRealtime();
 
-    adjustTargetLiveOffsetUs(liveOffsetUs);
+    StringBuilder builder = (DebugUtil.debug_lowlatency ? new StringBuilder(1024) : null);
+    if (builder != null) {
+      long minPossibleLiveOffsetUs = liveOffsetUs - bufferedDurationUs;
+      builder.append("calc speed: target [").append(WebUtil.us2s(mediaConfigurationTargetLiveOffsetUs));
+      builder.append(", ").append(WebUtil.us2s(minTargetLiveOffsetUs));
+      builder.append(", ").append(WebUtil.us2s(maxTargetLiveOffsetUs));
+      builder.append(", ").append(minPlaybackSpeed).append(", ").append(maxPlaybackSpeed);
+      builder.append(", ").append(WebUtil.us2s(targetLiveOffsetOverrideUs));
+      builder.append(", ").append(WebUtil.us2s(idealTargetLiveOffsetUs));
+      builder.append(", ").append(WebUtil.us2s(currentTargetLiveOffsetUs));
+      builder.append("], smooth [").append(WebUtil.us2s(liveOffsetUs));
+      builder.append(", ").append(WebUtil.us2s(bufferedDurationUs));
+      builder.append(", ").append(WebUtil.us2s(minPossibleLiveOffsetUs));
+      builder.append(", possible ").append(WebUtil.us2s(smoothedMinPossibleLiveOffsetUs));
+      builder.append(", ").append(WebUtil.us2s(abs(minPossibleLiveOffsetUs - smoothedMinPossibleLiveOffsetUs)));
+      builder.append(", deviation ").append(WebUtil.us2s(smoothedMinPossibleLiveOffsetDeviationUs));
+      builder.append("]");
+    }
+    adjustTargetLiveOffsetUs(liveOffsetUs, builder);
     long liveOffsetErrorUs = liveOffsetUs - currentTargetLiveOffsetUs;
     if (Math.abs(liveOffsetErrorUs) < maxLiveOffsetErrorUsForUnitSpeed) {
       adjustedPlaybackSpeed = 1f;
     } else {
       float calculatedSpeed = 1f + proportionalControlFactor * liveOffsetErrorUs;
+      // Slow the speed for the case buffer is not enough.
+      if (bufferedDurationUs < Math.max(minTargetLiveOffsetUs, 1_000_000)) {
+        calculatedSpeed = Math.min(adjustedPlaybackSpeed, calculatedSpeed);
+      }
       adjustedPlaybackSpeed =
           Util.constrainValue(calculatedSpeed, minPlaybackSpeed, maxPlaybackSpeed);
+    }
+    if (builder != null) {
+      builder.append(", current [").append(WebUtil.us2s(currentTargetLiveOffsetUs));
+      builder.append(", speed ").append(adjustedPlaybackSpeed);
+      builder.append("]");
+      Log.d(TAG, builder.toString());
     }
     return adjustedPlaybackSpeed;
   }
@@ -423,9 +457,23 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
               minPossibleLiveOffsetDeviationUs,
               minPossibleLiveOffsetSmoothingFactor);
     }
+    if (DEBUG_DETAIL && Log.isDebugEnabled()) {
+      StringBuilder builder = new StringBuilder(1024);
+      builder.append("update speed: smooth [current ").append(WebUtil.us2s(liveOffsetUs));
+      builder.append(", ").append(WebUtil.us2s(bufferedDurationUs));
+      builder.append(", ").append(WebUtil.us2s(minPossibleLiveOffsetUs));
+      builder.append(", possible ").append(WebUtil.us2s(smoothedMinPossibleLiveOffsetUs));
+      builder.append(", ").append(WebUtil.us2s(abs(minPossibleLiveOffsetUs - smoothedMinPossibleLiveOffsetUs)));
+      builder.append(", deviation ").append(WebUtil.us2s(smoothedMinPossibleLiveOffsetDeviationUs));
+      builder.append(", ").append(WebUtil.us2s(smoothedMinPossibleLiveOffsetUs + 3 * smoothedMinPossibleLiveOffsetDeviationUs));
+      builder.append(", speed ").append(adjustedPlaybackSpeed);
+      builder.append(", ").append(WebUtil.us2s(currentTargetLiveOffsetUs));
+      builder.append("]");
+      Log.d(TAG, builder.toString());
+    }
   }
 
-  private void adjustTargetLiveOffsetUs(long liveOffsetUs) {
+  private void adjustTargetLiveOffsetUs(long liveOffsetUs, StringBuilder builder) {
     // Stay in a safe distance (3 standard deviations = >99%) to the minimum possible live offset.
     long safeOffsetUs =
         smoothedMinPossibleLiveOffsetUs + 3 * smoothedMinPossibleLiveOffsetDeviationUs;
@@ -438,6 +486,15 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
           (long) ((adjustedPlaybackSpeed - 1f) * minUpdateIntervalUs);
       long decrementToIncreaseSpeedUs = (long) ((maxPlaybackSpeed - 1f) * minUpdateIntervalUs);
       long maxDecrementUs = decrementToOffsetCurrentSpeedUs + decrementToIncreaseSpeedUs;
+      if (builder != null) {
+        builder.append(", adjust [").append(WebUtil.us2s(currentTargetLiveOffsetUs));
+        builder.append("----max, v").append(WebUtil.us2s(safeOffsetUs));
+        builder.append(", v").append(WebUtil.us2s(idealTargetLiveOffsetUs));
+        builder.append(", v").append(WebUtil.us2s(currentTargetLiveOffsetUs - maxDecrementUs));
+        builder.append(", ").append(WebUtil.us2s(decrementToOffsetCurrentSpeedUs));
+        builder.append(", ").append(WebUtil.us2s(decrementToIncreaseSpeedUs));
+        builder.append("]");
+      }
       currentTargetLiveOffsetUs =
           max(safeOffsetUs, idealTargetLiveOffsetUs, currentTargetLiveOffsetUs - maxDecrementUs);
     } else {
@@ -446,6 +503,13 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
       // down gradually from the current offset.
       long offsetWhenSlowingDownNowUs =
           liveOffsetUs - (long) (max(0f, adjustedPlaybackSpeed - 1f) / proportionalControlFactor);
+      if (builder != null) {
+        builder.append(", adjust [").append(WebUtil.us2s(currentTargetLiveOffsetUs));
+        builder.append("++++, v").append(WebUtil.us2s(offsetWhenSlowingDownNowUs));
+        builder.append(", min ").append(WebUtil.us2s(currentTargetLiveOffsetUs));
+        builder.append(", max ").append(WebUtil.us2s(safeOffsetUs));
+        builder.append("]");
+      }
       currentTargetLiveOffsetUs =
           Util.constrainValue(offsetWhenSlowingDownNowUs, currentTargetLiveOffsetUs, safeOffsetUs);
       if (maxTargetLiveOffsetUs != C.TIME_UNSET

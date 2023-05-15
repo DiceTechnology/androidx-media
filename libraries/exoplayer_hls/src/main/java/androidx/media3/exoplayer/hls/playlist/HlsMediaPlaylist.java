@@ -26,6 +26,7 @@ import androidx.media3.common.C;
 import androidx.media3.common.DrmInitData;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.util.UnstableApi;
+import androidx.media3.common.util.Util;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -576,6 +577,19 @@ public final class HlsMediaPlaylist extends HlsPlaylist {
   /** Returns the result of adding the duration of the playlist to its start time. */
   public long getEndTimeUs() {
     return startTimeUs + durationUs;
+  }
+
+  public long getManifestLiveOffsetMs() {
+    long manifestLiveOffsetMs = C.TIME_UNSET;
+    if (serverControl == null) {
+      return manifestLiveOffsetMs;
+    } else if (serverControl.partHoldBackUs != C.TIME_UNSET
+        && partTargetDurationUs != C.TIME_UNSET) {
+      manifestLiveOffsetMs = Util.usToMs(serverControl.partHoldBackUs);
+    } else if (serverControl.holdBackUs != C.TIME_UNSET) {
+      manifestLiveOffsetMs = Util.usToMs(serverControl.holdBackUs);
+    }
+    return manifestLiveOffsetMs;
   }
 
   /**

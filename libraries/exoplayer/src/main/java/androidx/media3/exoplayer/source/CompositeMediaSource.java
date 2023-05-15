@@ -282,6 +282,14 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
     }
 
     @Override
+    public void onStreamLowLatency(
+        int windowIndex, @Nullable MediaPeriodId mediaPeriodId, long targetLiveOffsetMs, long partTargetDurationMs) {
+      if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {
+        mediaSourceEventDispatcher.streamLowLatency(targetLiveOffsetMs, partTargetDurationMs);
+      }
+    }
+
+    @Override
     public void onUpstreamDiscarded(
         int windowIndex, @Nullable MediaPeriodId mediaPeriodId, MediaLoadData mediaLoadData) {
       if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {

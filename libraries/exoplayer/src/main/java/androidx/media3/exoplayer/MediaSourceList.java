@@ -608,6 +608,23 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     }
 
     @Override
+    public void onStreamLowLatency(
+        int windowIndex,
+        @Nullable MediaSource.MediaPeriodId mediaPeriodId,
+        long targetLiveOffsetMs,
+        long partTargetDurationMs) {
+      @Nullable
+      Pair<Integer, MediaSource.@NullableType MediaPeriodId> eventParameters =
+          getEventParameters(windowIndex, mediaPeriodId);
+      if (eventParameters != null) {
+        eventHandler.post(
+            () ->
+                eventListener.onStreamLowLatency(
+                    eventParameters.first, eventParameters.second, targetLiveOffsetMs, partTargetDurationMs));
+      }
+    }
+
+    @Override
     public void onUpstreamDiscarded(
         int windowIndex,
         @Nullable MediaSource.MediaPeriodId mediaPeriodId,

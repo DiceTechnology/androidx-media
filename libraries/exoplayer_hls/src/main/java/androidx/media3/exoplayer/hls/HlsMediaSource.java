@@ -21,6 +21,7 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
 
 import android.os.Looper;
 import android.os.SystemClock;
+import android.util.Pair;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -29,6 +30,8 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaItem.LiveConfiguration;
 import androidx.media3.common.MediaLibraryInfo;
 import androidx.media3.common.StreamKey;
+import androidx.media3.common.endeavor.WebUtil;
+import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
@@ -37,6 +40,8 @@ import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider;
+import androidx.media3.exoplayer.endeavor.DebugUtil;
+import androidx.media3.exoplayer.endeavor.LiveEdgeManger;
 import androidx.media3.exoplayer.hls.playlist.DefaultHlsPlaylistParserFactory;
 import androidx.media3.exoplayer.hls.playlist.DefaultHlsPlaylistTracker;
 import androidx.media3.exoplayer.hls.playlist.FilteringHlsPlaylistParserFactory;
@@ -378,6 +383,7 @@ public final class HlsMediaSource extends BaseMediaSource
   private final HlsPlaylistTracker playlistTracker;
   private final long elapsedRealTimeOffsetMs;
   private final MediaItem mediaItem;
+  private final LiveEdgeManger edgeManger;
 
   private MediaItem.LiveConfiguration liveConfiguration;
   @Nullable private TransferListener mediaTransferListener;
@@ -407,6 +413,7 @@ public final class HlsMediaSource extends BaseMediaSource
     this.allowChunklessPreparation = allowChunklessPreparation;
     this.metadataType = metadataType;
     this.useSessionKeys = useSessionKeys;
+    this.edgeManger = new LiveEdgeManger();
   }
 
   @Override
@@ -496,13 +503,19 @@ public final class HlsMediaSource extends BaseMediaSource
     long periodDurationUs =
         playlist.hasEndTag ? offsetFromInitialStartTimeUs + playlist.durationUs : C.TIME_UNSET;
     long liveEdgeOffsetUs = getLiveEdgeOffsetUs(playlist);
+    Pair<Boolean, Long> edgeAdjuster = edgeManger.report(liveEdgeOffsetUs);
     long targetLiveOffsetUs;
-    if (liveConfiguration.targetOffsetMs != C.TIME_UNSET) {
+    if (liveConfiguration.targetOffsetMs != C.TIME_UNSET && !edgeAdjuster.first) {
       // Media item has a defined target offset.
       targetLiveOffsetUs = Util.msToUs(liveConfiguration.targetOffsetMs);
     } else {
       // Decide target offset from playlist.
-      targetLiveOffsetUs = getTargetLiveOffsetUs(playlist, liveEdgeOffsetUs);
+      targetLiveOffsetUs = getTargetLiveOffsetUs(playlist, edgeAdjuster.second);
+      if (DebugUtil.debug_lowlatency) {
+        Log.d(WebUtil.DEBUG, "Set HLS targetLiveOffsetUs to " + targetLiveOffsetUs
+            + " with applyEdgeOffsetUs " + edgeAdjuster.second
+            + ", liveEdgeOffsetUs " + liveEdgeOffsetUs);
+      }
     }
     // Ensure target live offset is within the live window and greater than the live edge offset.
     targetLiveOffsetUs =
@@ -607,8 +620,8 @@ public final class HlsMediaSource extends BaseMediaSource
     liveConfiguration =
         new LiveConfiguration.Builder()
             .setTargetOffsetMs(Util.usToMs(targetLiveOffsetUs))
-            .setMinPlaybackSpeed(disableSpeedAdjustment ? 1f : liveConfiguration.minPlaybackSpeed)
-            .setMaxPlaybackSpeed(disableSpeedAdjustment ? 1f : liveConfiguration.maxPlaybackSpeed)
+            .setMinPlaybackSpeed(disableSpeedAdjustment ? 1f : WebUtil.LOW_LATENCY_MIN_PLAYBACK_SPEED)
+            .setMaxPlaybackSpeed(disableSpeedAdjustment ? 1f : WebUtil.LOW_LATENCY_MAX_PLAYBACK_SPEED)
             .build();
   }
 

@@ -25,6 +25,7 @@ import android.os.SystemClock;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.ParserException;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -79,6 +80,8 @@ public final class DefaultHlsPlaylistTracker
   @Nullable private HlsMediaPlaylist primaryMediaPlaylistSnapshot;
   private boolean isLive;
   private long initialStartTimeUs;
+
+  private long manifestLiveOffsetMs;
 
   /**
    * Creates an instance.
@@ -225,7 +228,7 @@ public final class DefaultHlsPlaylistTracker
 
   @Override
   public void refreshPlaylist(Uri url) {
-    playlistBundles.get(url).loadPlaylist();
+    playlistBundles.get(url).resetLoadUntilMs().loadPlaylist();
   }
 
   @Override
@@ -355,6 +358,11 @@ public final class DefaultHlsPlaylistTracker
       // referenced directly by a variant, or it the last primary snapshot contains an end tag.
       return;
     }
+
+    MediaPlaylistBundle bundle = playlistBundles.get(primaryMediaPlaylistUrl);
+    if (bundle != null) {
+      bundle.resetLoadUntilMs();
+    }
     primaryMediaPlaylistUrl = url;
     MediaPlaylistBundle newPrimaryBundle = playlistBundles.get(primaryMediaPlaylistUrl);
     @Nullable HlsMediaPlaylist newPrimarySnapshot = newPrimaryBundle.playlistSnapshot;
@@ -365,6 +373,14 @@ public final class DefaultHlsPlaylistTracker
       // The snapshot for the new primary media playlist URL may be stale. Defer updating the
       // primary snapshot until after we've refreshed it.
       newPrimaryBundle.loadPlaylistInternal(getRequestUriForPrimaryChange(url));
+    }
+  }
+
+  private void maybeNotifyLowLatency(HlsMediaPlaylist playlist) {
+    long manifestLiveOffsetMs = playlist.getManifestLiveOffsetMs();
+    if (this.manifestLiveOffsetMs != manifestLiveOffsetMs) {
+      this.manifestLiveOffsetMs = manifestLiveOffsetMs;
+      eventDispatcher.streamLowLatency(manifestLiveOffsetMs, Util.usToMs(playlist.partTargetDurationUs));
     }
   }
 
@@ -528,6 +544,8 @@ public final class DefaultHlsPlaylistTracker
     private long excludeUntilMs;
     private boolean loadPending;
     @Nullable private IOException playlistError;
+
+    private long loadUntilMs;
 
     public MediaPlaylistBundle(Uri playlistUrl) {
       this.playlistUrl = playlistUrl;
@@ -723,6 +741,7 @@ public final class DefaultHlsPlaylistTracker
       if (playlistSnapshot != oldPlaylist) {
         playlistError = null;
         lastSnapshotChangeMs = currentTimeMs;
+        maybeNotifyLowLatency(playlistSnapshot);
         onPlaylistUpdated(playlistUrl, playlistSnapshot);
       } else if (!playlistSnapshot.hasEndTag) {
         boolean forceRetry = false;
@@ -766,7 +785,7 @@ public final class DefaultHlsPlaylistTracker
       // it doesn't have an end tag. Else the next load will be scheduled when refreshPlaylist is
       // called, or when this playlist becomes the primary.
       boolean scheduleLoad =
-          playlistSnapshot.partTargetDurationUs != C.TIME_UNSET
+          (playlistSnapshot.partTargetDurationUs != C.TIME_UNSET && shouldContinueLoad())
               || playlistUrl.equals(primaryMediaPlaylistUrl);
       if (scheduleLoad && !playlistSnapshot.hasEndTag) {
         loadPlaylistInternal(getMediaPlaylistUriForReload());
@@ -811,6 +830,19 @@ public final class DefaultHlsPlaylistTracker
     private boolean excludePlaylist(long exclusionDurationMs) {
       excludeUntilMs = SystemClock.elapsedRealtime() + exclusionDurationMs;
       return playlistUrl.equals(primaryMediaPlaylistUrl) && !maybeSelectNewPrimaryUrl();
+    }
+
+    private MediaPlaylistBundle resetLoadUntilMs() {
+      loadUntilMs = SystemClock.elapsedRealtime() + WebUtil.MANIFEST_LOAD_UNTIL_MS;
+      return this;
+    }
+
+    private boolean shouldContinueLoad() {
+      boolean result = (playlistUrl.equals(primaryMediaPlaylistUrl) || loadUntilMs == 0 || SystemClock.elapsedRealtime() < loadUntilMs);
+      if (!result) {
+        playlistSnapshot = null;
+      }
+      return result;
     }
   }
 

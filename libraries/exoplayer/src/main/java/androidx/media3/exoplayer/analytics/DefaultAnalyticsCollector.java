@@ -452,6 +452,16 @@ public class DefaultAnalyticsCollector implements AnalyticsCollector {
   }
 
   @Override
+  public final void onStreamLowLatency(
+      int windowIndex, @Nullable MediaPeriodId mediaPeriodId, long targetLiveOffsetMs, long partTargetDurationMs) {
+    EventTime eventTime = generateMediaPeriodEventTime(windowIndex, mediaPeriodId);
+    sendEvent(
+        eventTime,
+        AnalyticsListener.EVENT_STREAM_LOW_LATENCY,
+        listener -> listener.onStreamLowLatency(eventTime, targetLiveOffsetMs, partTargetDurationMs));
+  }
+
+  @Override
   public final void onUpstreamDiscarded(
       int windowIndex, @Nullable MediaPeriodId mediaPeriodId, MediaLoadData mediaLoadData) {
     EventTime eventTime = generateMediaPeriodEventTime(windowIndex, mediaPeriodId);
