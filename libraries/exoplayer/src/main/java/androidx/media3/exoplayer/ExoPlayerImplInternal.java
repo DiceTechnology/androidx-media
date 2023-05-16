@@ -44,6 +44,7 @@ import androidx.media3.common.Player.PlayWhenReadyChangeReason;
 import androidx.media3.common.Player.PlaybackSuppressionReason;
 import androidx.media3.common.Player.RepeatMode;
 import androidx.media3.common.Timeline;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Clock;
 import androidx.media3.common.util.HandlerWrapper;
@@ -55,6 +56,7 @@ import androidx.media3.exoplayer.DefaultMediaClock.PlaybackParametersListener;
 import androidx.media3.exoplayer.analytics.AnalyticsCollector;
 import androidx.media3.exoplayer.analytics.PlayerId;
 import androidx.media3.exoplayer.drm.DrmSession;
+import androidx.media3.exoplayer.endeavor.DebugUtil;
 import androidx.media3.exoplayer.metadata.MetadataRenderer;
 import androidx.media3.exoplayer.source.BehindLiveWindowException;
 import androidx.media3.exoplayer.source.MediaPeriod;
@@ -946,6 +948,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
           livePlaybackSpeedControl.getAdjustedPlaybackSpeed(
               getCurrentLiveOffsetUs(), getTotalBufferedDurationUs());
       if (mediaClock.getPlaybackParameters().speed != adjustedSpeed) {
+        debugSpeedControl(mediaClock.getPlaybackParameters().speed, adjustedSpeed);
         setMediaClockPlaybackParameters(playbackInfo.playbackParameters.withSpeed(adjustedSpeed));
         handlePlaybackParameters(
             playbackInfo.playbackParameters,
@@ -954,6 +957,47 @@ import java.util.concurrent.atomic.AtomicBoolean;
             /* acknowledgeCommand= */ false);
       }
     }
+  }
+
+  private void debugSpeedControl(float oldSpeed, float newSpeed) {
+    if (!DebugUtil.debug_lowlatency || !Log.isDebugEnabled()) {
+      return;
+    }
+
+    StringBuilder builder = new StringBuilder();
+    long nowMs = window.getCurrentUnixTimeMs(), winsMs = window.windowStartTimeMs, winUs = period.getPositionInWindowUs();
+    builder.append(String.format("adjust speed: [%.3f -> %.3f]", oldSpeed, newSpeed));
+    builder.append(", playback [").append(WebUtil.time(nowMs));
+    builder.append(", ").append(WebUtil.us2s(playbackInfo.positionUs));
+    builder.append(", ").append(WebUtil.us2s(queue.getLoadingPeriod().toPeriodTime(rendererPositionUs)));
+    builder.append(", ").append(WebUtil.time(winsMs));
+    builder.append(", ").append(WebUtil.us2s(winUs));
+    builder.append(", ").append(WebUtil.us2s(playbackInfo.bufferedPositionUs));
+    builder.append("]");
+
+    boolean same = playbackInfo.loadingMediaPeriodId.periodUid.equals(playbackInfo.periodId.periodUid);
+    long loadPosUs = playbackInfo.bufferedPositionUs, playPosUs = playbackInfo.positionUs;
+    playbackInfo.timeline.getPeriodByUid(playbackInfo.loadingMediaPeriodId.periodUid, period);
+    playbackInfo.timeline.getWindow(period.windowIndex, window);
+    long windowStartMs = window.windowStartTimeMs, baseUs = Util.msToUs(windowStartMs) + period.getPositionInWindowUs();
+    long loadWallMs = baseUs + loadPosUs, playWallUs = baseUs + playPosUs;
+    if (!same) {
+      playbackInfo.timeline.getPeriodByUid(playbackInfo.periodId.periodUid, period);
+      playbackInfo.timeline.getWindow(period.windowIndex, window);
+      windowStartMs = window.windowStartTimeMs;
+      playWallUs = Util.msToUs(windowStartMs) + period.getPositionInWindowUs() + playPosUs;
+      nowMs = window.getCurrentUnixTimeMs();
+    }
+
+    builder.append(", renderer ").append(WebUtil.us2s(rendererPositionUs));
+    builder.append(", loadWallUs ").append(WebUtil.stime0(loadWallMs / 1000));
+    builder.append(", playWallUs ").append(WebUtil.stime0(playWallUs / 1000));
+    builder.append(", windowMs ").append(WebUtil.stime0(windowStartMs));
+    builder.append(", eqs ").append(queue.getPlayingPeriod() == queue.getLoadingPeriod());
+    builder.append(", now ").append(WebUtil.stime0(nowMs)).append("[").append(WebUtil.ms2s(nowMs - System.currentTimeMillis())).append("]");
+    builder.append(", buffer0 ").append(WebUtil.us2s(loadWallMs - playWallUs));
+    builder.append(", speed0 ").append(mediaClock.getPlaybackParameters().speed);
+    Log.d(DefaultLivePlaybackSpeedControl.TAG, builder.toString());
   }
 
   private void setMediaClockPlaybackParameters(PlaybackParameters playbackParameters) {

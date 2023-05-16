@@ -123,7 +123,7 @@ public final class Log {
   private static final Object lock = new Object();
 
   @GuardedBy("lock")
-  private static int logLevel = LOG_LEVEL_ALL;
+  private static int logLevel = LOG_LEVEL_WARNING;
 
   @GuardedBy("lock")
   private static boolean logStackTraces = true;
@@ -173,6 +173,14 @@ public final class Log {
     synchronized (lock) {
       Log.logger = logger;
     }
+  }
+
+  public static boolean isDebugEnabled() {
+    return logLevel == LOG_LEVEL_ALL;
+  }
+
+  public static boolean isInfoEnabled() {
+    return logLevel <= LOG_LEVEL_INFO;
   }
 
   /**

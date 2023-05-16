@@ -230,6 +230,7 @@ public interface AnalyticsListener {
     EVENT_DRM_KEYS_REMOVED,
     EVENT_DRM_SESSION_RELEASED,
     EVENT_PLAYER_RELEASED,
+    EVENT_STREAM_LOW_LATENCY,
     EVENT_AUDIO_CODEC_ERROR,
     EVENT_VIDEO_CODEC_ERROR,
   })
@@ -372,6 +373,8 @@ public interface AnalyticsListener {
   @UnstableApi int EVENT_AUDIO_CODEC_ERROR = 1029;
   /** The video codec encountered an error. */
   @UnstableApi int EVENT_VIDEO_CODEC_ERROR = 1030;
+
+  int EVENT_STREAM_LOW_LATENCY = 10001;
 
   /** Time information of an event. */
   @UnstableApi
@@ -832,6 +835,15 @@ public interface AnalyticsListener {
       MediaLoadData mediaLoadData,
       IOException error,
       boolean wasCanceled) {}
+
+  /**
+   * Called when the low latency flag is found or changed from a manifest first time.
+   *
+   * @param eventTime The event time.
+   * @param targetLiveOffsetMs The target live offset with milliseconds.
+   * @param partTargetDurationMs The part target duration with milliseconds.
+   */
+  default void onStreamLowLatency(EventTime eventTime, long targetLiveOffsetMs, long partTargetDurationMs) {}
 
   /**
    * Called when the downstream format sent to the renderers changed.

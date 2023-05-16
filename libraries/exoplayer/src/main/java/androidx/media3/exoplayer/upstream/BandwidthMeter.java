@@ -106,6 +106,14 @@ public interface BandwidthMeter {
   /** Returns the estimated bitrate. */
   long getBitrateEstimate();
 
+  /** Set current bandwidth meter is under low latency stream or not. */
+  default void setLowLatencyMode(boolean lowLatencyMode) {}
+
+  /** Current bandwidth meter is under low latency stream or not. */
+  default boolean useLowLatencyMode() {
+    return false;
+  }
+
   /**
    * Returns the estimated time to first byte, in microseconds, or {@link C#TIME_UNSET} if no
    * estimate is available.

@@ -293,6 +293,7 @@ public final class DefaultBandwidthMeter implements BandwidthMeter, TransferList
   private long totalBytesTransferred;
   private long bitrateEstimate;
   private long lastReportedBitrateEstimate;
+  private boolean isLowLatencyMode;
 
   private boolean networkTypeOverrideSet;
   private @C.NetworkType int networkTypeOverride;
@@ -349,6 +350,16 @@ public final class DefaultBandwidthMeter implements BandwidthMeter, TransferList
   @Override
   public synchronized long getBitrateEstimate() {
     return bitrateEstimate;
+  }
+
+  @Override
+  public void setLowLatencyMode(boolean lowLatencyMode) {
+    isLowLatencyMode = lowLatencyMode;
+  }
+
+  @Override
+  public boolean useLowLatencyMode() {
+    return isLowLatencyMode;
   }
 
   @Override
@@ -474,6 +485,11 @@ public final class DefaultBandwidthMeter implements BandwidthMeter, TransferList
   }
 
   private static boolean isTransferAtFullNetworkSpeed(DataSpec dataSpec, boolean isNetwork) {
+    if (true) {
+      // For low latency streams, manifest and preloading part may be blocked.
+      // But we also need these inaccurate data as a reference.
+      return isNetwork;
+    }
     return isNetwork && !dataSpec.isFlagSet(DataSpec.FLAG_MIGHT_NOT_USE_FULL_NETWORK_SPEED);
   }
 

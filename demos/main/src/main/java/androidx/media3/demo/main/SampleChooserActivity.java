@@ -100,6 +100,9 @@ public class SampleChooserActivity extends AppCompatActivity
     sampleListView.setAdapter(sampleAdapter);
     sampleListView.setOnChildClickListener(this);
 
+    // Global Setting.
+    Log.setLogLevel(Log.LOG_LEVEL_ALL);
+
     Intent intent = getIntent();
     String dataUri = intent.getDataString();
     if (dataUri != null) {

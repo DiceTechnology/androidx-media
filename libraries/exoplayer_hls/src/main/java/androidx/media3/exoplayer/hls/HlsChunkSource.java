@@ -28,6 +28,7 @@ import androidx.annotation.VisibleForTesting;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.TrackGroup;
+import androidx.media3.common.util.Log;
 import androidx.media3.common.util.TimestampAdjuster;
 import androidx.media3.common.util.UriUtil;
 import androidx.media3.common.util.Util;
@@ -335,8 +336,9 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       // The playlist did not change and the part in the new playlist is still a preload hint.
       return CHUNK_PUBLICATION_STATE_PRELOAD;
     }
+    boolean sameDiscontinuitySequence = (mediaPlaylist.discontinuitySequence + newPart.relativeDiscontinuitySequence) == mediaChunk.discontinuitySequenceNumber;
     Uri newUri = Uri.parse(UriUtil.resolve(mediaPlaylist.baseUri, newPart.url));
-    return Util.areEqual(newUri, mediaChunk.dataSpec.uri)
+    return Util.areEqual(newUri, mediaChunk.dataSpec.uri) && sameDiscontinuitySequence
         ? CHUNK_PUBLICATION_STATE_PUBLISHED
         : CHUNK_PUBLICATION_STATE_REMOVED;
   }
@@ -385,10 +387,11 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     }
 
     // Select the track.
+    trackSelection.useTwoPhaseSwitch();
     MediaChunkIterator[] mediaChunkIterators = createMediaChunkIterators(previous, loadPositionUs);
     trackSelection.updateSelectedTrack(
         playbackPositionUs, bufferedDurationUs, timeToLiveEdgeUs, queue, mediaChunkIterators);
-    int selectedTrackIndex = trackSelection.getSelectedIndexInTrackGroup();
+    int selectedTrackIndex = trackSelection.getSelectingIndexInTrackGroup();
     boolean switchingTrack = oldTrackIndex != selectedTrackIndex;
     Uri selectedPlaylistUrl = playlistUrls[selectedTrackIndex];
     if (!playlistTracker.isSnapshotValid(selectedPlaylistUrl)) {
@@ -400,7 +403,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     }
     @Nullable
     HlsMediaPlaylist playlist =
-        playlistTracker.getPlaylistSnapshot(selectedPlaylistUrl, /* isForPlayback= */ true);
+        playlistTracker.getPlaylistSnapshot(selectedPlaylistUrl, /* isForPlayback= */ false);
     // playlistTracker snapshot is valid (checked by if() above), so playlist must be non-null.
     checkNotNull(playlist);
     independentSegments = playlist.hasIndependentSegments;
@@ -411,9 +414,14 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     long startOfPlaylistInPeriodUs = playlist.startTimeUs - playlistTracker.getInitialStartTimeUs();
     Pair<Long, Integer> nextMediaSequenceAndPartIndex =
         getNextMediaSequenceAndPartIndex(
-            previous, switchingTrack, playlist, startOfPlaylistInPeriodUs, loadPositionUs);
+            previous, switchingTrack, playlist, startOfPlaylistInPeriodUs, loadPositionUs, true);
+    if (nextMediaSequenceAndPartIndex == null) {
+      out.playlistUrl = selectedPlaylistUrl;
+      return;
+    }
     long chunkMediaSequence = nextMediaSequenceAndPartIndex.first;
     int partIndex = nextMediaSequenceAndPartIndex.second;
+    boolean completeTwoPhaseSwitch = true;
     if (chunkMediaSequence < playlist.mediaSequence && previous != null && switchingTrack) {
       // We try getting the next chunk without adapting in case that's the reason for falling
       // behind the live window.
@@ -423,6 +431,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
           playlistTracker.getPlaylistSnapshot(selectedPlaylistUrl, /* isForPlayback= */ true);
       // playlistTracker snapshot is valid (checked by if() above), so playlist must be non-null.
       checkNotNull(playlist);
+      updateLiveEdgeTimeUs(playlist);
       startOfPlaylistInPeriodUs = playlist.startTimeUs - playlistTracker.getInitialStartTimeUs();
       // Get the next segment/part without switching tracks.
       Pair<Long, Integer> nextMediaSequenceAndPartIndexWithoutAdapting =
@@ -431,9 +440,11 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
               /* switchingTrack= */ false,
               playlist,
               startOfPlaylistInPeriodUs,
-              loadPositionUs);
+              loadPositionUs,
+              false);
       chunkMediaSequence = nextMediaSequenceAndPartIndexWithoutAdapting.first;
       partIndex = nextMediaSequenceAndPartIndexWithoutAdapting.second;
+      completeTwoPhaseSwitch = false;
     }
 
     if (chunkMediaSequence < playlist.mediaSequence) {
@@ -466,18 +477,26 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     // We have a valid media segment, we can discard any playlist errors at this point.
     seenExpectedPlaylistError = false;
     expectedPlaylistUrl = null;
+    if (completeTwoPhaseSwitch) {
+      trackSelection.completeTwoPhaseSwitch();
+      HlsMediaPlaylist mediaPlaylist = playlistTracker.getPlaylistSnapshot(selectedPlaylistUrl, /* isForPlayback= */ true);
+      // playlistTracker snapshot is valid (checked by if() above), so mediaPlaylist must be non-null.
+      checkNotNull(mediaPlaylist);
+      independentSegments = mediaPlaylist.hasIndependentSegments;
+      updateLiveEdgeTimeUs(mediaPlaylist);
+    }
 
     // Check if the media segment or its initialization segment are fully encrypted.
     @Nullable
     Uri initSegmentKeyUri =
         getFullEncryptionKeyUri(playlist, segmentBaseHolder.segmentBase.initializationSegment);
-    out.chunk = maybeCreateEncryptionChunkFor(initSegmentKeyUri, selectedTrackIndex);
+    out.chunk = maybeCreateEncryptionChunkFor(initSegmentKeyUri, selectedTrackIndex, true);
     if (out.chunk != null) {
       return;
     }
     @Nullable
     Uri mediaSegmentKeyUri = getFullEncryptionKeyUri(playlist, segmentBaseHolder.segmentBase);
-    out.chunk = maybeCreateEncryptionChunkFor(mediaSegmentKeyUri, selectedTrackIndex);
+    out.chunk = maybeCreateEncryptionChunkFor(mediaSegmentKeyUri, selectedTrackIndex, false);
     if (out.chunk != null) {
       return;
     }
@@ -525,6 +544,10 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
           : null;
     }
 
+    if (segmentIndexInPlaylist > mediaPlaylist.segments.size() || segmentIndexInPlaylist < 0) {
+      return null;
+    }
+
     Segment mediaSegment = mediaPlaylist.segments.get(segmentIndexInPlaylist);
     if (nextPartIndex == C.INDEX_UNSET) {
       return new SegmentBaseHolder(mediaSegment, nextMediaSequence, /* partIndex= */ C.INDEX_UNSET);
@@ -561,6 +584,19 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       scratchSpace = encryptionKeyChunk.getDataHolder();
       keyCache.put(encryptionKeyChunk.dataSpec.uri, checkNotNull(encryptionKeyChunk.getResult()));
     }
+  }
+
+  protected long getPartTargetDurationUs() {
+    long durationUs = C.TIME_UNSET;
+    if (trackSelection != null && playlistTracker != null) {
+      int selectedTrackIndex = trackSelection.getSelectingIndexInTrackGroup();
+      Uri selectedPlaylistUrl = playlistUrls[selectedTrackIndex];
+      HlsMediaPlaylist mediaPlaylist = playlistTracker.getPlaylistSnapshot(selectedPlaylistUrl, false);
+      if (mediaPlaylist != null) {
+        durationUs = mediaPlaylist.partTargetDurationUs;
+      }
+    }
+    return durationUs;
   }
 
   /**
@@ -634,7 +670,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       boolean switchingTrack = trackIndex != oldTrackIndex;
       Pair<Long, Integer> chunkMediaSequenceAndPartIndex =
           getNextMediaSequenceAndPartIndex(
-              previous, switchingTrack, playlist, startOfPlaylistInPeriodUs, loadPositionUs);
+              previous, switchingTrack, playlist, startOfPlaylistInPeriodUs, loadPositionUs, false);
       long chunkMediaSequence = chunkMediaSequenceAndPartIndex.first;
       int partIndex = chunkMediaSequenceAndPartIndex.second;
       chunkIterators[i] =
@@ -745,6 +781,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
    * @param startOfPlaylistInPeriodUs The start of {@code mediaPlaylist} relative to the period
    *     start in microseconds.
    * @param loadPositionUs The current load position relative to the period start in microseconds.
+   * @param checkPartIndependent Should check part is independent or not
    * @return The media sequence and part index to load.
    */
   private Pair<Long, Integer> getNextMediaSequenceAndPartIndex(
@@ -752,8 +789,53 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       boolean switchingTrack,
       HlsMediaPlaylist mediaPlaylist,
       long startOfPlaylistInPeriodUs,
-      long loadPositionUs) {
+      long loadPositionUs,
+      boolean checkPartIndependent) {
     if (previous == null || switchingTrack) {
+      if (previous != null) {
+        long mediaSequence = previous.chunkIndex;
+        int partIndex = previous.partIndex;
+        if (previous.isLoadCompleted()) {
+          if (partIndex == C.INDEX_UNSET) {
+            mediaSequence = previous.getNextChunkIndex();
+          } else {
+            partIndex += 1;
+          }
+        }
+
+        // while switching, we should check the part is independent or not, for preload hint we wait it change to part.
+        int segments = mediaPlaylist.segments.size();
+        if (checkPartIndependent && segments > 0 && mediaPlaylist.partTargetDurationUs != C.TIME_UNSET) {
+          HlsMediaPlaylist.Part part = null;
+          int segIndex = (int) (mediaSequence - mediaPlaylist.mediaSequence);
+          if (segIndex == segments) {
+            int index = partIndex != C.INDEX_UNSET ? partIndex : 0;
+            if (index < mediaPlaylist.trailingParts.size()) {
+              part = mediaPlaylist.trailingParts.get(index);
+            }
+          } else if (segIndex < segments && segIndex >= 0 && partIndex != C.INDEX_UNSET) {
+            Segment mediaSegment = mediaPlaylist.segments.get(segIndex);
+            if (partIndex < mediaSegment.parts.size()) {
+              part = mediaSegment.parts.get(partIndex);
+            } else if (segIndex + 1 == segments && !mediaPlaylist.trailingParts.isEmpty()) {
+              part = mediaPlaylist.trailingParts.get(0);
+            }
+          }
+          if (part != null) {
+            // for part, return null for preload hint, C.TIME_UNSET for independent part
+            if (part.isPreload) {
+              return null;
+            }
+            if (part.isIndependent) {
+              Log.d("HlsChunkSource", "switch-part-independent, " + mediaSequence + ":" + partIndex + " - " + part.url);
+            } else {
+              Log.d("HlsChunkSource", "#switch-wait-next-independent, " + mediaSequence + ":" + partIndex + " - " + part.url);
+              return new Pair<>(C.TIME_UNSET, C.INDEX_UNSET);
+            }
+          }
+        }
+        return new Pair<>(mediaSequence, partIndex);
+      }
       long endOfPlaylistInPeriodUs = startOfPlaylistInPeriodUs + mediaPlaylist.durationUs;
       long targetPositionInPeriodUs =
           (previous == null || independentSegments) ? loadPositionUs : previous.startTimeUs;
@@ -818,7 +900,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   }
 
   @Nullable
-  private Chunk maybeCreateEncryptionChunkFor(@Nullable Uri keyUri, int selectedTrackIndex) {
+  private Chunk maybeCreateEncryptionChunkFor(@Nullable Uri keyUri, int selectedTrackIndex, boolean initSegment) {
     if (keyUri == null) {
       return null;
     }

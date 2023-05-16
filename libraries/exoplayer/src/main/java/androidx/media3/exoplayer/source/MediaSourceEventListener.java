@@ -122,6 +122,16 @@ public interface MediaSourceEventListener {
       boolean wasCanceled) {}
 
   /**
+   * Called when the low latency flag is found or changed from a manifest first time.
+   *
+   * @param windowIndex The window index in the timeline of the media source this load belongs to.
+   * @param mediaPeriodId The {@link MediaPeriodId} the media belongs to.
+   * @param targetLiveOffsetMs The target live offset with milliseconds.
+   * @param partTargetDurationMs The part target duration with milliseconds.
+   */
+  default void onStreamLowLatency(int windowIndex, @Nullable MediaPeriodId mediaPeriodId, long targetLiveOffsetMs, long partTargetDurationMs) {}
+
+  /**
    * Called when data is removed from the back of a media buffer, typically so that it can be
    * re-buffered in a different format.
    *
@@ -419,6 +429,15 @@ public interface MediaSourceEventListener {
             () ->
                 listener.onLoadError(
                     windowIndex, mediaPeriodId, loadEventInfo, mediaLoadData, error, wasCanceled));
+      }
+    }
+
+    public void streamLowLatency(long targetLiveOffsetMs, long partTargetDurationMs) {
+      for (ListenerAndHandler listenerAndHandler : listenerAndHandlers) {
+        MediaSourceEventListener listener = listenerAndHandler.listener;
+        postOrRun(
+            listenerAndHandler.handler,
+            () -> listener.onStreamLowLatency(windowIndex, mediaPeriodId, targetLiveOffsetMs, partTargetDurationMs));
       }
     }
 

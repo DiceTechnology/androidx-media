@@ -27,6 +27,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.Pair;
 import android.util.SparseArray;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
@@ -37,6 +38,7 @@ import androidx.media3.common.ParserException;
 import androidx.media3.common.Player;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.Timeline;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
@@ -54,6 +56,8 @@ import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider;
+import androidx.media3.exoplayer.endeavor.DebugUtil;
+import androidx.media3.exoplayer.endeavor.LiveEdgeManger;
 import androidx.media3.exoplayer.offline.FilteringManifestParser;
 import androidx.media3.exoplayer.source.BaseMediaSource;
 import androidx.media3.exoplayer.source.CompositeSequenceableLoaderFactory;
@@ -361,6 +365,7 @@ public final class DashMediaSource extends BaseMediaSource {
   private final Runnable simulateManifestRefreshRunnable;
   private final PlayerEmsgCallback playerEmsgCallback;
   private final LoaderErrorThrower manifestLoadErrorThrower;
+  private final LiveEdgeManger edgeManger;
 
   private DataSource dataSource;
   private Loader loader;
@@ -383,6 +388,8 @@ public final class DashMediaSource extends BaseMediaSource {
 
   private int firstPeriodId;
 
+  private long manifestLiveOffsetMs;
+  
   private DashMediaSource(
       MediaItem mediaItem,
       @Nullable DashManifest manifest,
@@ -425,6 +432,7 @@ public final class DashMediaSource extends BaseMediaSource {
       refreshManifestRunnable = this::startLoadingManifest;
       simulateManifestRefreshRunnable = () -> processManifest(false);
     }
+    edgeManger = new LiveEdgeManger();
   }
 
   /**
@@ -436,6 +444,26 @@ public final class DashMediaSource extends BaseMediaSource {
     synchronized (manifestUriLock) {
       this.manifestUri = manifestUri;
       this.initialManifestUri = manifestUri;
+    }
+  }
+
+  private void maybeNotifyLowLatency() {
+    long manifestLiveOffsetMs = (manifest.serviceDescription == null ? C.TIME_UNSET : manifest.serviceDescription.targetOffsetMs);
+    if (this.manifestLiveOffsetMs != manifestLiveOffsetMs) {
+      this.manifestLiveOffsetMs = manifestLiveOffsetMs;
+
+      int idx = manifest.getPeriodCount() - 1;
+      long durUs = manifest.getPeriodDurationUs(idx), partTargetDurationMs = C.TIME_UNSET;
+      Period period = manifest.getPeriod(idx);
+      int videoIndex = period.getAdaptationSetIndex(C.TRACK_TYPE_VIDEO);
+      if (videoIndex != C.INDEX_UNSET) {
+        DashSegmentIndex index = period.adaptationSets.get(videoIndex).representations.get(0).getIndex();
+        if (index != null) {
+          long first = index.getFirstAvailableSegmentNum(durUs, Util.msToUs(Util.getNowUnixTimeMs(elapsedRealtimeOffsetMs)));
+          partTargetDurationMs = Util.usToMs(index.getDurationUs(first, durUs));
+        }
+      }
+      manifestEventDispatcher.streamLowLatency(manifestLiveOffsetMs, Math.max(1000, partTargetDurationMs));
     }
   }
 
@@ -885,6 +913,26 @@ public final class DashMediaSource extends BaseMediaSource {
     }
   }
 
+  /**
+   * Gets the target live offset, in milliseconds, for a live playlist.
+   *
+   * @param liveEdgeOffsetMs The current live edge offset.
+   * @return The selected target live offset, in milliseconds.
+   */
+  private long getTargetLiveOffsetMs(long liveEdgeOffsetMs) {
+    long targetOffsetMs;
+    if (manifest.serviceDescription != null
+        && manifest.serviceDescription.targetOffsetMs != C.TIME_UNSET) {
+      targetOffsetMs = manifest.serviceDescription.targetOffsetMs;
+    } else if (manifest.suggestedPresentationDelayMs != C.TIME_UNSET) {
+      targetOffsetMs = manifest.suggestedPresentationDelayMs;
+    } else {
+      targetOffsetMs = fallbackTargetLiveOffsetMs;
+    }
+    // similar to HlsMediaSource, we add liveEdgeOffsetMs to targetOffsetMs
+    return targetOffsetMs + liveEdgeOffsetMs;
+  }
+
   private void updateLiveConfiguration(long nowInWindowUs, long windowDurationUs) {
     // Default maximum offset: start of window.
     long maxPossibleLiveOffsetMs = usToMs(nowInWindowUs);
@@ -924,18 +972,21 @@ public final class DashMediaSource extends BaseMediaSource {
       // under the assumption that it is safer for playback.
       maxLiveOffsetMs = minLiveOffsetMs;
     }
+    long liveEdgeOffsetUs = nowInWindowUs - windowDurationUs;
+    Pair<Boolean, Long> edgeAdjuster = edgeManger.report(liveEdgeOffsetUs);
     long targetOffsetMs;
-    if (liveConfiguration.targetOffsetMs != C.TIME_UNSET) {
+    if (liveConfiguration.targetOffsetMs != C.TIME_UNSET && !edgeAdjuster.first) {
       // Keep existing target offset even if the media configuration changes.
       targetOffsetMs = liveConfiguration.targetOffsetMs;
-    } else if (manifest.serviceDescription != null
-        && manifest.serviceDescription.targetOffsetMs != C.TIME_UNSET) {
-      targetOffsetMs = manifest.serviceDescription.targetOffsetMs;
-    } else if (manifest.suggestedPresentationDelayMs != C.TIME_UNSET) {
-      targetOffsetMs = manifest.suggestedPresentationDelayMs;
     } else {
-      targetOffsetMs = fallbackTargetLiveOffsetMs;
+      targetOffsetMs = getTargetLiveOffsetMs(Util.usToMs(edgeAdjuster.second));
+      if (DebugUtil.debug_lowlatency) {
+        Log.d(WebUtil.DEBUG, "Set DASH targetLiveOffsetMs to " + targetOffsetMs
+            + " with applyEdgeOffsetUs " + edgeAdjuster.second
+            + ", liveEdgeOffsetUs " + liveEdgeOffsetUs);
+      }
     }
+
     if (targetOffsetMs < minLiveOffsetMs) {
       targetOffsetMs = minLiveOffsetMs;
     }
@@ -948,6 +999,8 @@ public final class DashMediaSource extends BaseMediaSource {
           constrainValue(
               maxTargetOffsetForSafeDistanceToWindowStartMs, minLiveOffsetMs, maxLiveOffsetMs);
     }
+
+    maybeNotifyLowLatency();
     float minPlaybackSpeed = C.RATE_UNSET;
     if (mediaItem.liveConfiguration.minPlaybackSpeed != C.RATE_UNSET) {
       minPlaybackSpeed = mediaItem.liveConfiguration.minPlaybackSpeed;
@@ -959,6 +1012,14 @@ public final class DashMediaSource extends BaseMediaSource {
       maxPlaybackSpeed = mediaItem.liveConfiguration.maxPlaybackSpeed;
     } else if (manifest.serviceDescription != null) {
       maxPlaybackSpeed = manifest.serviceDescription.maxPlaybackSpeed;
+    }
+    if (manifestLiveOffsetMs != C.TIME_UNSET) {
+      if (minPlaybackSpeed == C.RATE_UNSET) {
+        minPlaybackSpeed = WebUtil.LOW_LATENCY_MIN_PLAYBACK_SPEED;
+      }
+      if (maxPlaybackSpeed == C.RATE_UNSET) {
+        maxPlaybackSpeed = WebUtil.LOW_LATENCY_MAX_PLAYBACK_SPEED;
+      }
     }
     if (minPlaybackSpeed == C.RATE_UNSET
         && maxPlaybackSpeed == C.RATE_UNSET

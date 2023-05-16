@@ -437,6 +437,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
               C.TIME_UNSET,
               readOnlyMediaChunks,
               mediaChunkIterators);
+          primaryTrackSelection.completeTwoPhaseSwitch();
           int chunkIndex = chunkSource.getTrackGroup().indexOf(lastMediaChunk.trackFormat);
           if (primaryTrackSelection.getSelectedIndexInTrackGroup() != chunkIndex) {
             // This is the first selection and the chunk loaded during preparation does not match
@@ -524,15 +525,25 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     if (mediaChunks.isEmpty()) {
       return;
     }
-    HlsMediaChunk lastMediaChunk = Iterables.getLast(mediaChunks);
+    int sz = mediaChunks.size();
+    for (int i = 0; i < sz; i++) {
+      checkPublish(mediaChunks.get(i), i == sz - 1);
+    }
+  }
+
+  private void checkPublish(HlsMediaChunk chunk, boolean last) {
+    if (chunk == null || chunk.isPublished()) {
+      return;
+    }
     @HlsChunkSource.ChunkPublicationState
-    int chunkState = chunkSource.getChunkPublicationState(lastMediaChunk);
+    int chunkState = chunkSource.getChunkPublicationState(chunk);
     if (chunkState == CHUNK_PUBLICATION_STATE_PUBLISHED) {
-      lastMediaChunk.publish();
-    } else if (chunkState == CHUNK_PUBLICATION_STATE_REMOVED
+      chunk.publish();
+    } else if (last && chunkState == CHUNK_PUBLICATION_STATE_REMOVED
         && !loadingFinished
         && loader.isLoading()) {
       loader.cancelLoading();
+      Log.d(WebUtil.DEBUG, "chunk " + chunk.uid + " removed!!!");
     }
   }
 
@@ -852,6 +863,13 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
             loadDurationMs,
             loadable.bytesLoaded());
     loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    long endTimeUs = loadable.endTimeUs;
+    if (endTimeUs <= loadable.startTimeUs) {
+      long durationUs = chunkSource.getPartTargetDurationUs();
+      if (durationUs != C.TIME_UNSET) {
+        endTimeUs = loadable.startTimeUs + durationUs;
+      }
+    }
     mediaSourceEventDispatcher.loadCompleted(
         loadEventInfo,
         loadable.type,
@@ -860,7 +878,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         loadable.trackSelectionReason,
         loadable.trackSelectionData,
         loadable.startTimeUs,
-        loadable.endTimeUs);
+        endTimeUs);
     if (!prepared) {
       continueLoading(lastSeekPositionUs);
     } else {
