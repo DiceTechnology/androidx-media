@@ -20,6 +20,9 @@ import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.TrackGroup;
+import androidx.media3.common.endeavor.cmcd.CMCDCollector;
+import androidx.media3.common.endeavor.cmcd.CMCDContext;
+import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDObjectType;
 import androidx.media3.datasource.TransferListener;
 import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
@@ -60,6 +63,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   private SsManifest manifest;
   private ChunkSampleStream<SsChunkSource>[] sampleStreams;
   private SequenceableLoader compositeSequenceableLoader;
+  @Nullable private CMCDContext cmcdContext;
 
   public SsMediaPeriod(
       SsManifest manifest,
@@ -88,6 +92,11 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         compositeSequenceableLoaderFactory.createCompositeSequenceableLoader(sampleStreams);
   }
 
+  public SsMediaPeriod setCMCDContext(CMCDContext cmcdContext) {
+    this.cmcdContext = cmcdContext;
+    return this;
+  }
+
   public void updateManifest(SsManifest manifest) {
     this.manifest = manifest;
     for (ChunkSampleStream<SsChunkSource> sampleStream : sampleStreams) {
@@ -101,6 +110,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       sampleStream.release();
     }
     callback = null;
+    cmcdContext = null;
   }
 
   // MediaPeriod implementation.
@@ -237,7 +247,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     int streamElementIndex = trackGroups.indexOf(selection.getTrackGroup());
     SsChunkSource chunkSource =
         chunkSourceFactory.createChunkSource(
-            manifestLoaderErrorThrower, manifest, streamElementIndex, selection, transferListener);
+            manifestLoaderErrorThrower, manifest, streamElementIndex, selection, transferListener)
+            .setCMCDCollector(prepareCMCDCollector(manifest.streamElements[streamElementIndex].type));
     return new ChunkSampleStream<>(
         manifest.streamElements[streamElementIndex].type,
         null,
@@ -250,6 +261,14 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         drmEventDispatcher,
         loadErrorHandlingPolicy,
         mediaSourceEventDispatcher);
+  }
+
+  private CMCDCollector prepareCMCDCollector(@C.TrackType int trackType) {
+    CMCDCollector collector = CMCDContext.createCollector(cmcdContext);
+    if (collector != null) {
+      collector.updateObjectType(CMCDObjectType.from(trackType));
+    }
+    return collector;
   }
 
   private static TrackGroupArray buildTrackGroups(

@@ -434,6 +434,10 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
 
     headers.putAll(requestProperties.getSnapshot());
     headers.putAll(dataSpec.httpRequestHeaders);
+    Map<String, String> cmcdHeaders = dataSpec.buildCMCDHeaders();
+    if (cmcdHeaders != null) {
+      headers.putAll(cmcdHeaders);
+    }
 
     for (Map.Entry<String, String> header : headers.entrySet()) {
       builder.header(header.getKey(), header.getValue());

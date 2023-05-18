@@ -92,6 +92,7 @@ import androidx.media3.exoplayer.analytics.DefaultAnalyticsCollector;
 import androidx.media3.exoplayer.analytics.MediaMetricsListener;
 import androidx.media3.exoplayer.analytics.PlayerId;
 import androidx.media3.exoplayer.audio.AudioRendererEventListener;
+import androidx.media3.exoplayer.endeavor.CMCDManager;
 import androidx.media3.exoplayer.metadata.MetadataOutput;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId;
@@ -348,6 +349,7 @@ import java.util.concurrent.TimeoutException;
               playbackInfoUpdateListener,
               playerId,
               builder.playbackLooper);
+      CMCDManager.getInstance().addPlayer(playerId, this);
 
       volume = 1;
       repeatMode = Player.REPEAT_MODE_OFF;
@@ -997,6 +999,7 @@ import java.util.concurrent.TimeoutException;
     wakeLockManager.setStayAwake(false);
     wifiLockManager.setStayAwake(false);
     audioFocusManager.release();
+    CMCDManager.getInstance().releasePlayer(this);
     if (!internalPlayer.release()) {
       // One of the renderers timed out releasing its resources.
       listeners.sendEvent(

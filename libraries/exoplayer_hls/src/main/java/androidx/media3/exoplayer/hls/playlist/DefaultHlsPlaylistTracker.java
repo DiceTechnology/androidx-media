@@ -26,6 +26,8 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.ParserException;
 import androidx.media3.common.endeavor.WebUtil;
+import androidx.media3.common.endeavor.cmcd.CMCDCollector;
+import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDObjectType;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -80,6 +82,7 @@ public final class DefaultHlsPlaylistTracker
   @Nullable private HlsMediaPlaylist primaryMediaPlaylistSnapshot;
   private boolean isLive;
   private long initialStartTimeUs;
+  private CMCDCollector masterCollector;
 
   private long manifestLiveOffsetMs;
 
@@ -140,6 +143,7 @@ public final class DefaultHlsPlaylistTracker
         new ParsingLoadable<>(
             dataSourceFactory.createDataSource(C.DATA_TYPE_MANIFEST),
             initialPlaylistUri,
+            masterCollector,
             C.DATA_TYPE_MANIFEST,
             playlistParserFactory.createPlaylistParser());
     Assertions.checkState(initialPlaylistLoader == null);
@@ -172,6 +176,18 @@ public final class DefaultHlsPlaylistTracker
     playlistRefreshHandler.removeCallbacksAndMessages(null);
     playlistRefreshHandler = null;
     playlistBundles.clear();
+    if (masterCollector != null) {
+      masterCollector.release();
+      masterCollector = null;
+    }
+  }
+
+  @Override
+  public void setCMCDCollector(CMCDCollector masterCollector) {
+    this.masterCollector = masterCollector;
+    if (masterCollector != null) {
+      masterCollector.updateObjectType(CMCDObjectType.MANIFEST);
+    }
   }
 
   @Override
@@ -264,6 +280,7 @@ public final class DefaultHlsPlaylistTracker
     // Add a temporary playlist listener for loading the first primary playlist.
     listeners.add(new FirstPrimaryMediaPlaylistListener());
     createBundles(multivariantPlaylist.mediaPlaylistUrls);
+    updateCMCDPayload(multivariantPlaylist);
     LoadEventInfo loadEventInfo =
         new LoadEventInfo(
             loadable.loadTaskId,
@@ -422,7 +439,7 @@ public final class DefaultHlsPlaylistTracker
     int listSize = urls.size();
     for (int i = 0; i < listSize; i++) {
       Uri url = urls.get(i);
-      MediaPlaylistBundle bundle = new MediaPlaylistBundle(url);
+      MediaPlaylistBundle bundle = new MediaPlaylistBundle(url, CMCDCollector.createCollector(masterCollector));
       playlistBundles.put(url, bundle);
     }
   }
@@ -526,6 +543,19 @@ public final class DefaultHlsPlaylistTracker
     return mediaSequenceOffset < oldSegments.size() ? oldSegments.get(mediaSequenceOffset) : null;
   }
 
+  private void updateCMCDPayload(HlsMultivariantPlaylist multivariantPlaylist) {
+    if (masterCollector == null) {
+      return;
+    }
+    int topBitrate = 0;
+    for (Variant variant : multivariantPlaylist.variants) {
+      if (topBitrate < variant.format.bitrate) {
+        topBitrate = variant.format.bitrate;
+      }
+    }
+    masterCollector.updateTopBitrate(Math.round(topBitrate / 1024f));
+  }
+
   /** Holds all information related to a specific Media Playlist. */
   private final class MediaPlaylistBundle implements Loader.Callback<ParsingLoadable<HlsPlaylist>> {
 
@@ -546,9 +576,14 @@ public final class DefaultHlsPlaylistTracker
     @Nullable private IOException playlistError;
 
     private long loadUntilMs;
+    private CMCDCollector playlistCollector;
 
-    public MediaPlaylistBundle(Uri playlistUrl) {
+    public MediaPlaylistBundle(Uri playlistUrl, CMCDCollector playlistCollector) {
       this.playlistUrl = playlistUrl;
+      this.playlistCollector = playlistCollector;
+      if (playlistCollector != null) {
+        playlistCollector.updateObjectType(CMCDObjectType.MANIFEST);
+      }
       mediaPlaylistLoader = new Loader("DefaultHlsPlaylistTracker:MediaPlaylist");
       mediaPlaylistDataSource = dataSourceFactory.createDataSource(C.DATA_TYPE_MANIFEST);
     }
@@ -583,6 +618,10 @@ public final class DefaultHlsPlaylistTracker
 
     public void release() {
       mediaPlaylistLoader.release();
+      if (playlistCollector != null) {
+        playlistCollector.release();
+        playlistCollector = null;
+      }
     }
 
     // Loader.Callback implementation.
@@ -719,6 +758,7 @@ public final class DefaultHlsPlaylistTracker
           new ParsingLoadable<>(
               mediaPlaylistDataSource,
               playlistRequestUri,
+              playlistCollector,
               C.DATA_TYPE_MANIFEST,
               mediaPlaylistParser);
       long elapsedRealtime =

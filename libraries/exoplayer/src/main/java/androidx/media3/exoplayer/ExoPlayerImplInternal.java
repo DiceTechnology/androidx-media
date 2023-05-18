@@ -997,7 +997,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
     builder.append(", now ").append(WebUtil.stime0(nowMs)).append("[").append(WebUtil.ms2s(nowMs - System.currentTimeMillis())).append("]");
     builder.append(", buffer0 ").append(WebUtil.us2s(loadWallMs - playWallUs));
     builder.append(", speed0 ").append(mediaClock.getPlaybackParameters().speed);
-    Log.d(DefaultLivePlaybackSpeedControl.TAG, builder.toString());
+    Log.i(DefaultLivePlaybackSpeedControl.TAG, builder.toString());
   }
 
   private void setMediaClockPlaybackParameters(PlaybackParameters playbackParameters) {

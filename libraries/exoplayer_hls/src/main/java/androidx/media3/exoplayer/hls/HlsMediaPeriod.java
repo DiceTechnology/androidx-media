@@ -26,6 +26,9 @@ import androidx.media3.common.MimeTypes;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.endeavor.WebUtil;
+import androidx.media3.common.endeavor.cmcd.CMCDCollector;
+import androidx.media3.common.endeavor.cmcd.CMCDContext;
+import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDObjectType;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -94,6 +97,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
   private int[][] manifestUrlIndicesPerWrapper;
   private int audioVideoSampleStreamWrapperCount;
   private SequenceableLoader compositeSequenceableLoader;
+  @Nullable private CMCDContext cmcdContext;
 
   /**
    * Creates an HLS media period.
@@ -157,12 +161,18 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
     manifestUrlIndicesPerWrapper = new int[0][];
   }
 
+  public HlsMediaPeriod setCMCDContext(CMCDContext cmcdContext) {
+    this.cmcdContext = cmcdContext;
+    return this;
+  }
+
   public void release() {
     playlistTracker.removeListener(this);
     for (HlsSampleStreamWrapper sampleStreamWrapper : sampleStreamWrappers) {
       sampleStreamWrapper.release();
     }
     mediaPeriodCallback = null;
+    cmcdContext = null;
   }
 
   @Override
@@ -786,7 +796,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
             mediaTransferListener,
             timestampAdjusterProvider,
             muxedCaptionFormats,
-            playerId);
+            playerId).setCMCDCollector(prepareCMCDCollector(trackType, muxedAudioFormats));
     return new HlsSampleStreamWrapper(
         uid,
         trackType,
@@ -801,6 +811,19 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsPlaylistTracker.Pla
         loadErrorHandlingPolicy,
         eventDispatcher,
         metadataType);
+  }
+
+  private CMCDCollector prepareCMCDCollector(@C.TrackType int trackType, @Nullable List<Format> muxedAudioFormats) {
+    CMCDCollector collector = CMCDContext.createCollector(cmcdContext);
+    if (collector != null) {
+      CMCDObjectType objectType = CMCDObjectType.from(trackType);
+      if (trackType == C.TRACK_TYPE_DEFAULT) {
+        boolean muxedAudio = (muxedAudioFormats != null && muxedAudioFormats.size() > 0);
+        objectType = muxedAudio ? CMCDObjectType.MUXED_AUDIO_VIDEO : CMCDObjectType.VIDEO_ONLY;
+      }
+      collector.updateObjectType(objectType);
+    }
+    return collector;
   }
 
   @Nullable

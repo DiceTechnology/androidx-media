@@ -122,7 +122,7 @@ public class EventLogger implements AnalyticsListener {
   @UnstableApi
   @Override
   public void onPlaybackStateChanged(EventTime eventTime, @Player.State int state) {
-    Log.d(WebUtil.DEBUG, "onPlaybackStateChanged " + getStateString(state));
+    Log.i(WebUtil.DEBUG, "onPlaybackStateChanged " + getStateString(state));
     logd(eventTime, "state", getStateString(state));
   }
 
@@ -149,7 +149,7 @@ public class EventLogger implements AnalyticsListener {
   @UnstableApi
   @Override
   public void onIsPlayingChanged(EventTime eventTime, boolean isPlaying) {
-    Log.d(WebUtil.DEBUG, "onIsPlayingChanged " + isPlaying);
+    Log.i(WebUtil.DEBUG, "onIsPlayingChanged " + isPlaying);
     logd(eventTime, "isPlaying", Boolean.toString(isPlaying));
   }
 
@@ -210,7 +210,7 @@ public class EventLogger implements AnalyticsListener {
           .append(newPosition.adIndexInAdGroup);
     }
     builder.append("]");
-    Log.d(WebUtil.DEBUG, "onPositionDiscontinuity " + builder.toString());
+    Log.i(WebUtil.DEBUG, "onPositionDiscontinuity " + builder.toString());
     logd(eventTime, "positionDiscontinuity", builder.toString());
   }
 
@@ -281,7 +281,7 @@ public class EventLogger implements AnalyticsListener {
   @UnstableApi
   @Override
   public void onTracksChanged(EventTime eventTime, Tracks tracks) {
-    Log.d(WebUtil.DEBUG, "onTracksChanged ");
+    Log.i(WebUtil.DEBUG, "onTracksChanged ");
     logd("tracks [" + getEventTimeString(eventTime));
     // Log tracks associated to renderers.
     ImmutableList<Tracks.Group> trackGroups = tracks.getGroups();
@@ -348,7 +348,7 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onAudioInputFormatChanged(
       EventTime eventTime, Format format, @Nullable DecoderReuseEvaluation decoderReuseEvaluation) {
-    Log.d(WebUtil.DEBUG, "onAudioInputFormatChanged " + (format == null ? "-" : format.label + ", " + TrackCollector.getFormatGroupId(format)));
+    Log.i(WebUtil.DEBUG, "onAudioInputFormatChanged " + (format == null ? "-" : format.label + ", " + TrackCollector.getFormatGroupId(format)));
     logd(eventTime, "audioInputFormat", Format.toLogString(format));
   }
 
@@ -425,14 +425,14 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onVideoInputFormatChanged(
       EventTime eventTime, Format format, @Nullable DecoderReuseEvaluation decoderReuseEvaluation) {
-    Log.d(WebUtil.DEBUG, "onVideoInputFormatChanged " + (format == null ? "-" : format.bitrate + ", " + TrackCollector.getAudioGroupId(format)));
+    Log.i(WebUtil.DEBUG, "onVideoInputFormatChanged " + (format == null ? "-" : format.bitrate + ", " + TrackCollector.getAudioGroupId(format)));
     logd(eventTime, "videoInputFormat", Format.toLogString(format));
   }
 
   @UnstableApi
   @Override
   public void onDroppedVideoFrames(EventTime eventTime, int droppedFrames, long elapsedMs) {
-    Log.d(WebUtil.DEBUG, "droppedFrames " + droppedFrames + ", " + elapsedMs);
+    Log.i(WebUtil.DEBUG, "droppedFrames " + droppedFrames + ", " + elapsedMs);
     logd(eventTime, "droppedFrames", Integer.toString(droppedFrames));
   }
 
@@ -492,7 +492,7 @@ public class EventLogger implements AnalyticsListener {
 
     String loadUri = (loadEventInfo != null && loadEventInfo.uri != null ? loadEventInfo.uri.toString() : null);
     if (loadUri != null) {
-      Log.d(WebUtil.DEBUG, String.format("loadCompleted [%.3f, %.3f kb, %.3f s], play %.3f s, buff %.3f s\n%s",
+      Log.i(WebUtil.DEBUG, String.format("loadCompleted [%.3f, %.3f kb, %.3f s], play %.3f s, buff %.3f s\n%s",
           System.currentTimeMillis() / 1000f,
           loadEventInfo.bytesLoaded / 1000f,
           loadEventInfo.loadDurationMs / 1000f,
@@ -508,7 +508,7 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onBandwidthEstimate(
       EventTime eventTime, int totalLoadTimeMs, long totalBytesLoaded, long bitrateEstimate) {
-    // Log.d(WebUtil.DEBUG, "onBandwidthEstimate [" + totalLoadTimeMs + " ms, " + (totalBytesLoaded / 1000f) + "], " + (bitrateEstimate / 1000f));
+    // Log.i(WebUtil.DEBUG, "onBandwidthEstimate [" + totalLoadTimeMs + " ms, " + (totalBytesLoaded / 1000f) + "], " + (bitrateEstimate / 1000f));
     // Do nothing.
   }
 

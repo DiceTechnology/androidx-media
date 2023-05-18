@@ -24,6 +24,9 @@ import androidx.annotation.CheckResult;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
+import androidx.media3.common.endeavor.cmcd.CMCDCollector;
+import androidx.media3.common.endeavor.cmcd.CMCDType;
+import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDObjectType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
@@ -154,6 +157,7 @@ public class DefaultDashChunkSource implements DashChunkSource {
   private int periodIndex;
   @Nullable private IOException fatalError;
   private boolean missingLastSegment;
+  @Nullable private CMCDCollector cmcdCollector;
 
   /**
    * @param chunkExtractorFactory Creates {@link ChunkExtractor} instances to use for extracting
@@ -229,6 +233,12 @@ public class DefaultDashChunkSource implements DashChunkSource {
               /* segmentNumShift= */ 0,
               representation.getIndex());
     }
+  }
+
+  @Override
+  public DefaultDashChunkSource setCMCDCollector(CMCDCollector cmcdCollector) {
+    this.cmcdCollector = cmcdCollector;
+    return this;
   }
 
   @Override
@@ -636,9 +646,16 @@ public class DefaultDashChunkSource implements DashChunkSource {
     } else {
       requestUri = indexUri;
     }
+    CMCDCollector collector = prepareChunkCollector(
+        true,
+        trackFormat,
+        -1,
+        -1,
+        null,
+        representationHolder);
     DataSpec dataSpec =
         DashUtil.buildDataSpec(
-            representation, representationHolder.selectedBaseUrl.url, requestUri, /* flags= */ 0);
+            representation, representationHolder.selectedBaseUrl.url, requestUri, /* flags= */ 0, collector);
     return new InitializationChunk(
         dataSource,
         dataSpec,
@@ -669,9 +686,16 @@ public class DefaultDashChunkSource implements DashChunkSource {
                   firstSegmentNum, nowPeriodTimeUs)
               ? 0
               : DataSpec.FLAG_MIGHT_NOT_USE_FULL_NETWORK_SPEED;
+      CMCDCollector collector = prepareChunkCollector(
+          false,
+          trackFormat,
+          endTimeUs - startTimeUs,
+          firstSegmentNum,
+          segmentUri,
+          representationHolder);
       DataSpec dataSpec =
           DashUtil.buildDataSpec(
-              representation, representationHolder.selectedBaseUrl.url, segmentUri, flags);
+              representation, representationHolder.selectedBaseUrl.url, segmentUri, flags, collector);
       return new SingleSampleMediaChunk(
           dataSource,
           dataSpec,
@@ -708,9 +732,16 @@ public class DefaultDashChunkSource implements DashChunkSource {
           representationHolder.isSegmentAvailableAtFullNetworkSpeed(segmentNum, nowPeriodTimeUs)
               ? 0
               : DataSpec.FLAG_MIGHT_NOT_USE_FULL_NETWORK_SPEED;
+      CMCDCollector collector = prepareChunkCollector(
+          false,
+          trackFormat,
+          endTimeUs - startTimeUs,
+          segmentNum,
+          segmentUri,
+          representationHolder);
       DataSpec dataSpec =
           DashUtil.buildDataSpec(
-              representation, representationHolder.selectedBaseUrl.url, segmentUri, flags);
+              representation, representationHolder.selectedBaseUrl.url, segmentUri, flags, collector);
       long sampleOffsetUs = -representation.presentationTimeOffsetUs;
       return new ContainerMediaChunk(
           dataSource,
@@ -727,6 +758,39 @@ public class DefaultDashChunkSource implements DashChunkSource {
           sampleOffsetUs,
           representationHolder.chunkExtractor);
     }
+  }
+
+  private CMCDCollector prepareChunkCollector(
+      boolean initSegment,
+      Format format,
+      long durationUs,
+      long segmentNum,
+      RangedUri segmentUri,
+      RepresentationHolder holder) {
+    CMCDCollector collector = CMCDCollector.createCollector(cmcdCollector);
+    if (collector != null) {
+      int bitrate = Math.round(format.bitrate / 1024f);
+      collector.updateEncodedBitrate(bitrate);
+      collector.updateObjectType(CMCDObjectType.from(cmcdCollector));
+      if (initSegment) {
+        collector.updateStartup(true);
+      } else {
+        collector.updateObjectDuration((int) Util.usToMs(durationUs));
+        collector.updateRequestedThroughput(CMCDType.calcRequestedThroughput(bitrate));
+
+        // Find the next object.
+        if (cmcdCollector.isActiveNextPayload()) {
+          RangedUri nextRangeUri = (segmentNum == C.INDEX_UNSET ? null : holder.getSegmentUrl(segmentNum + 1));
+          if (nextRangeUri != null) {
+            Uri nextUri = nextRangeUri.resolveUri(holder.selectedBaseUrl.url);
+            Uri mediaUri = segmentUri.resolveUri(holder.selectedBaseUrl.url);
+            collector.updateNextObjectRequest(CMCDType.buildNextObject(mediaUri, nextUri));
+            collector.updateNextRangeRequest(CMCDType.buildNextRange(nextRangeUri.start, nextRangeUri.length));
+          }
+        }
+      }
+    }
+    return collector;
   }
 
   private RepresentationHolder updateSelectedBaseUrl(int trackIndex) {

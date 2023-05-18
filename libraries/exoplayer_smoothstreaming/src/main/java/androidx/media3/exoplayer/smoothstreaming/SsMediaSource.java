@@ -25,11 +25,17 @@ import android.os.Looper;
 import android.os.SystemClock;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
+import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaLibraryInfo;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.Timeline;
+import androidx.media3.common.endeavor.cmcd.CMCDCollector;
+import androidx.media3.common.endeavor.cmcd.CMCDContext;
+import androidx.media3.common.endeavor.cmcd.CMCDType;
+import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDObjectType;
+import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDStreamFormat;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -39,6 +45,7 @@ import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider;
+import androidx.media3.exoplayer.endeavor.CMCDManager;
 import androidx.media3.exoplayer.offline.FilteringManifestParser;
 import androidx.media3.exoplayer.smoothstreaming.manifest.SsManifest;
 import androidx.media3.exoplayer.smoothstreaming.manifest.SsManifest.StreamElement;
@@ -333,6 +340,8 @@ public final class SsMediaSource extends BaseMediaSource
   private SsManifest manifest;
 
   private Handler manifestRefreshHandler;
+  @Nullable private CMCDContext cmcdContext;
+  @Nullable private CMCDCollector manifestCollector;
 
   private SsMediaSource(
       MediaItem mediaItem,
@@ -374,6 +383,7 @@ public final class SsMediaSource extends BaseMediaSource
   @Override
   protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     this.mediaTransferListener = mediaTransferListener;
+    this.cmcdContext = prepareCMCDContext();
     drmSessionManager.prepare();
     drmSessionManager.setPlayer(/* playbackLooper= */ Looper.myLooper(), getPlayerId());
     if (sideloadedManifest) {
@@ -408,7 +418,7 @@ public final class SsMediaSource extends BaseMediaSource
             loadErrorHandlingPolicy,
             mediaSourceEventDispatcher,
             manifestLoaderErrorThrower,
-            allocator);
+            allocator).setCMCDContext(cmcdContext);
     mediaPeriods.add(period);
     return period;
   }
@@ -433,6 +443,10 @@ public final class SsMediaSource extends BaseMediaSource
       manifestRefreshHandler = null;
     }
     drmSessionManager.release();
+    if (cmcdContext != null) {
+      CMCDManager.getInstance().releaseContext(cmcdContext);
+      cmcdContext = null;
+    }
   }
 
   // Loader.Callback implementation
@@ -514,6 +528,7 @@ public final class SsMediaSource extends BaseMediaSource
     for (int i = 0; i < mediaPeriods.size(); i++) {
       mediaPeriods.get(i).updateManifest(manifest);
     }
+    updateCMCDPayload(manifest);
 
     long startTimeUs = Long.MAX_VALUE;
     long endTimeUs = Long.MIN_VALUE;
@@ -598,12 +613,47 @@ public final class SsMediaSource extends BaseMediaSource
     }
     ParsingLoadable<SsManifest> loadable =
         new ParsingLoadable<>(
-            manifestDataSource, manifestUri, C.DATA_TYPE_MANIFEST, manifestParser);
+            manifestDataSource, manifestUri, prepareManifestCollector(), C.DATA_TYPE_MANIFEST, manifestParser);
     long elapsedRealtimeMs =
         manifestLoader.startLoading(
             loadable, this, loadErrorHandlingPolicy.getMinimumLoadableRetryCount(loadable.type));
     manifestEventDispatcher.loadStarted(
         new LoadEventInfo(loadable.loadTaskId, loadable.dataSpec, elapsedRealtimeMs),
         loadable.type);
+  }
+
+  private CMCDContext prepareCMCDContext() {
+    CMCDContext context = CMCDManager.getInstance().createContext(getPlayerId());
+    if (context != null) {
+      String contentId = (manifestUri == null ? null : CMCDType.toUuidString(manifestUri.toString()));
+      context.updateMediaInfo(contentId, CMCDStreamFormat.SMOOTH_STREAMING);
+    }
+    return context;
+  }
+
+  private CMCDCollector prepareManifestCollector() {
+    if (cmcdContext == null) {
+      return null;
+    }
+    if (manifestCollector == null) {
+      manifestCollector = CMCDContext.createCollector(cmcdContext);
+      manifestCollector.updateObjectType(CMCDObjectType.MANIFEST);
+    }
+    return manifestCollector;
+  }
+
+  private void updateCMCDPayload(SsManifest manifest) {
+    if (manifestCollector == null) {
+      return;
+    }
+    int topBitrate = 0;
+    for (StreamElement streamElement : manifest.streamElements) {
+      for (Format format : streamElement.formats) {
+        if (topBitrate < format.bitrate) {
+          topBitrate = format.bitrate;
+        }
+      }
+    }
+    manifestCollector.updateTopBitrate(Math.round(topBitrate / 1024f));
   }
 }
