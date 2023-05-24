@@ -543,7 +543,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         && !loadingFinished
         && loader.isLoading()) {
       loader.cancelLoading();
-      Log.d(WebUtil.DEBUG, "chunk " + chunk.uid + " removed!!!");
+      Log.i(WebUtil.DEBUG, "chunk " + chunk.uid + " removed!!!");
     }
   }
 

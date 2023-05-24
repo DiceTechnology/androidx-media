@@ -79,7 +79,7 @@ public class DebugBase {
         if (next <= i) {
           next = size;
         }
-        Log.d(tag, builder.substring(i, Math.min(next, size)));
+        Log.i(tag, builder.substring(i, Math.min(next, size)));
         i = next;
       }
       reset();

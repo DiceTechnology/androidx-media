@@ -57,6 +57,7 @@ import androidx.media3.datasource.DataSourceInputStream;
 import androidx.media3.datasource.DataSourceUtil;
 import androidx.media3.datasource.DataSpec;
 import androidx.media3.exoplayer.RenderersFactory;
+import androidx.media3.exoplayer.endeavor.CMCDManager;
 import androidx.media3.exoplayer.offline.DownloadService;
 import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableList;
@@ -102,6 +103,7 @@ public class SampleChooserActivity extends AppCompatActivity
 
     // Global Setting.
     Log.setLogLevel(Log.LOG_LEVEL_ALL);
+    CMCDManager.getInstance().setAllActivations(false);
 
     Intent intent = getIntent();
     String dataUri = intent.getDataString();

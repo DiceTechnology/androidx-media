@@ -18,6 +18,7 @@ package androidx.media3.exoplayer.hls.playlist;
 import android.net.Uri;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
+import androidx.media3.common.endeavor.cmcd.CMCDCollector;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.hls.HlsDataSourceFactory;
 import androidx.media3.exoplayer.source.MediaSourceEventListener.EventDispatcher;
@@ -138,6 +139,12 @@ public interface HlsPlaylistTracker {
    * <p>Must be called once per {@link #start} call.
    */
   void stop();
+
+  /**
+   * Set the CMCD data collector.
+   * @param masterCollector
+   */
+  default void setCMCDCollector(CMCDCollector masterCollector) {}
 
   /**
    * Registers a listener to receive events from the playlist tracker.

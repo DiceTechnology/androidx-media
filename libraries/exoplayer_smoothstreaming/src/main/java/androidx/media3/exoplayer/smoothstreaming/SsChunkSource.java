@@ -16,6 +16,7 @@
 package androidx.media3.exoplayer.smoothstreaming;
 
 import androidx.annotation.Nullable;
+import androidx.media3.common.endeavor.cmcd.CMCDCollector;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.TransferListener;
 import androidx.media3.exoplayer.smoothstreaming.manifest.SsManifest;
@@ -47,6 +48,10 @@ public interface SsChunkSource extends ChunkSource {
         int streamElementIndex,
         ExoTrackSelection trackSelection,
         @Nullable TransferListener transferListener);
+  }
+
+  default SsChunkSource setCMCDCollector(CMCDCollector cmcdCollector) {
+    return this;
   }
 
   /**

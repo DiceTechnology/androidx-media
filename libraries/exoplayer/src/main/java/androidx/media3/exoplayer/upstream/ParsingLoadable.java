@@ -19,6 +19,7 @@ import android.net.Uri;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.ParserException;
+import androidx.media3.common.endeavor.cmcd.CMCDCollector;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -68,7 +69,7 @@ public final class ParsingLoadable<T> implements Loadable {
    */
   public static <T> T load(DataSource dataSource, Parser<? extends T> parser, Uri uri, int type)
       throws IOException {
-    ParsingLoadable<T> loadable = new ParsingLoadable<>(dataSource, uri, type, parser);
+    ParsingLoadable<T> loadable = new ParsingLoadable<>(dataSource, uri, null, type, parser);
     loadable.load();
     return Assertions.checkNotNull(loadable.getResult());
   }
@@ -112,10 +113,10 @@ public final class ParsingLoadable<T> implements Loadable {
    * @param type See {@link #type}.
    * @param parser Parses the object from the response.
    */
-  public ParsingLoadable(DataSource dataSource, Uri uri, int type, Parser<? extends T> parser) {
+  public ParsingLoadable(DataSource dataSource, Uri uri, CMCDCollector cmcdCollector, int type, Parser<? extends T> parser) {
     this(
         dataSource,
-        new DataSpec.Builder().setUri(uri).setFlags(DataSpec.FLAG_ALLOW_GZIP).build(),
+        new DataSpec.Builder().setUri(uri).setFlags(DataSpec.FLAG_ALLOW_GZIP).setCMCDCollector(cmcdCollector).build(),
         type,
         parser);
   }

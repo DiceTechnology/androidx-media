@@ -563,7 +563,8 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
           length,
           allowGzip,
           /* followRedirects= */ true,
-          dataSpec.httpRequestHeaders);
+          dataSpec.httpRequestHeaders,
+          dataSpec.buildCMCDHeaders());
     }
 
     // We need to handle redirects ourselves to allow cross-protocol redirects or to keep the POST
@@ -579,7 +580,8 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
               length,
               allowGzip,
               /* followRedirects= */ false,
-              dataSpec.httpRequestHeaders);
+              dataSpec.httpRequestHeaders,
+              dataSpec.buildCMCDHeaders());
       int responseCode = connection.getResponseCode();
       String location = connection.getHeaderField("Location");
       if ((httpMethod == DataSpec.HTTP_METHOD_GET || httpMethod == DataSpec.HTTP_METHOD_HEAD)
@@ -638,7 +640,8 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
       long length,
       boolean allowGzip,
       boolean followRedirects,
-      Map<String, String> requestParameters)
+      Map<String, String> requestParameters,
+      Map<String, String> cmcdHeaders)
       throws IOException {
     HttpURLConnection connection = openConnection(url);
     connection.setConnectTimeout(connectTimeoutMillis);
@@ -650,6 +653,9 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
     }
     requestHeaders.putAll(requestProperties.getSnapshot());
     requestHeaders.putAll(requestParameters);
+    if (cmcdHeaders != null) {
+      requestHeaders.putAll(cmcdHeaders);
+    }
 
     for (Map.Entry<String, String> property : requestHeaders.entrySet()) {
       connection.setRequestProperty(property.getKey(), property.getValue());

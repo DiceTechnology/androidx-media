@@ -400,7 +400,7 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
       builder.append(", current [").append(WebUtil.us2s(currentTargetLiveOffsetUs));
       builder.append(", speed ").append(adjustedPlaybackSpeed);
       builder.append("]");
-      Log.d(TAG, builder.toString());
+      Log.i(TAG, builder.toString());
     }
     return adjustedPlaybackSpeed;
   }
@@ -469,7 +469,7 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
       builder.append(", speed ").append(adjustedPlaybackSpeed);
       builder.append(", ").append(WebUtil.us2s(currentTargetLiveOffsetUs));
       builder.append("]");
-      Log.d(TAG, builder.toString());
+      Log.i(TAG, builder.toString());
     }
   }
 
