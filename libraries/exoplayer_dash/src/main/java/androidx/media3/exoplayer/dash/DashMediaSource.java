@@ -47,6 +47,7 @@ import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDStreamFormat;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
+import androidx.media3.common.util.UriUtil;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.TransferListener;
@@ -804,9 +805,10 @@ public final class DashMediaSource extends BaseMediaSource {
 
   private void resolveUtcTimingElementHttp(
       UtcTimingElement timingElement, ParsingLoadable.Parser<Long> parser) {
+    Uri timingUri = UriUtil.resolveToUri(manifestUri.toString(), timingElement.value);
     startLoading(
         new ParsingLoadable<>(
-            dataSource, Uri.parse(timingElement.value), null, C.DATA_TYPE_TIME_SYNCHRONIZATION, parser),
+            dataSource, timingUri, null, C.DATA_TYPE_TIME_SYNCHRONIZATION, parser),
         new UtcTimestampCallback(),
         1);
   }
