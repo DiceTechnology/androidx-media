@@ -211,7 +211,7 @@ public abstract class SegmentBase {
         return (duration * C.MICROS_PER_SECOND) / timescale;
       } else {
         long segmentCount = getSegmentCount(periodDurationUs);
-        return segmentCount != INDEX_UNBOUNDED
+        return segmentCount != INDEX_UNBOUNDED && periodDurationUs != C.TIME_UNSET
                 && sequenceNumber == (getFirstSegmentNum() + segmentCount - 1)
             ? (periodDurationUs - getSegmentTimeUs(sequenceNumber))
             : ((duration * C.MICROS_PER_SECOND) / timescale);

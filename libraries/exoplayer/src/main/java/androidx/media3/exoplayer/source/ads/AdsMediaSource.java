@@ -266,7 +266,8 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
       checkNotNull(adMediaSourceHolders[adGroupIndex][adIndexInAdGroup])
           .handleSourceInfoRefresh(newTimeline);
     } else {
-      Assertions.checkArgument(newTimeline.getPeriodCount() == 1);
+      // Workaround to ignore multiperiod csai exceptions
+      // Assertions.checkArgument(newTimeline.getPeriodCount() == 1);
       contentTimeline = newTimeline;
     }
     maybeUpdateSourceInfo();
@@ -335,7 +336,8 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
   private void maybeUpdateSourceInfo() {
     @Nullable Timeline contentTimeline = this.contentTimeline;
     if (adPlaybackState != null && contentTimeline != null) {
-      if (adPlaybackState.adGroupCount == 0) {
+      // Workaround to ignore multiperiod csai exceptions
+      if (adPlaybackState.adGroupCount == 0 || contentTimeline.getPeriodCount() > 1) {
         refreshSourceInfo(contentTimeline);
       } else {
         adPlaybackState = adPlaybackState.withAdDurationsUs(getAdDurationsUs());

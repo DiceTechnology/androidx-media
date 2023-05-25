@@ -312,7 +312,10 @@ public final class Cea708Decoder extends CeaDecoder {
     // exhausted. On each iteration we process a single service block. If the block has a service
     // number different to the currently selected service, then we skip it and continue with the
     // next service block.
-    captionChannelPacketData.reset(currentDtvCcPacket.packetData, currentDtvCcPacket.currentIndex);
+
+    // Fix for https://dicetech.atlassian.net/browse/DORIS-1710.
+    captionChannelPacketData.reset(currentDtvCcPacket.packetData, currentDtvCcPacket.packetSize * 2 - 1);
+    // captionChannelPacketData.reset(currentDtvCcPacket.packetData, currentDtvCcPacket.currentIndex);
     while (captionChannelPacketData.bitsLeft() > 0) {
       // Parse the Standard Service Block Header (see CEA-708B 6.2.1)
       int serviceNumber = captionChannelPacketData.readBits(3);
