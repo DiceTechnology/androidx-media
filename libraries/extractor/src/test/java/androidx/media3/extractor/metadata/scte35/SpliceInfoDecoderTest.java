@@ -23,7 +23,11 @@ import static org.junit.Assert.assertThrows;
 
 import androidx.media3.common.Metadata;
 import androidx.media3.common.util.TimestampAdjuster;
+import androidx.media3.common.util.Util;
 import androidx.media3.extractor.metadata.MetadataInputBuffer;
+import androidx.media3.extractor.metadata.scte35.SegmentationDescriptor.SegmentationType;
+import androidx.media3.extractor.metadata.scte35.SpliceDescriptor.AvailDescriptor;
+import androidx.media3.extractor.metadata.scte35.SpliceDescriptor.DescriptorType;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -42,6 +46,103 @@ public final class SpliceInfoDecoderTest {
   public void setUp() {
     decoder = new SpliceInfoDecoder();
     inputBuffer = new MetadataInputBuffer();
+  }
+
+  @Test
+  public void testSpliceInsertCueOut() {
+    String scte35OutHex = "0xFC302500000000000000FFF0140576AD89827FEFFF392DC5E97E00D512AE0001000000004B2D168C";
+    Metadata metadata = feedInputBuffer(Util.getBytesFromHexString(scte35OutHex.substring(2)), 0, 0);
+
+    assertThat(metadata.length()).isEqualTo(1);
+    assertThat(metadata.get(0)).isInstanceOf(SpliceInsertCommand.class);
+
+    SpliceInsertCommand command = (SpliceInsertCommand) metadata.get(0);
+    assertThat(command.outOfNetworkIndicator).isTrue();
+    assertThat(command.autoReturn).isFalse();
+    assertThat(command.breakDurationUs).isEqualTo(155155000);
+    assertThat(command.descriptorList.size()).isEqualTo(0);
+  }
+
+  @Test
+  public void testSpliceInsertCueIn() {
+    String scte35InHex = "0xFC302700000000000000FFF00F05100000037F4FFEFE4F6CF80BB8000000070005534150530A4ACD4FC2";
+    Metadata metadata = feedInputBuffer(Util.getBytesFromHexString(scte35InHex.substring(2)), 0, 0);
+
+    assertThat(metadata.length()).isEqualTo(1);
+    assertThat(metadata.get(0)).isInstanceOf(SpliceInsertCommand.class);
+
+    SpliceInsertCommand command = (SpliceInsertCommand) metadata.get(0);
+    assertThat(command.outOfNetworkIndicator).isFalse();
+    assertThat(command.autoReturn).isFalse();
+    assertThat(command.breakDurationUs).isEqualTo(TIME_UNSET);
+    assertThat(command.descriptorList.size()).isEqualTo(1);
+    assertThat(command.descriptorList.get(0).descriptorType).isEqualTo(DescriptorType.AVAIL_DESCRIPTOR);
+
+    AvailDescriptor descriptor = (AvailDescriptor) command.descriptorList.get(0);
+    assertThat(descriptor.descriptorLength).isEqualTo(5);
+    assertThat(descriptor.identifier).isEqualTo("SAPS");
+  }
+
+  @Test
+  public void testTimeSignalCueOut() {
+    String scte35OutHex = "0xFC304100000000000000FFF00506FEFDCA599B002B00084355454900000014000553415053140218435545491055072B7FFD0000D512AE0C044D53474E300101EE33825C";
+    Metadata metadata = feedInputBuffer(Util.getBytesFromHexString(scte35OutHex.substring(2)), 0, 0);
+
+    assertThat(metadata.length()).isEqualTo(1);
+    assertThat(metadata.get(0)).isInstanceOf(TimeSignalCommand.class);
+
+    TimeSignalCommand command = (TimeSignalCommand) metadata.get(0);
+    assertThat(command.descriptorList.size()).isEqualTo(3);
+    assertThat(command.descriptorList.get(0).descriptorType).isEqualTo(DescriptorType.AVAIL_DESCRIPTOR);
+    assertThat(command.descriptorList.get(1).descriptorType).isEqualTo(DescriptorType.AVAIL_DESCRIPTOR);
+    assertThat(command.descriptorList.get(2).isSegmentationDescriptor()).isTrue();
+
+    AvailDescriptor descriptor = (AvailDescriptor) command.descriptorList.get(0);
+    assertThat(descriptor.descriptorLength).isEqualTo(8);
+    assertThat(descriptor.identifier).isEqualTo("CUEI");
+
+    SegmentationDescriptor segmentationDescriptor = (SegmentationDescriptor) command.descriptorList.get(2);
+    assertThat(segmentationDescriptor.descriptorLength).isEqualTo(24);
+    assertThat(segmentationDescriptor.identifier).isEqualTo("CUEI");
+    assertThat(segmentationDescriptor.segmentationEventCancelIndicator).isFalse();
+    assertThat(segmentationDescriptor.programSegmentationFlag).isTrue();
+    assertThat(segmentationDescriptor.segmentationDurationFlag).isTrue();
+    assertThat(segmentationDescriptor.deliveryNotRestrictedFlag).isTrue();
+    assertThat(segmentationDescriptor.segmentationUpidType).isEqualTo(12);
+    assertThat(segmentationDescriptor.segmentationUpidLength).isEqualTo(4);
+    assertThat(segmentationDescriptor.segmentationDurationUs).isEqualTo(155155000);
+    assertThat(segmentationDescriptor.segmentationType).isEqualTo(SegmentationType.PROVIDER_ADVERTISEMENT_START);
+  }
+
+  @Test
+  public void testTimeSignalCueIn() {
+    String scte35InHex = "0xFC303C00000000000000FFF00506FEAF0B59F1002600084355454900000014000553415053140213435545491055072B7FBD0C044D53474E310101F132F754";
+    Metadata metadata = feedInputBuffer(Util.getBytesFromHexString(scte35InHex.substring(2)), 0, 0);
+
+    assertThat(metadata.length()).isEqualTo(1);
+    assertThat(metadata.get(0)).isInstanceOf(TimeSignalCommand.class);
+
+    TimeSignalCommand command = (TimeSignalCommand) metadata.get(0);
+    assertThat(command.descriptorList.size()).isEqualTo(3);
+    assertThat(command.descriptorList.get(0).descriptorType).isEqualTo(DescriptorType.AVAIL_DESCRIPTOR);
+    assertThat(command.descriptorList.get(1).descriptorType).isEqualTo(DescriptorType.AVAIL_DESCRIPTOR);
+    assertThat(command.descriptorList.get(2).isSegmentationDescriptor()).isTrue();
+
+    AvailDescriptor descriptor = (AvailDescriptor) command.descriptorList.get(0);
+    assertThat(descriptor.descriptorLength).isEqualTo(8);
+    assertThat(descriptor.identifier).isEqualTo("CUEI");
+
+    SegmentationDescriptor segmentationDescriptor = (SegmentationDescriptor) command.descriptorList.get(2);
+    assertThat(segmentationDescriptor.descriptorLength).isEqualTo(19);
+    assertThat(segmentationDescriptor.identifier).isEqualTo("CUEI");
+    assertThat(segmentationDescriptor.segmentationEventCancelIndicator).isFalse();
+    assertThat(segmentationDescriptor.programSegmentationFlag).isTrue();
+    assertThat(segmentationDescriptor.segmentationDurationFlag).isFalse();
+    assertThat(segmentationDescriptor.deliveryNotRestrictedFlag).isTrue();
+    assertThat(segmentationDescriptor.segmentationUpidType).isEqualTo(12);
+    assertThat(segmentationDescriptor.segmentationUpidLength).isEqualTo(4);
+    assertThat(segmentationDescriptor.segmentationDurationUs).isEqualTo(TIME_UNSET);
+    assertThat(segmentationDescriptor.segmentationType).isEqualTo(SegmentationType.PROVIDER_ADVERTISEMENT_END);
   }
 
   @Test

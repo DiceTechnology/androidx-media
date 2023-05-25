@@ -20,6 +20,7 @@ import androidx.media3.common.C;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.TimestampAdjuster;
 import androidx.media3.common.util.UnstableApi;
+import java.util.List;
 
 /** Represents a time signal command as defined in SCTE35, Section 9.3.4. */
 @UnstableApi
@@ -29,17 +30,21 @@ public final class TimeSignalCommand extends SpliceCommand {
   public final long ptsTime;
   /** Equivalent to {@link #ptsTime} but in the playback timebase. */
   public final long playbackPositionUs;
+  public final List<SpliceDescriptor> descriptorList;
 
-  private TimeSignalCommand(long ptsTime, long playbackPositionUs) {
+  private TimeSignalCommand(long ptsTime, long playbackPositionUs, List<SpliceDescriptor> descriptorList) {
     this.ptsTime = ptsTime;
     this.playbackPositionUs = playbackPositionUs;
+    this.descriptorList = descriptorList;
   }
 
   /* package */ static TimeSignalCommand parseFromSection(
       ParsableByteArray sectionData, long ptsAdjustment, TimestampAdjuster timestampAdjuster) {
     long ptsTime = parseSpliceTime(sectionData, ptsAdjustment);
     long playbackPositionUs = timestampAdjuster.adjustTsTimestamp(ptsTime);
-    return new TimeSignalCommand(ptsTime, playbackPositionUs);
+    // Handle the descriptor_loop_length and splice_descriptor().
+    List<SpliceDescriptor> descriptors = SpliceDescriptor.parseFromSection(sectionData);
+    return new TimeSignalCommand(ptsTime, playbackPositionUs, descriptors);
   }
 
   /**
@@ -69,6 +74,7 @@ public final class TimeSignalCommand extends SpliceCommand {
   public void writeToParcel(Parcel dest, int flags) {
     dest.writeLong(ptsTime);
     dest.writeLong(playbackPositionUs);
+    SpliceDescriptor.writeToParcel(descriptorList, dest);
   }
 
   public static final Creator<TimeSignalCommand> CREATOR =
@@ -76,7 +82,7 @@ public final class TimeSignalCommand extends SpliceCommand {
 
         @Override
         public TimeSignalCommand createFromParcel(Parcel in) {
-          return new TimeSignalCommand(in.readLong(), in.readLong());
+          return new TimeSignalCommand(in.readLong(), in.readLong(), SpliceDescriptor.createFromParcel(in));
         }
 
         @Override
