@@ -35,6 +35,7 @@ import androidx.media3.common.C;
 import androidx.media3.common.DrmInitData;
 import androidx.media3.common.DrmInitData.SchemeData;
 import androidx.media3.common.MimeTypes;
+import androidx.media3.common.endeavor.ExoConfig;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.ParsableByteArray;
@@ -240,7 +241,13 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
     int requestType =
         Util.SDK_INT >= 23 ? request.getRequestType() : KeyRequest.REQUEST_TYPE_UNKNOWN;
 
-    return new KeyRequest(requestData, licenseServerUrl, requestType);
+    String xDrmInfo = null;
+    int size = (schemeDatas == null ? 0 : schemeDatas.size());
+    if (!ExoConfig.getInstance().isObtainKeyIdsFromManifest() && size > 0) {
+      UUID[] keyIds = PsshAtomUtil.parseKeyIds(schemeDatas.get(0).data, uuid);
+      xDrmInfo = WidevineUtil.generateXDrmInfo(uuid, keyIds);
+    }
+    return new KeyRequest(requestData, licenseServerUrl, requestType).setXDrmInfo(xDrmInfo);
   }
 
   private static String adjustLicenseServerUrl(String licenseServerUrl) {
@@ -502,7 +509,8 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
    * <p>See <a href="https://github.com/google/ExoPlayer/issues/4413">GitHub issue #4413</a>.
    */
   private static boolean needsForceWidevineL3Workaround() {
-    return "ASUS_Z00AD".equals(Util.MODEL);
+    boolean configL3 = "L3".equalsIgnoreCase(ExoConfig.getInstance().getWidevineSecurityLevel());
+    return configL3 || "ASUS_Z00AD".equals(Util.MODEL);
   }
 
   /**

@@ -33,6 +33,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.RenderersFactory;
 import androidx.media3.exoplayer.offline.DownloadManager;
 import androidx.media3.exoplayer.offline.DownloadNotificationHelper;
+import com.facebook.stetho.okhttp3.StethoInterceptor;
 import java.io.File;
 import java.net.CookieHandler;
 import java.net.CookieManager;
@@ -93,7 +94,8 @@ public final class DemoUtil {
   public static synchronized DataSource.Factory getHttpDataSourceFactory(Context context) {
     if (httpDataSourceFactory == null) {
       if (USE_OKHTTP_FOR_NETWORKING) {
-        OkHttpClient.Builder okHttpBuilder = new OkHttpClient.Builder();
+        OkHttpClient.Builder okHttpBuilder = new OkHttpClient.Builder()
+            .addNetworkInterceptor(new StethoInterceptor());
         httpDataSourceFactory = new OkHttpDataSource.Factory((Call.Factory) okHttpBuilder.build());
       } else if (USE_CRONET_FOR_NETWORKING) {
         context = context.getApplicationContext();

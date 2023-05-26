@@ -36,6 +36,7 @@ import androidx.media3.common.DrmInitData.SchemeData;
 import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -558,6 +559,16 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
     if (offlineLicenseKeySetId == null) {
       schemeDatas = getSchemeDatas(checkNotNull(format.drmInitData), uuid, false);
       if (schemeDatas.isEmpty()) {
+        if (Log.isDebugEnabled()) {
+          int sz = format.drmInitData.schemeDataCount;
+          String info = "missing scheme data, drmInitData size " + sz;
+          for (int i = 0; i < sz; i++) {
+            SchemeData schemeData = format.drmInitData.get(i);
+            info += (schemeData == null ? ", [empty" : ", [" + schemeData.data.length) + ": "
+                + schemeData.uuid.toString() + "]";
+          }
+          Log.i(WebUtil.DEBUG, info);
+        }
         final MissingSchemeDataException error = new MissingSchemeDataException(uuid);
         Log.e(TAG, "DRM error", error);
         if (eventDispatcher != null) {

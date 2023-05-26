@@ -886,6 +886,12 @@ public final class DefaultHlsPlaylistTracker
     }
   }
 
+  @Nullable
+  @Override
+  public HlsMediaPlaylist getPrimaryMediaPlaylist() {
+    return primaryMediaPlaylistSnapshot;
+  }
+
   /**
    * Takes care of handling load errors of the first media playlist and applies exclusion according
    * to the {@link LoadErrorHandlingPolicy} before the first media period has been created and
