@@ -48,8 +48,16 @@ public final class EventMessage implements Metadata.Entry {
    * scheme_id_uri from section 7.3.2 of <a
    * href="https://www.scte.org/SCTEDocs/Standards/ANSI_SCTE%20214-3%202015.pdf">SCTE 214-3
    * 2015</a>.
+   *
+   * Part 3 (deprecated) contains further constraints for the DASH ISOBMFF profile.
    */
   @VisibleForTesting public static final String SCTE35_SCHEME_ID = "urn:scte:scte35:2014:bin";
+
+  /**
+   * Part 1 describes general MPD constraints and common features supported by both the DASH TS profile and DASH ISO-BMFF profile.
+   * see section 6.7.2 of https://wagtail-prod-storage.s3.amazonaws.com/documents/ANSI_SCTE_214-1_2022.pdf
+   */
+  public static final String SCTE35_XML_BIN_SCHEME_ID = "urn:scte:scte35:2014:xml+bin";
 
   private static final Format ID3_FORMAT =
       new Format.Builder().setSampleMimeType(MimeTypes.APPLICATION_ID3).build();
@@ -106,6 +114,7 @@ public final class EventMessage implements Metadata.Entry {
       case ID3_SCHEME_ID_APPLE:
         return ID3_FORMAT;
       case SCTE35_SCHEME_ID:
+      case SCTE35_XML_BIN_SCHEME_ID:
         return SCTE35_FORMAT;
       default:
         return null;

@@ -1175,7 +1175,9 @@ public class DashManifestParser extends DefaultHandler
         Util.scaleLargeTimestamp(
             presentationTime - presentationTimeOffset, C.MICROS_PER_SECOND, timescale);
     String messageData = parseString(xpp, "messageData", null);
-    byte[] eventObject = parseEventObject(xpp, scratchOutputStream);
+    byte[] eventObject = EventMessage.SCTE35_XML_BIN_SCHEME_ID.equals(schemeIdUri)
+        ? parseEventSignalBinaryObject(xpp)
+        : parseEventObject(xpp, scratchOutputStream);
     return Pair.create(
         presentationTimesUs,
         buildEvent(
@@ -1184,6 +1186,35 @@ public class DashManifestParser extends DefaultHandler
             id,
             durationMs,
             messageData == null ? eventObject : Util.getUtf8Bytes(messageData)));
+  }
+
+  protected byte[] parseEventSignalBinaryObject(XmlPullParser xpp)
+      throws XmlPullParserException, IOException {
+    byte[] binary = null;
+    do {
+      xpp.next();
+      if (XmlPullParserUtil.isStartTag(xpp, "Signal")) {
+        binary = parseBinaryObject(xpp);
+      } else {
+        maybeSkipTag(xpp);
+      }
+    } while (!XmlPullParserUtil.isEndTag(xpp, "Event"));
+    return binary == null ? new byte[0] : binary;
+  }
+
+  protected byte[] parseBinaryObject(XmlPullParser xpp)
+      throws XmlPullParserException, IOException {
+    byte[] binary = null;
+    do {
+      xpp.next();
+      if (XmlPullParserUtil.isStartTag(xpp, "Binary")) {
+        String text = xpp.nextText();
+        binary = Base64.decode(text, Base64.DEFAULT);
+      } else {
+        maybeSkipTag(xpp);
+      }
+    } while (!XmlPullParserUtil.isEndTag(xpp, "Signal"));
+    return binary;
   }
 
   /**

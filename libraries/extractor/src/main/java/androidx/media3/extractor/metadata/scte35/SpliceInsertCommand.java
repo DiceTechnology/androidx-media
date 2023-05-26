@@ -77,6 +77,7 @@ public final class SpliceInsertCommand extends SpliceCommand {
   public final int availNum;
   /** Holds the value of {@code avails_expected} as defined in SCTE35, Section 9.3.3. */
   public final int availsExpected;
+  public final List<SpliceDescriptor> descriptorList;
 
   private SpliceInsertCommand(
       long spliceEventId,
@@ -91,7 +92,8 @@ public final class SpliceInsertCommand extends SpliceCommand {
       long breakDurationUs,
       int uniqueProgramId,
       int availNum,
-      int availsExpected) {
+      int availsExpected,
+      List<SpliceDescriptor> descriptorList) {
     this.spliceEventId = spliceEventId;
     this.spliceEventCancelIndicator = spliceEventCancelIndicator;
     this.outOfNetworkIndicator = outOfNetworkIndicator;
@@ -105,6 +107,7 @@ public final class SpliceInsertCommand extends SpliceCommand {
     this.uniqueProgramId = uniqueProgramId;
     this.availNum = availNum;
     this.availsExpected = availsExpected;
+    this.descriptorList = descriptorList;
   }
 
   private SpliceInsertCommand(Parcel in) {
@@ -126,6 +129,7 @@ public final class SpliceInsertCommand extends SpliceCommand {
     uniqueProgramId = in.readInt();
     availNum = in.readInt();
     availsExpected = in.readInt();
+    descriptorList = SpliceDescriptor.createFromParcel(in);
   }
 
   /* package */ static SpliceInsertCommand parseFromSection(
@@ -178,6 +182,8 @@ public final class SpliceInsertCommand extends SpliceCommand {
       availNum = sectionData.readUnsignedByte();
       availsExpected = sectionData.readUnsignedByte();
     }
+    // Handle the descriptor_loop_length and splice_descriptor().
+    List<SpliceDescriptor> descriptors = SpliceDescriptor.parseFromSection(sectionData);
     return new SpliceInsertCommand(
         spliceEventId,
         spliceEventCancelIndicator,
@@ -191,7 +197,8 @@ public final class SpliceInsertCommand extends SpliceCommand {
         breakDurationUs,
         uniqueProgramId,
         availNum,
-        availsExpected);
+        availsExpected,
+        descriptors);
   }
 
   /** Holds splicing information for specific splice insert command components. */
@@ -240,6 +247,7 @@ public final class SpliceInsertCommand extends SpliceCommand {
     dest.writeInt(uniqueProgramId);
     dest.writeInt(availNum);
     dest.writeInt(availsExpected);
+    SpliceDescriptor.writeToParcel(descriptorList, dest);
   }
 
   public static final Parcelable.Creator<SpliceInsertCommand> CREATOR =
