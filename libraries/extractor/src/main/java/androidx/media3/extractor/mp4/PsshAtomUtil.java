@@ -145,6 +145,18 @@ public final class PsshAtomUtil {
     return parsedAtom.schemeData;
   }
 
+  public static @Nullable UUID[] parseKeyIds(byte[] atom, UUID uuid) {
+    PsshAtom parsedAtom = parsePsshAtom(atom);
+    if (parsedAtom == null) {
+      return null;
+    }
+    if (uuid != null && !uuid.equals(parsedAtom.uuid)) {
+      Log.w(TAG, "UUID mismatch. Expected: " + uuid + ", got: " + parsedAtom.uuid + ".");
+      return null;
+    }
+    return parsedAtom.keyIds;
+  }
+
   /**
    * Parses a PSSH atom. Version 0 and 1 PSSH atoms are supported.
    *
@@ -177,9 +189,17 @@ public final class PsshAtomUtil {
       return null;
     }
     UUID uuid = new UUID(atomData.readLong(), atomData.readLong());
+    UUID[] keyIds = null;
     if (atomVersion == 1) {
       int keyIdCount = atomData.readUnsignedIntToInt();
-      atomData.skipBytes(16 * keyIdCount);
+//      atomData.skipBytes(16 * keyIdCount);
+
+      if (keyIdCount > 0) {
+        keyIds = new UUID[keyIdCount];
+        for (int i = 0; i < keyIdCount; i++) {
+          keyIds[i] = new UUID(atomData.readLong(), atomData.readLong());
+        }
+      }
     }
     int dataSize = atomData.readUnsignedIntToInt();
     if (dataSize != atomData.bytesLeft()) {
@@ -188,7 +208,7 @@ public final class PsshAtomUtil {
     }
     byte[] data = new byte[dataSize];
     atomData.readBytes(data, 0, dataSize);
-    return new PsshAtom(uuid, atomVersion, data);
+    return new PsshAtom(uuid, atomVersion, data).setKeyIds(keyIds);
   }
 
   // TODO: Consider exposing this and making parsePsshAtom public.
@@ -197,11 +217,17 @@ public final class PsshAtomUtil {
     private final UUID uuid;
     private final int version;
     private final byte[] schemeData;
+    private UUID[] keyIds;
 
     public PsshAtom(UUID uuid, int version, byte[] schemeData) {
       this.uuid = uuid;
       this.version = version;
       this.schemeData = schemeData;
+    }
+
+    public PsshAtom setKeyIds(UUID[] keyIds) {
+      this.keyIds = keyIds;
+      return this;
     }
   }
 }

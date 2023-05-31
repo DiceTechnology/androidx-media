@@ -81,6 +81,7 @@ import androidx.media3.common.TrackGroup;
 import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
+import androidx.media3.common.endeavor.LimitedSeekRange;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.RepeatModeUtil;
 import androidx.media3.common.util.UnstableApi;
@@ -228,6 +229,17 @@ public class PlayerControlView extends FrameLayout {
     void onProgressUpdate(long position, long bufferedPosition);
   }
 
+  /** Listener to be notified when the DVR window is updated. */
+  public interface DvrWindowListener {
+
+    /**
+     * Called when the DVR window is updated.
+     *
+     * @param hasDvrWindow Indicates whether the stream has a valid DVR window.
+     */
+    void onDvrWindowUpdate(boolean hasDvrWindow);
+  }
+
   /**
    * @deprecated Register a {@link PlayerView.FullscreenButtonClickListener} via {@link
    *     PlayerView#setFullscreenButtonClickListener(PlayerView.FullscreenButtonClickListener)}
@@ -263,6 +275,9 @@ public class PlayerControlView extends FrameLayout {
   private static final int SETTINGS_PLAYBACK_SPEED_POSITION = 0;
   private static final int SETTINGS_AUDIO_TRACK_SELECTION_POSITION = 1;
 
+  /** The minimum duration of a DVR window in order for it to be considered a valid DVR window. */
+  private static final long MIN_LENGTH_OF_DVR_MS = 120_000;
+
   private final PlayerControlViewLayoutManager controlViewLayoutManager;
   private final Resources resources;
   private final ComponentListener componentListener;
@@ -283,6 +298,8 @@ public class PlayerControlView extends FrameLayout {
   @Nullable private final View previousButton;
   @Nullable private final View nextButton;
   @Nullable private final View playPauseButton;
+  @Nullable private final View playButton;
+  @Nullable private final View pauseButton;
   @Nullable private final View fastForwardButton;
   @Nullable private final View rewindButton;
   @Nullable private final TextView fastForwardButtonTextView;
@@ -329,6 +346,11 @@ public class PlayerControlView extends FrameLayout {
   @Nullable private Player player;
   @Nullable private ProgressUpdateListener progressUpdateListener;
 
+  private boolean showPlayPauseButton;
+  @Nullable private DvrWindowListener dvrWindowListener;
+
+  @Nullable protected LimitedSeekRange limitedSeekRange;
+
   @Nullable private OnFullScreenModeChangedListener onFullScreenModeChangedListener;
   private boolean isFullScreen;
   private boolean isAttachedToWindow;
@@ -374,6 +396,7 @@ public class PlayerControlView extends FrameLayout {
     showTimeoutMs = DEFAULT_SHOW_TIMEOUT_MS;
     repeatToggleModes = DEFAULT_REPEAT_TOGGLE_MODES;
     timeBarMinUpdateIntervalMs = DEFAULT_TIME_BAR_MIN_UPDATE_INTERVAL_MS;
+    showPlayPauseButton = true;
     boolean showRewindButton = true;
     boolean showFastForwardButton = true;
     boolean showPreviousButton = true;
@@ -488,6 +511,14 @@ public class PlayerControlView extends FrameLayout {
     playPauseButton = findViewById(R.id.exo_play_pause);
     if (playPauseButton != null) {
       playPauseButton.setOnClickListener(componentListener);
+    }
+    playButton = findViewById(R.id.exo_play);
+    if (playButton != null) {
+      playButton.setOnClickListener(componentListener);
+    }
+    pauseButton = findViewById(R.id.exo_pause);
+    if (pauseButton != null) {
+      pauseButton.setOnClickListener(componentListener);
     }
     previousButton = findViewById(R.id.exo_prev);
     if (previousButton != null) {
@@ -695,11 +726,35 @@ public class PlayerControlView extends FrameLayout {
     updateTimeline();
   }
 
+  public void setLimitedSeekRange(LimitedSeekRange limitedSeekRange) {
+    this.limitedSeekRange = limitedSeekRange;
+    updateTimeline();
+  }
+
   /**
-   * @deprecated Register a {@link PlayerView.ControllerVisibilityListener} via {@link
-   *     PlayerView#setControllerVisibilityListener(PlayerView.ControllerVisibilityListener)}
-   *     instead. Using {@link PlayerControlView} as a standalone class without {@link PlayerView}
-   *     is deprecated.
+   * Sets the {@link DvrWindowListener}.
+   *
+   * @param listener The listener to be notified when the DVR window is updated.
+   */
+  public void setDvrWindowListener(@Nullable DvrWindowListener listener) {
+    this.dvrWindowListener = listener;
+  }
+
+  /**
+   * Sets whether the play/pause button is shown.
+   *
+   * @param showPlayPauseButton Whether the play/pause button is shown.
+   */
+  public void setShowPlayPauseButton(boolean showPlayPauseButton) {
+    this.showPlayPauseButton = showPlayPauseButton;
+    updatePlayPauseButton();
+  }
+
+  /**
+   * @deprecated Register a {@link StyledPlayerView.ControllerVisibilityListener} via {@link
+   *     StyledPlayerView#setControllerVisibilityListener(StyledPlayerView.ControllerVisibilityListener)}
+   *     instead. Using {@link StyledPlayerControlView} as a standalone class without {@link
+   *     StyledPlayerView} is deprecated.
    */
   @SuppressWarnings("deprecation")
   @Deprecated
@@ -974,6 +1029,9 @@ public class PlayerControlView extends FrameLayout {
   }
 
   private void updatePlayPauseButton() {
+    if (!showPlayPauseButton) {
+      return;
+    }
     if (!isVisible() || !isAttachedToWindow) {
       return;
     }
@@ -995,6 +1053,20 @@ public class PlayerControlView extends FrameLayout {
 
       boolean enablePlayPause = shouldEnablePlayPauseButton();
       updateButton(enablePlayPause, playPauseButton);
+    } else if (playButton != null && pauseButton != null) {
+      boolean requestPlayPauseFocus = false;
+      boolean shouldShowPauseButton = shouldShowPauseButton();
+      if (playButton != null) {
+        requestPlayPauseFocus |= shouldShowPauseButton && playButton.isFocused();
+        playButton.setVisibility(shouldShowPauseButton ? GONE : VISIBLE);
+      }
+      if (pauseButton != null) {
+        requestPlayPauseFocus |= !shouldShowPauseButton && pauseButton.isFocused();
+        pauseButton.setVisibility(shouldShowPauseButton ? VISIBLE : GONE);
+      }
+      if (requestPlayPauseFocus) {
+        requestPlayPauseFocus();
+      }
     }
   }
 
@@ -1233,7 +1305,14 @@ public class PlayerControlView extends FrameLayout {
         durationUs = msToUs(playerDurationMs);
       }
     }
-    long durationMs = Util.usToMs(durationUs);
+    // Apply the limited seek range.
+    // long durationMs = Util.usToMs(durationUs);
+    long realDurationMs = Util.usToMs(durationUs);
+    long durationMs = LimitedSeekRange.adjustDuration(realDurationMs, limitedSeekRange);
+    boolean isVod = LimitedSeekRange.isUseAsVod(limitedSeekRange);
+    if (dvrWindowListener != null && player.isCurrentWindowLive() && !isVod) {
+      dvrWindowListener.onDvrWindowUpdate(realDurationMs > MIN_LENGTH_OF_DVR_MS);
+    }
     if (durationView != null) {
       durationView.setText(Util.getStringForTime(formatBuilder, formatter, durationMs));
     }
@@ -1262,6 +1341,10 @@ public class PlayerControlView extends FrameLayout {
     if (player != null && player.isCommandAvailable(COMMAND_GET_CURRENT_MEDIA_ITEM)) {
       position = currentWindowOffset + player.getContentPosition();
       bufferedPosition = currentWindowOffset + player.getContentBufferedPosition();
+
+      // Apply the limited seek range.
+      position = LimitedSeekRange.adjustPosition(position, limitedSeekRange).getPositionMs();
+      bufferedPosition = LimitedSeekRange.adjustPosition(bufferedPosition, limitedSeekRange).getPositionMs();
     }
     if (positionView != null && !scrubbing) {
       positionView.setText(Util.getStringForTime(formatBuilder, formatter, position));
@@ -1276,8 +1359,11 @@ public class PlayerControlView extends FrameLayout {
 
     // Cancel any pending updates and schedule a new one if necessary.
     removeCallbacks(updateProgressAction);
-    int playbackState = player == null ? Player.STATE_IDLE : player.getPlaybackState();
-    if (player != null && player.isPlaying()) {
+    // Apply the limited seek range.
+    // int playbackState = player == null ? Player.STATE_IDLE : player.getPlaybackState();
+    int realPlaybackState = player == null ? Player.STATE_IDLE : player.getPlaybackState();
+    int playbackState = LimitedSeekRange.adjustPlaybackState(realPlaybackState, limitedSeekRange);
+    if (player != null && player.isPlaying() && playbackState != Player.STATE_ENDED) {
       long mediaTimeDelayMs =
           timeBar != null ? timeBar.getPreferredUpdateDelay() : MAX_UPDATE_INTERVAL_MS;
 
@@ -1351,6 +1437,13 @@ public class PlayerControlView extends FrameLayout {
   /* package */ void requestPlayPauseFocus() {
     if (playPauseButton != null) {
       playPauseButton.requestFocus();
+    } else if (playButton != null && pauseButton != null) {
+      boolean shouldShowPauseButton = shouldShowPauseButton();
+      if (!shouldShowPauseButton) {
+        playButton.requestFocus();
+      } else {
+        pauseButton.requestFocus();
+      }
     }
   }
 
@@ -1706,7 +1799,10 @@ public class PlayerControlView extends FrameLayout {
     public void onScrubStop(TimeBar timeBar, long position, boolean canceled) {
       scrubbing = false;
       if (!canceled && player != null) {
-        seekToTimeBarPosition(player, position);
+        // Apply the limited seek range.
+        // seekToTimeBarPosition(player, position);
+        long realPositionMs = LimitedSeekRange.revertPosition(position, limitedSeekRange).getPositionMs();
+        seekToTimeBarPosition(player, realPositionMs);
       }
       controlViewLayoutManager.resetHideCallbacks();
     }
@@ -1744,6 +1840,10 @@ public class PlayerControlView extends FrameLayout {
         }
       } else if (playPauseButton == view) {
         dispatchPlayPause(player);
+      } else if (playButton == view) {
+        dispatchPlay(player);
+      } else if (pauseButton == view) {
+        dispatchPause(player);
       } else if (repeatToggleButton == view) {
         if (player.isCommandAvailable(COMMAND_SET_REPEAT_MODE)) {
           player.setRepeatMode(

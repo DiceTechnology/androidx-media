@@ -509,7 +509,7 @@ public final class DefaultMediaSourceFactory implements MediaSourceFactory {
 
   // internal methods
 
-  private static MediaSource maybeClipMediaSource(MediaItem mediaItem, MediaSource mediaSource) {
+  public static MediaSource maybeClipMediaSource(MediaItem mediaItem, MediaSource mediaSource) {
     if (mediaItem.clippingConfiguration.startPositionMs == 0
         && mediaItem.clippingConfiguration.endPositionMs == C.TIME_END_OF_SOURCE
         && !mediaItem.clippingConfiguration.relativeToDefaultPosition) {
@@ -558,7 +558,7 @@ public final class DefaultMediaSourceFactory implements MediaSourceFactory {
   }
 
   /** Loads media source factories lazily. */
-  private static final class DelegateFactoryLoader {
+  public static final class DelegateFactoryLoader {
     private final ExtractorsFactory extractorsFactory;
     private final Map<Integer, @NullableType Supplier<MediaSource.Factory>>
         mediaSourceFactorySuppliers;
@@ -690,7 +690,7 @@ public final class DefaultMediaSourceFactory implements MediaSourceFactory {
     }
   }
 
-  private static final class UnknownSubtitlesExtractor implements Extractor {
+  public static final class UnknownSubtitlesExtractor implements Extractor {
     private final Format format;
 
     public UnknownSubtitlesExtractor(Format format) {

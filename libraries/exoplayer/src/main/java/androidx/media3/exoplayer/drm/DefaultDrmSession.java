@@ -32,6 +32,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.media3.common.C;
 import androidx.media3.common.DrmInitData.SchemeData;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Consumer;
 import androidx.media3.common.util.CopyOnWriteMultiset;
@@ -143,6 +144,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
   private @DrmSession.State int state;
   private int referenceCount;
+  private String name = "drmSession";
   @Nullable private HandlerThread requestHandlerThread;
   @Nullable private RequestHandler requestHandler;
   @Nullable private CryptoConfig cryptoConfig;
@@ -326,6 +328,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       if (openInternal()) {
         doLicense(true);
       }
+      Log.i(WebUtil.DEBUG, name + " created");
     } else if (eventDispatcher != null
         && isOpen()
         && eventDispatchers.count(eventDispatcher) == 1) {
@@ -359,6 +362,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         mediaDrm.closeSession(sessionId);
         sessionId = null;
       }
+      Log.i(WebUtil.DEBUG, name + " released");
     }
     if (eventDispatcher != null) {
       eventDispatchers.remove(eventDispatcher);
@@ -393,10 +397,14 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       int localState = state;
       dispatchEvent(eventDispatcher -> eventDispatcher.drmSessionAcquired(localState));
       Assertions.checkNotNull(sessionId);
+      name = "drmSession @" + new String(sessionId);
+      Log.i(WebUtil.DEBUG, name + " open");
       return true;
     } catch (NotProvisionedException e) {
+      Log.e(WebUtil.DEBUG, name + " open fail - no provisioned, " + e);
       provisioningManager.provisionRequired(this);
     } catch (Exception e) {
+      Log.e(WebUtil.DEBUG, name + " open fail - " + e);
       onError(e, DrmUtil.ERROR_SOURCE_EXO_MEDIA_DRM);
     }
 
@@ -411,13 +419,16 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     currentProvisionRequest = null;
 
     if (response instanceof Exception) {
+      Log.e(WebUtil.DEBUG, name + " provision acquire fail - " + response);
       provisioningManager.onProvisionError((Exception) response, /* thrownByExoMediaDrm= */ false);
       return;
     }
 
     try {
       mediaDrm.provideProvisionResponse((byte[]) response);
+      Log.i(WebUtil.DEBUG, name + " provision acquired");
     } catch (Exception e) {
+      Log.e(WebUtil.DEBUG, name + " provision store fail - " + e);
       provisioningManager.onProvisionError(e, /* thrownByExoMediaDrm= */ true);
       return;
     }
@@ -507,6 +518,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     currentKeyRequest = null;
 
     if (response instanceof Exception) {
+      Log.e(WebUtil.DEBUG, name + " key acquire fail - " + response);
       onKeysError((Exception) response, /* thrownByExoMediaDrm= */ false);
       return;
     }
@@ -528,7 +540,9 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         state = STATE_OPENED_WITH_KEYS;
         dispatchEvent(DrmSessionEventListener.EventDispatcher::drmKeysLoaded);
       }
+      Log.i(WebUtil.DEBUG, name + " key acquired");
     } catch (Exception e) {
+      Log.e(WebUtil.DEBUG, name + " key store fail - " + e);
       onKeysError(e, /* thrownByExoMediaDrm= */ true);
     }
   }

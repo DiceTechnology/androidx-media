@@ -19,7 +19,9 @@ import android.net.Uri;
 import android.text.TextUtils;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
+import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
+import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
@@ -122,6 +124,8 @@ public final class HttpMediaDrmCallback implements MediaDrmCallback {
       throws MediaDrmCallbackException {
     String url =
         request.getDefaultUrl() + "&signedRequest=" + Util.fromUtf8Bytes(request.getData());
+
+    Log.i(WebUtil.DEBUG, "drmSession provision request [" + url + "]");
     return executePost(
         dataSourceFactory,
         url,
@@ -158,6 +162,22 @@ public final class HttpMediaDrmCallback implements MediaDrmCallback {
     synchronized (keyRequestProperties) {
       requestProperties.putAll(keyRequestProperties);
     }
+    if (request.getXDrmInfo() != null) {
+      requestProperties.put(WidevineUtil.X_DRM_INFO, request.getXDrmInfo());
+    }
+
+    String msg = url;
+    String token = requestProperties.get(WidevineUtil.AUTHORIZATION);
+    if (!WebUtil.empty(token)) {
+      String xDrmInfo = requestProperties.get(WidevineUtil.X_DRM_INFO);
+      if (WebUtil.empty(xDrmInfo)) {
+        xDrmInfo = WidevineUtil.createXDrmInfoHeader(null, null);
+        requestProperties.put(WidevineUtil.X_DRM_INFO, xDrmInfo);
+      }
+      msg += ", X-DRM-INFO " + xDrmInfo;
+      msg += ", Authorization " + token;
+    }
+    Log.i(WebUtil.DEBUG, "drmSession key request [" + msg + "]");
     return executePost(dataSourceFactory, url, request.getData(), requestProperties);
   }
 

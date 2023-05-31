@@ -274,6 +274,7 @@ public interface ExoMediaDrm {
     private final byte[] data;
     private final String licenseServerUrl;
     private final @RequestType int requestType;
+    private String xDrmInfo;
 
     /**
      * Creates an instance with {@link #REQUEST_TYPE_UNKNOWN}.
@@ -315,6 +316,15 @@ public interface ExoMediaDrm {
      */
     public @RequestType int getRequestType() {
       return requestType;
+    }
+
+    public KeyRequest setXDrmInfo(String xDrmInfo) {
+      this.xDrmInfo = xDrmInfo;
+      return this;
+    }
+
+    public String getXDrmInfo() {
+      return xDrmInfo;
     }
   }
 

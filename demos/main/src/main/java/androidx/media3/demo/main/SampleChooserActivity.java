@@ -56,12 +56,15 @@ import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSourceInputStream;
 import androidx.media3.datasource.DataSourceUtil;
 import androidx.media3.datasource.DataSpec;
+import androidx.media3.demo.main.upstream.PlaybackProvider;
 import androidx.media3.exoplayer.RenderersFactory;
 import androidx.media3.exoplayer.endeavor.CMCDManager;
 import androidx.media3.exoplayer.offline.DownloadService;
+import com.facebook.stetho.Stetho;
 import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.reactivex.android.schedulers.AndroidSchedulers;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -104,6 +107,7 @@ public class SampleChooserActivity extends AppCompatActivity
     // Global Setting.
     Log.setLogLevel(Log.LOG_LEVEL_ALL);
     CMCDManager.getInstance().setAllActivations(false);
+    Stetho.initializeWithDefaults(getApplicationContext());
 
     Intent intent = getIntent();
     String dataUri = intent.getDataString();
@@ -267,6 +271,26 @@ public class SampleChooserActivity extends AppCompatActivity
     intent.putExtra(
         IntentUtil.PREFER_EXTENSION_DECODERS_EXTRA,
         isNonNullAndChecked(preferExtensionDecodersMenuItem));
+    if (playlistHolder.mediaItems.size() == 1) {
+      Uri originUri = playlistHolder.mediaItems.get(0).localConfiguration.uri;
+      PlaybackProvider.getInstance().getLiveStreamInfo(originUri)
+          .observeOn(AndroidSchedulers.mainThread())
+          .subscribe(result -> {
+                List<MediaItem> mediaItems = playlistHolder.mediaItems;
+                if (result != null && result.localConfiguration != null) {
+                  Log.i(TAG, "fetch video from backend - " + originUri.getQuery() + " >> " + result.localConfiguration.uri);
+                  mediaItems = Collections.singletonList(result);
+                }
+                IntentUtil.addToIntent(mediaItems, intent);
+                startActivity(intent);
+              },
+              error -> {
+                Log.e(TAG, "fail to fetch video from backend - " + originUri.getQuery(), error);
+                IntentUtil.addToIntent(playlistHolder.mediaItems, intent);
+                startActivity(intent);
+              });
+      return true;
+    }
     IntentUtil.addToIntent(playlistHolder.mediaItems, intent);
     startActivity(intent);
     return true;

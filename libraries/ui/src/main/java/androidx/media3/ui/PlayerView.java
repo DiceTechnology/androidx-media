@@ -66,6 +66,7 @@ import androidx.media3.common.Timeline.Period;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.VideoSize;
 import androidx.media3.common.text.CueGroup;
+import androidx.media3.common.endeavor.LimitedSeekRange;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.RepeatModeUtil;
 import androidx.media3.common.util.UnstableApi;
@@ -1087,6 +1088,12 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
       @Nullable long[] extraAdGroupTimesMs, @Nullable boolean[] extraPlayedAdGroups) {
     Assertions.checkStateNotNull(controller);
     controller.setExtraAdGroupMarkers(extraAdGroupTimesMs, extraPlayedAdGroups);
+  }
+
+  public void setLimitedSeekRange(LimitedSeekRange limitedSeekRange) {
+    if (controller != null) {
+      controller.setLimitedSeekRange(limitedSeekRange);
+    }
   }
 
   /**
