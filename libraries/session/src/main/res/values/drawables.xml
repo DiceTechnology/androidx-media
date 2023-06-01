@@ -21,4 +21,8 @@
   <drawable name="media3_notification_seek_forward">@android:drawable/ic_media_ff</drawable>
   <drawable name="media3_notification_seek_back">@android:drawable/ic_media_rew</drawable>
   <drawable name="media3_notification_small_icon">@drawable/media3_icon_circular_play</drawable>
+
+  <drawable name="media3_ext_action_repeat_all">@drawable/media3_ext_icon_repeat_all</drawable>
+  <drawable name="media3_ext_action_repeat_off">@drawable/media3_ext_icon_repeat_off</drawable>
+  <drawable name="media3_ext_action_repeat_one">@drawable/media3_ext_icon_repeat_one</drawable>
 </resources>
