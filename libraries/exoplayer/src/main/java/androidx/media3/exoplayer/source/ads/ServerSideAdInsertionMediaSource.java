@@ -66,6 +66,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
@@ -398,6 +399,25 @@ public final class ServerSideAdInsertionMediaSource extends BaseMediaSource
       drmEventDispatcherWithoutId.drmKeysRemoved();
     } else {
       mediaPeriod.drmEventDispatcher.drmKeysRemoved();
+    }
+  }
+
+  @Override
+  public void onDrmKeyStatusChange(
+      int windowIndex,
+      @Nullable MediaSource.MediaPeriodId mediaPeriodId,
+      String sessionId,
+      String securityLevel,
+      List<UUID> usableKeys,
+      List<UUID> otherKeys) {
+    @Nullable
+    MediaPeriodImpl mediaPeriod =
+        getMediaPeriodForEvent(
+            mediaPeriodId, /* mediaLoadData= */ null, /* useLoadingPeriod= */ false);
+    if (mediaPeriod == null) {
+      drmEventDispatcherWithoutId.drmKeyStatusChange(sessionId, securityLevel, usableKeys, otherKeys);
+    } else {
+      mediaPeriod.drmEventDispatcher.drmKeyStatusChange(sessionId, securityLevel, usableKeys, otherKeys);
     }
   }
 

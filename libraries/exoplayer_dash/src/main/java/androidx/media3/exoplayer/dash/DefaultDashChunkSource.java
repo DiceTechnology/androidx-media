@@ -651,6 +651,7 @@ public class DefaultDashChunkSource implements DashChunkSource {
         trackFormat,
         -1,
         -1,
+        -1,
         null,
         representationHolder);
     DataSpec dataSpec =
@@ -691,6 +692,7 @@ public class DefaultDashChunkSource implements DashChunkSource {
           trackFormat,
           endTimeUs - startTimeUs,
           firstSegmentNum,
+          firstSegmentNum + maxSegmentCount - 1,
           segmentUri,
           representationHolder);
       DataSpec dataSpec =
@@ -737,6 +739,7 @@ public class DefaultDashChunkSource implements DashChunkSource {
           trackFormat,
           endTimeUs - startTimeUs,
           segmentNum,
+          firstSegmentNum + maxSegmentCount - 1,
           segmentUri,
           representationHolder);
       DataSpec dataSpec =
@@ -765,6 +768,7 @@ public class DefaultDashChunkSource implements DashChunkSource {
       Format format,
       long durationUs,
       long segmentNum,
+      long maxSegmentNum,
       RangedUri segmentUri,
       RepresentationHolder holder) {
     CMCDCollector collector = CMCDCollector.createCollector(cmcdCollector);
@@ -780,7 +784,8 @@ public class DefaultDashChunkSource implements DashChunkSource {
 
         // Find the next object.
         if (cmcdCollector.isActiveNextPayload()) {
-          RangedUri nextRangeUri = (segmentNum == C.INDEX_UNSET ? null : holder.getSegmentUrl(segmentNum + 1));
+          boolean hasNext = segmentNum != C.INDEX_UNSET && segmentNum < maxSegmentNum;
+          RangedUri nextRangeUri = hasNext ? holder.getSegmentUrl(segmentNum + 1) : null;
           if (nextRangeUri != null) {
             Uri nextUri = nextRangeUri.resolveUri(holder.selectedBaseUrl.url);
             Uri mediaUri = segmentUri.resolveUri(holder.selectedBaseUrl.url);

@@ -62,6 +62,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
@@ -889,6 +890,21 @@ public class DefaultAnalyticsCollector implements AnalyticsCollector {
         eventTime,
         AnalyticsListener.EVENT_DRM_KEYS_REMOVED,
         listener -> listener.onDrmKeysRemoved(eventTime));
+  }
+
+  @Override
+  public final void onDrmKeyStatusChange(
+      int windowIndex,
+      @Nullable MediaPeriodId mediaPeriodId,
+      String sessionId,
+      String securityLevel,
+      List<UUID> usableKeys,
+      List<UUID> otherKeys) {
+    EventTime eventTime = generateMediaPeriodEventTime(windowIndex, mediaPeriodId);
+    sendEvent(
+        eventTime,
+        AnalyticsListener.EVENT_DRM_KEY_STATUS_CHANGE,
+        listener -> listener.onDrmKeyStatusChange(eventTime, sessionId, securityLevel, usableKeys, otherKeys));
   }
 
   @Override

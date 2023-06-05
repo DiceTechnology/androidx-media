@@ -24,6 +24,8 @@ import androidx.media3.common.Player;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /** Listener of {@link DrmSessionManager} events. */
@@ -86,6 +88,25 @@ public interface DrmSessionEventListener {
    * @param mediaPeriodId The {@link MediaPeriodId} associated with the drm session.
    */
   default void onDrmKeysRemoved(int windowIndex, @Nullable MediaPeriodId mediaPeriodId) {}
+
+  /**
+   * Called each time the keys in a session change status, such as when the license is renewed or
+   * expires.
+   *
+   * @param windowIndex The window index in the timeline this media period belongs to.
+   * @param mediaPeriodId The {@link MediaPeriodId} associated with the drm session.
+   * @param sessionId The DRM session ID on which the event occurred.
+   * @param securityLevel The securityLevel property value of the underlying DRM plugin.
+   * @param usableKeys A list of usable key ID.
+   * @param otherKeys A list of not-usable key ID.
+   */
+  default void onDrmKeyStatusChange(
+      int windowIndex,
+      @Nullable MediaPeriodId mediaPeriodId,
+      String sessionId,
+      String securityLevel,
+      List<UUID> usableKeys,
+      List<UUID> otherKeys) {}
 
   /**
    * Called each time a drm session is released.
@@ -212,6 +233,20 @@ public interface DrmSessionEventListener {
         postOrRun(
             listenerAndHandler.handler,
             () -> listener.onDrmKeysRemoved(windowIndex, mediaPeriodId));
+      }
+    }
+
+    /** Dispatches {@link #onDrmKeyStatusChange(int, MediaPeriodId, String, String, List, List)} . */
+    public void drmKeyStatusChange(
+        String sessionId,
+        String securityLevel,
+        List<UUID> usableKeys,
+        List<UUID> otherKeys) {
+      for (ListenerAndHandler listenerAndHandler : listenerAndHandlers) {
+        DrmSessionEventListener listener = listenerAndHandler.listener;
+        postOrRun(
+            listenerAndHandler.handler,
+            () -> listener.onDrmKeyStatusChange(windowIndex, mediaPeriodId, sessionId, securityLevel, usableKeys, otherKeys));
       }
     }
 

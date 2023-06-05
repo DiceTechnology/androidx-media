@@ -29,6 +29,7 @@ import androidx.media3.exoplayer.dash.manifest.SegmentBase.SingleSegmentBase;
 import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 /** A DASH representation. */
 @UnstableApi
@@ -56,6 +57,8 @@ public abstract class Representation {
   public final List<Descriptor> essentialProperties;
   /** Supplemental properties in the adaptation set. May be empty. */
   public final List<Descriptor> supplementalProperties;
+
+  public List<UUID> defaultKids;
 
   private final RangedUri initializationUri;
 
@@ -150,6 +153,11 @@ public abstract class Representation {
     this.supplementalProperties = supplementalProperties;
     initializationUri = segmentBase.getInitialization(this);
     presentationTimeOffsetUs = segmentBase.getPresentationTimeOffsetUs();
+  }
+
+  public Representation setDefaultKids(List<UUID> defaultKids) {
+    this.defaultKids = defaultKids;
+    return this;
   }
 
   /**

@@ -28,6 +28,8 @@ import androidx.media3.exoplayer.drm.DrmSession;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Composite {@link MediaSource} consisting of multiple child sources.
@@ -341,6 +343,19 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
     public void onDrmKeysRemoved(int windowIndex, @Nullable MediaPeriodId mediaPeriodId) {
       if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {
         drmEventDispatcher.drmKeysRemoved();
+      }
+    }
+
+    @Override
+    public void onDrmKeyStatusChange(
+        int windowIndex,
+        @Nullable MediaSource.MediaPeriodId mediaPeriodId,
+        String sessionId,
+        String securityLevel,
+        List<UUID> usableKeys,
+        List<UUID> otherKeys) {
+      if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {
+        drmEventDispatcher.drmKeyStatusChange(sessionId, securityLevel, usableKeys, otherKeys);
       }
     }
 
