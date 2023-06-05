@@ -51,6 +51,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
@@ -721,6 +722,24 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       if (eventParameters != null) {
         eventHandler.post(
             () -> eventListener.onDrmKeysRemoved(eventParameters.first, eventParameters.second));
+      }
+    }
+
+    @Override
+    public void onDrmKeyStatusChange(
+        int windowIndex,
+        @Nullable MediaSource.MediaPeriodId mediaPeriodId,
+        String sessionId,
+        String securityLevel,
+        List<UUID> usableKeys,
+        List<UUID> otherKeys) {
+      @Nullable
+      Pair<Integer, MediaSource.@NullableType MediaPeriodId> eventParameters =
+          getEventParameters(windowIndex, mediaPeriodId);
+      if (eventParameters != null) {
+        eventHandler.post(
+            () -> eventListener.onDrmKeyStatusChange(eventParameters.first, eventParameters.second,
+                sessionId, securityLevel, usableKeys, otherKeys));
       }
     }
 

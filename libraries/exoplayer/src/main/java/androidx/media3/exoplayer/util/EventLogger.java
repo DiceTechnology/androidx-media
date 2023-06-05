@@ -47,7 +47,9 @@ import androidx.media3.exoplayer.trackselection.MappingTrackSelector;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.text.NumberFormat;
+import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 /** Logs events from {@link Player} and other core components using {@link Log}. */
 @SuppressWarnings("UngroupedOverloads")
@@ -552,6 +554,17 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onDrmKeysRemoved(EventTime eventTime) {
     logd(eventTime, "drmKeysRemoved");
+  }
+
+  @Override
+  public final void onDrmKeyStatusChange(
+      EventTime eventTime,
+      String sessionId,
+      String securityLevel,
+      List<UUID> usableKeys,
+      List<UUID> otherKeys) {
+    Log.i(WebUtil.DEBUG, "drmKeyStatusChange, " + sessionId + ", " + securityLevel
+        + ", [" + TextUtils.join(", ", usableKeys) + "]");
   }
 
   @UnstableApi

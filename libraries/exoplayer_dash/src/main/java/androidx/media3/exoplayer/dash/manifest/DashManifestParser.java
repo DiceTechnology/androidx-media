@@ -862,9 +862,11 @@ public class DashManifestParser extends DefaultHandler
     }
     ArrayList<SchemeData> drmSchemeDatas = representationInfo.drmSchemeDatas;
     drmSchemeDatas.addAll(extraDrmSchemeDatas);
+    ArrayList<UUID> defaultKids = new ArrayList<>();
     if (!drmSchemeDatas.isEmpty()) {
       fillInClearKeyInformation(drmSchemeDatas);
       filterRedundantIncompleteSchemeDatas(drmSchemeDatas);
+      fillInDefaultKeyIds(drmSchemeDatas, defaultKids);
       formatBuilder.setDrmInitData(new DrmInitData(drmSchemeType, drmSchemeDatas));
     }
     ArrayList<Descriptor> inbandEventStreams = representationInfo.inbandEventStreams;
@@ -877,7 +879,7 @@ public class DashManifestParser extends DefaultHandler
         inbandEventStreams,
         representationInfo.essentialProperties,
         representationInfo.supplementalProperties,
-        /* cacheKey= */ null);
+        /* cacheKey= */ null).setDefaultKids(defaultKids);
   }
 
   // SegmentBase, SegmentList and SegmentTemplate parsing.
@@ -1764,6 +1766,21 @@ public class DashManifestParser extends DefaultHandler
             i,
             new SchemeData(
                 C.CLEARKEY_UUID, clearKeyLicenseServerUrl, schemeData.mimeType, schemeData.data));
+      }
+    }
+  }
+
+  private static void fillInDefaultKeyIds(ArrayList<SchemeData> schemeDatas, ArrayList<UUID> defaultKids) {
+    for (SchemeData schemeData : schemeDatas) {
+      if (!C.COMMON_PSSH_UUID.equals(schemeData.uuid) || schemeData.data == null) {
+        continue;
+      }
+      UUID[] keyIds = PsshAtomUtil.parseKeyIds(schemeData.data, schemeData.uuid);
+      if (keyIds == null || keyIds.length == 0) {
+        continue;
+      }
+      for (UUID keyId : keyIds) {
+        defaultKids.add(keyId);
       }
     }
   }

@@ -69,6 +69,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * A listener for analytics events.
@@ -375,6 +376,7 @@ public interface AnalyticsListener {
   @UnstableApi int EVENT_VIDEO_CODEC_ERROR = 1030;
 
   int EVENT_STREAM_LOW_LATENCY = 10001;
+  int EVENT_DRM_KEY_STATUS_CHANGE = 10002;
 
   /** Time information of an event. */
   @UnstableApi
@@ -1355,6 +1357,23 @@ public interface AnalyticsListener {
    */
   @UnstableApi
   default void onDrmKeysRemoved(EventTime eventTime) {}
+
+  /**
+   * Called each time the keys in a session change status, such as when the license is renewed or
+   * expires.
+   *
+   * @param eventTime The event time.
+   * @param sessionId The DRM session ID on which the event occurred.
+   * @param securityLevel The securityLevel property value of the underlying DRM plugin.
+   * @param usableKeys A list of usable key ID.
+   * @param otherKeys A list of not-usable key ID.
+   */
+  default void onDrmKeyStatusChange(
+      EventTime eventTime,
+      String sessionId,
+      String securityLevel,
+      List<UUID> usableKeys,
+      List<UUID> otherKeys) {}
 
   /**
    * Called each time a drm session is released.

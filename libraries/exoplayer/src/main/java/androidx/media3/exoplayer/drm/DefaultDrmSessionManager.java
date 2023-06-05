@@ -22,6 +22,7 @@ import static androidx.media3.common.util.Assertions.checkStateNotNull;
 import static java.lang.annotation.ElementType.TYPE_USE;
 
 import android.annotation.SuppressLint;
+import android.media.MediaDrm.KeyStatus;
 import android.media.ResourceBusyException;
 import android.os.Handler;
 import android.os.Looper;
@@ -43,6 +44,7 @@ import androidx.media3.common.util.Util;
 import androidx.media3.exoplayer.analytics.PlayerId;
 import androidx.media3.exoplayer.drm.DrmSession.DrmSessionException;
 import androidx.media3.exoplayer.drm.ExoMediaDrm.OnEventListener;
+import androidx.media3.exoplayer.drm.ExoMediaDrm.OnKeyStatusChangeListener;
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy;
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy;
 import com.google.common.collect.ImmutableList;
@@ -53,6 +55,7 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -320,6 +323,7 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
   private int mode;
   @Nullable private byte[] offlineLicenseKeySetId;
   private @MonotonicNonNull PlayerId playerId;
+  private MediaDrmKeyStatusChangeListener keyStatusChangeListener;
 
   /* package */ @Nullable volatile MediaDrmHandler mediaDrmHandler;
 
@@ -479,6 +483,12 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
     if (exoMediaDrm == null) {
       exoMediaDrm = exoMediaDrmProvider.acquireExoMediaDrm(uuid);
       exoMediaDrm.setOnEventListener(new MediaDrmEventListener());
+      // Set OnKeyStatusChangeListener instance
+      if (keyStatusChangeListener != null) {
+        keyStatusChangeListener.setEventDispatcher(null);
+      }
+      keyStatusChangeListener = new MediaDrmKeyStatusChangeListener();
+      exoMediaDrm.setOnKeyStatusChangeListener(keyStatusChangeListener);
     } else if (sessionKeepaliveMs != C.TIME_UNSET) {
       // Re-acquire the keepalive references for any sessions that are still active.
       for (int i = 0; i < sessions.size(); i++) {
@@ -577,6 +587,9 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
         return new ErrorStateDrmSession(
             new DrmSessionException(error, PlaybackException.ERROR_CODE_DRM_CONTENT_ERROR));
       }
+    }
+    if (keyStatusChangeListener != null) {
+      keyStatusChangeListener.setEventDispatcher(eventDispatcher);
     }
 
     @Nullable DefaultDrmSession session;
@@ -829,6 +842,10 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
         && preacquiredSessionReferences.isEmpty()) {
       // This manager and all its sessions are fully released so we can release exoMediaDrm.
       checkNotNull(exoMediaDrm).release();
+      if (keyStatusChangeListener != null) {
+        keyStatusChangeListener.setEventDispatcher(null);
+        keyStatusChangeListener = null;
+      }
       exoMediaDrm = null;
     }
   }
@@ -1005,6 +1022,40 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
     public void onEvent(
         ExoMediaDrm md, @Nullable byte[] sessionId, int event, int extra, @Nullable byte[] data) {
       checkNotNull(mediaDrmHandler).obtainMessage(event, sessionId).sendToTarget();
+    }
+  }
+
+  private class MediaDrmKeyStatusChangeListener implements OnKeyStatusChangeListener {
+
+    @Nullable private DrmSessionEventListener.EventDispatcher eventDispatcher;
+
+    public void setEventDispatcher(@Nullable DrmSessionEventListener.EventDispatcher eventDispatcher) {
+      this.eventDispatcher = eventDispatcher;
+    }
+
+    @Override
+    public void onKeyStatusChange(ExoMediaDrm mediaDrm, byte[] sessionId,
+        List<ExoMediaDrm.KeyStatus> exoKeyInformation, boolean hasNewUsableKey) {
+      if (mediaDrm == null || eventDispatcher == null) {
+        return;
+      }
+
+      List<UUID> usableKeys = new ArrayList<>(exoKeyInformation.size());
+      List<UUID> otherKeys = new ArrayList<>(exoKeyInformation.size());
+      String securityLevel = mediaDrm.getPropertyString("securityLevel");
+      for (ExoMediaDrm.KeyStatus status : exoKeyInformation) {
+        // STATUS_USABLE = 0, STATUS_EXPIRED = 1, STATUS_OUTPUT_NOT_ALLOWED = 2
+        // STATUS_PENDING = 3,STATUS_INTERNAL_ERROR = 4, STATUS_USABLE_IN_FUTURE = 5
+        ByteBuffer byteBuffer = ByteBuffer.wrap(status.getKeyId());
+        UUID keyUuid = new UUID(byteBuffer.getLong(), byteBuffer.getLong());
+        byteBuffer.clear();
+        if (status.getStatusCode() == KeyStatus.STATUS_USABLE) {
+          usableKeys.add(keyUuid);
+        } else {
+          otherKeys.add(keyUuid);
+        }
+      }
+      eventDispatcher.drmKeyStatusChange(new String(sessionId), securityLevel, usableKeys, otherKeys);
     }
   }
 
