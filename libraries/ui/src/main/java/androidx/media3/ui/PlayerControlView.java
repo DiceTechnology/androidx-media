@@ -751,10 +751,10 @@ public class PlayerControlView extends FrameLayout {
   }
 
   /**
-   * @deprecated Register a {@link StyledPlayerView.ControllerVisibilityListener} via {@link
-   *     StyledPlayerView#setControllerVisibilityListener(StyledPlayerView.ControllerVisibilityListener)}
-   *     instead. Using {@link StyledPlayerControlView} as a standalone class without {@link
-   *     StyledPlayerView} is deprecated.
+   * @deprecated Register a {@link PlayerView.ControllerVisibilityListener} via {@link
+   *     PlayerView#setControllerVisibilityListener(PlayerView.ControllerVisibilityListener)}
+   *     instead. Using {@link PlayerControlView} as a standalone class without {@link PlayerView}
+   *     is deprecated.
    */
   @SuppressWarnings("deprecation")
   @Deprecated
