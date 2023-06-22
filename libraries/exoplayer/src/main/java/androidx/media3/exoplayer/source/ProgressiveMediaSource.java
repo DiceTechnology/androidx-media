@@ -284,9 +284,9 @@ public final class ProgressiveMediaSource extends BaseMediaSource
   protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     transferListener = mediaTransferListener;
     cmcdContext = prepareCMCDContext();
-    drmSessionManager.prepare();
     drmSessionManager.setPlayer(
         /* playbackLooper= */ checkNotNull(Looper.myLooper()), getPlayerId());
+    drmSessionManager.prepare();
     notifySourceInfoRefreshed();
   }
 

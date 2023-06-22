@@ -384,8 +384,8 @@ public final class SsMediaSource extends BaseMediaSource
   protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     this.mediaTransferListener = mediaTransferListener;
     this.cmcdContext = prepareCMCDContext();
-    drmSessionManager.prepare();
     drmSessionManager.setPlayer(/* playbackLooper= */ Looper.myLooper(), getPlayerId());
+    drmSessionManager.prepare();
     if (sideloadedManifest) {
       manifestLoaderErrorThrower = new LoaderErrorThrower.Dummy();
       processManifest();

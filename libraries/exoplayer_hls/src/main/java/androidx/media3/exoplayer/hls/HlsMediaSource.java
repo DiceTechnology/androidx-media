@@ -430,9 +430,9 @@ public final class HlsMediaSource extends BaseMediaSource
   protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     this.mediaTransferListener = mediaTransferListener;
     this.cmcdContext = prepareCMCDContext();
-    drmSessionManager.prepare();
     drmSessionManager.setPlayer(
         /* playbackLooper= */ checkNotNull(Looper.myLooper()), getPlayerId());
+    drmSessionManager.prepare();
     MediaSourceEventListener.EventDispatcher eventDispatcher =
         createEventDispatcher(/* mediaPeriodId= */ null);
     playlistTracker.setCMCDCollector(CMCDContext.createCollector(cmcdContext));
