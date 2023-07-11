@@ -484,11 +484,13 @@ public class DefaultDrmSessionManager implements DrmSessionManager {
       exoMediaDrm = exoMediaDrmProvider.acquireExoMediaDrm(uuid);
       exoMediaDrm.setOnEventListener(new MediaDrmEventListener());
       // Set OnKeyStatusChangeListener instance
-      if (keyStatusChangeListener != null) {
-        keyStatusChangeListener.setEventDispatcher(null);
+      if (Util.SDK_INT >= 23) {
+        if (keyStatusChangeListener != null) {
+          keyStatusChangeListener.setEventDispatcher(null);
+        }
+        keyStatusChangeListener = new MediaDrmKeyStatusChangeListener();
+        exoMediaDrm.setOnKeyStatusChangeListener(keyStatusChangeListener);
       }
-      keyStatusChangeListener = new MediaDrmKeyStatusChangeListener();
-      exoMediaDrm.setOnKeyStatusChangeListener(keyStatusChangeListener);
     } else if (sessionKeepaliveMs != C.TIME_UNSET) {
       // Re-acquire the keepalive references for any sessions that are still active.
       for (int i = 0; i < sessions.size(); i++) {
