@@ -163,7 +163,7 @@ public class LimitedSeekRange {
   // Generate limited seek range.
   public static LimitedSeekRange from(long startTimeMs, long endTimeMs, boolean seekToStart) {
     long nowMs = System.currentTimeMillis();
-    boolean useAsLive = !isValidTimeStamp(endTimeMs) || endTimeMs + 300_000 >= nowMs;
+    boolean useAsLive = !isValidTimeStamp(endTimeMs) || endTimeMs > nowMs;
     return from(startTimeMs, endTimeMs, seekToStart, useAsLive);
   }
 
