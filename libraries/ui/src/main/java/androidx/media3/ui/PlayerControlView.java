@@ -82,6 +82,7 @@ import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.endeavor.LimitedSeekRange;
+import androidx.media3.common.endeavor.TimelineAdjuster;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.RepeatModeUtil;
 import androidx.media3.common.util.UnstableApi;
@@ -349,6 +350,7 @@ public class PlayerControlView extends FrameLayout {
   private boolean showPlayPauseButton;
   @Nullable private DvrWindowListener dvrWindowListener;
 
+  @Nullable protected TimelineAdjuster timelineAdjuster;
   @Nullable protected LimitedSeekRange limitedSeekRange;
 
   @Nullable private OnFullScreenModeChangedListener onFullScreenModeChangedListener;
@@ -683,6 +685,8 @@ public class PlayerControlView extends FrameLayout {
       this.player.removeListener(componentListener);
     }
     this.player = player;
+    this.timelineAdjuster = null;
+    this.limitedSeekRange = null;
     if (player != null) {
       player.addListener(componentListener);
     }
@@ -726,9 +730,38 @@ public class PlayerControlView extends FrameLayout {
     updateTimeline();
   }
 
+  public void setExtraTimelineAdjuster(TimelineAdjuster timelineAdjuster) {
+    this.timelineAdjuster = timelineAdjuster;
+    updateTimeline();
+  }
+
   public void setLimitedSeekRange(LimitedSeekRange limitedSeekRange) {
     this.limitedSeekRange = limitedSeekRange;
     updateTimeline();
+  }
+
+  protected long scaleSeekbarToTimelineMs(long seekbarMs) {
+    long positionMs = LimitedSeekRange.revertPosition(seekbarMs, limitedSeekRange).getPositionMs();
+    if (timelineAdjuster != null) {
+      positionMs = timelineAdjuster.scaleSeekbarToTimelineMs(positionMs);
+    }
+    return positionMs;
+  }
+
+  protected long scaleTimelineToSeekbarMs(long timelineMs) {
+    long positionMs = LimitedSeekRange.adjustPosition(timelineMs, limitedSeekRange).getPositionMs();
+    if (timelineAdjuster != null) {
+      positionMs = timelineAdjuster.scaleTimelineToSeekbarMs(positionMs);
+    }
+    return positionMs;
+  }
+
+  protected long adjustDuration(long realDurationMs) {
+    long durationMs = LimitedSeekRange.adjustDuration(realDurationMs, limitedSeekRange);
+    if (timelineAdjuster != null) {
+      durationMs = timelineAdjuster.scaleTimelineToSeekbarMs(durationMs);
+    }
+    return durationMs;
   }
 
   /**
@@ -1305,12 +1338,12 @@ public class PlayerControlView extends FrameLayout {
         durationUs = msToUs(playerDurationMs);
       }
     }
-    // Apply the limited seek range.
+    // Apply the timeline converter.
     // long durationMs = Util.usToMs(durationUs);
     long realDurationMs = Util.usToMs(durationUs);
-    long durationMs = LimitedSeekRange.adjustDuration(realDurationMs, limitedSeekRange);
+    long durationMs = adjustDuration(realDurationMs);
     boolean isVod = LimitedSeekRange.isUseAsVod(limitedSeekRange);
-    if (dvrWindowListener != null && player.isCurrentWindowLive() && !isVod) {
+    if (dvrWindowListener != null && player.isCurrentMediaItemLive() && !isVod) {
       dvrWindowListener.onDvrWindowUpdate(realDurationMs > MIN_LENGTH_OF_DVR_MS);
     }
     if (durationView != null) {
@@ -1342,9 +1375,9 @@ public class PlayerControlView extends FrameLayout {
       position = currentWindowOffset + player.getContentPosition();
       bufferedPosition = currentWindowOffset + player.getContentBufferedPosition();
 
-      // Apply the limited seek range.
-      position = LimitedSeekRange.adjustPosition(position, limitedSeekRange).getPositionMs();
-      bufferedPosition = LimitedSeekRange.adjustPosition(bufferedPosition, limitedSeekRange).getPositionMs();
+      // Apply the timeline converter.
+      position = scaleTimelineToSeekbarMs(position);
+      bufferedPosition = scaleTimelineToSeekbarMs(bufferedPosition);
     }
     if (positionView != null && !scrubbing) {
       positionView.setText(Util.getStringForTime(formatBuilder, formatter, position));
@@ -1359,7 +1392,7 @@ public class PlayerControlView extends FrameLayout {
 
     // Cancel any pending updates and schedule a new one if necessary.
     removeCallbacks(updateProgressAction);
-    // Apply the limited seek range.
+    // Apply the timeline converter.
     // int playbackState = player == null ? Player.STATE_IDLE : player.getPlaybackState();
     int realPlaybackState = player == null ? Player.STATE_IDLE : player.getPlaybackState();
     int playbackState = LimitedSeekRange.adjustPlaybackState(realPlaybackState, limitedSeekRange);
@@ -1799,10 +1832,12 @@ public class PlayerControlView extends FrameLayout {
     public void onScrubStop(TimeBar timeBar, long position, boolean canceled) {
       scrubbing = false;
       if (!canceled && player != null) {
-        // Apply the limited seek range.
-        // seekToTimeBarPosition(player, position);
-        long realPositionMs = LimitedSeekRange.revertPosition(position, limitedSeekRange).getPositionMs();
-        seekToTimeBarPosition(player, realPositionMs);
+        // In here we should not apply the timeline converter directly. To have a chance to support
+        // snap back feature while seeking, we should pass a ForwardingPlayer instance to PlayerView.
+        // And then in ForwardingPlayer instance we can involve our ExoDoris instance to support
+        // snap back feature, also apply the timeline converter (limited seek range, exclude ads
+        // and so on), same as we done for new Doris player view.
+        seekToTimeBarPosition(player, position);
       }
       controlViewLayoutManager.resetHideCallbacks();
     }
