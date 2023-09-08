@@ -65,7 +65,7 @@ public class LimitedSeekRange {
     return useAsLive || isWaitReady() ? C.DCE_UNSET : Math.max(0, endTimeMs - factStartTimeMs);
   }
 
-  public static boolean isUseAsVod(LimitedSeekRange limitedSeekRange) {
+  public static boolean isUseLiveAsVod(LimitedSeekRange limitedSeekRange) {
     return limitedSeekRange != null && !limitedSeekRange.useAsLive;
   }
 
@@ -91,23 +91,23 @@ public class LimitedSeekRange {
     return timeMs == C.TIME_UNSET || limitedSeekRange == null || limitedSeekRange.isWaitReady();
   }
 
-  public static Position revertPosition(long adjustedPositionMs, LimitedSeekRange limitedSeekRange) {
-    if (shouldUseOriginal(adjustedPositionMs, limitedSeekRange)) {
-      return Position.legal(adjustedPositionMs);
+  public static Position scaleSeekbarToTimelineMs(long seekbarMs, LimitedSeekRange limitedSeekRange) {
+    if (shouldUseOriginal(seekbarMs, limitedSeekRange)) {
+      return Position.legal(seekbarMs);
     }
-    Position position = toPosition(adjustedPositionMs, limitedSeekRange);
+    Position position = toPosition(seekbarMs, limitedSeekRange);
     return position.offset(limitedSeekRange.timestampOffsetMs);
   }
 
-  public static Position adjustPosition(long positionMs, LimitedSeekRange limitedSeekRange) {
-    if (shouldUseOriginal(positionMs, limitedSeekRange)) {
-      return Position.legal(positionMs);
+  public static Position scaleTimelineToSeekbarMs(long timelineMs, LimitedSeekRange limitedSeekRange) {
+    if (shouldUseOriginal(timelineMs, limitedSeekRange)) {
+      return Position.legal(timelineMs);
     }
-    long adjustedPositionMs = positionMs - limitedSeekRange.timestampOffsetMs;
+    long adjustedPositionMs = timelineMs - limitedSeekRange.timestampOffsetMs;
     return toPosition(adjustedPositionMs, limitedSeekRange);
   }
 
-  public static long adjustDuration(long durationMs, LimitedSeekRange limitedSeekRange) {
+  public static long scaleDurationToSeekbarMs(long durationMs, LimitedSeekRange limitedSeekRange) {
     if (shouldUseOriginal(durationMs, limitedSeekRange)) {
       return durationMs;
     }
@@ -117,14 +117,14 @@ public class LimitedSeekRange {
     return limitedSeekRange.getDurationMs();
   }
 
-  public static long revertTimestamp(long adjustedTimeMs, LimitedSeekRange limitedSeekRange) {
-    if (shouldUseOriginal(adjustedTimeMs, limitedSeekRange)) {
-      return adjustedTimeMs;
+  public static long scaleTimestampToTimelineMs(long timeMs, LimitedSeekRange limitedSeekRange) {
+    if (shouldUseOriginal(timeMs, limitedSeekRange)) {
+      return timeMs;
     }
-    return adjustedTimeMs + limitedSeekRange.timestampOffsetMs;
+    return timeMs + limitedSeekRange.timestampOffsetMs;
   }
 
-  public static long adjustTimestamp(long timeMs, LimitedSeekRange limitedSeekRange) {
+  public static long scaleTimestampToSeekbarMs(long timeMs, LimitedSeekRange limitedSeekRange) {
     if (shouldUseOriginal(timeMs, limitedSeekRange)) {
       return timeMs;
     }

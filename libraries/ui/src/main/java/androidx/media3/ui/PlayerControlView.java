@@ -81,6 +81,7 @@ import androidx.media3.common.TrackGroup;
 import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
+import androidx.media3.common.endeavor.ExoConfig;
 import androidx.media3.common.endeavor.LimitedSeekRange;
 import androidx.media3.common.endeavor.TimelineAdjuster;
 import androidx.media3.common.util.Assertions;
@@ -724,8 +725,32 @@ public class PlayerControlView extends FrameLayout {
     } else {
       extraPlayedAdGroups = checkNotNull(extraPlayedAdGroups);
       Assertions.checkArgument(extraAdGroupTimesMs.length == extraPlayedAdGroups.length);
-      this.extraAdGroupTimesMs = extraAdGroupTimesMs;
-      this.extraPlayedAdGroups = extraPlayedAdGroups;
+
+      long[] newExtraAdGroupTimesMs = extraAdGroupTimesMs;
+      boolean[] newExtraPlayedAdGroups = extraPlayedAdGroups;
+      if (ExoConfig.getInstance().isHideMarkerForWatchedAd()) {
+        int markerCount = 0;
+        for (boolean markerPlayed : extraPlayedAdGroups) {
+          if (!markerPlayed) {
+            markerCount++;
+          }
+        }
+        if (markerCount != extraPlayedAdGroups.length) {
+          int index = 0;
+          newExtraAdGroupTimesMs = new long[markerCount];
+          newExtraPlayedAdGroups = new boolean[markerCount];
+          for (int i = 0; i < extraPlayedAdGroups.length; i++) {
+            if (extraPlayedAdGroups[i]) {
+              continue;
+            }
+            newExtraAdGroupTimesMs[index] = extraAdGroupTimesMs[i];
+            newExtraPlayedAdGroups[index] = false;
+            index++;
+          }
+        }
+      }
+      this.extraAdGroupTimesMs = newExtraAdGroupTimesMs;
+      this.extraPlayedAdGroups = newExtraPlayedAdGroups;
     }
     updateTimeline();
   }
@@ -741,7 +766,7 @@ public class PlayerControlView extends FrameLayout {
   }
 
   protected long scaleSeekbarToTimelineMs(long seekbarMs) {
-    long positionMs = LimitedSeekRange.revertPosition(seekbarMs, limitedSeekRange).getPositionMs();
+    long positionMs = LimitedSeekRange.scaleSeekbarToTimelineMs(seekbarMs, limitedSeekRange).getPositionMs();
     if (timelineAdjuster != null) {
       positionMs = timelineAdjuster.scaleSeekbarToTimelineMs(positionMs);
     }
@@ -749,15 +774,15 @@ public class PlayerControlView extends FrameLayout {
   }
 
   protected long scaleTimelineToSeekbarMs(long timelineMs) {
-    long positionMs = LimitedSeekRange.adjustPosition(timelineMs, limitedSeekRange).getPositionMs();
+    long positionMs = LimitedSeekRange.scaleTimelineToSeekbarMs(timelineMs, limitedSeekRange).getPositionMs();
     if (timelineAdjuster != null) {
       positionMs = timelineAdjuster.scaleTimelineToSeekbarMs(positionMs);
     }
     return positionMs;
   }
 
-  protected long adjustDuration(long realDurationMs) {
-    long durationMs = LimitedSeekRange.adjustDuration(realDurationMs, limitedSeekRange);
+  protected long scaleDurationToSeekbarMs(long realDurationMs) {
+    long durationMs = LimitedSeekRange.scaleDurationToSeekbarMs(realDurationMs, limitedSeekRange);
     if (timelineAdjuster != null) {
       durationMs = timelineAdjuster.scaleTimelineToSeekbarMs(durationMs);
     }
@@ -1326,7 +1351,9 @@ public class PlayerControlView extends FrameLayout {
               }
               adGroupTimesMs[adGroupCount] = Util.usToMs(durationUs + adGroupTimeInWindowUs);
               playedAdGroups[adGroupCount] = period.hasPlayedAdGroup(adGroupIndex);
-              adGroupCount++;
+              if (!playedAdGroups[adGroupCount] || !ExoConfig.getInstance().isHideMarkerForWatchedAd()) {
+                adGroupCount++;
+              }
             }
           }
         }
@@ -1341,8 +1368,8 @@ public class PlayerControlView extends FrameLayout {
     // Apply the timeline converter.
     // long durationMs = Util.usToMs(durationUs);
     long realDurationMs = Util.usToMs(durationUs);
-    long durationMs = adjustDuration(realDurationMs);
-    boolean isVod = LimitedSeekRange.isUseAsVod(limitedSeekRange);
+    long durationMs = scaleDurationToSeekbarMs(realDurationMs);
+    boolean isVod = LimitedSeekRange.isUseLiveAsVod(limitedSeekRange);
     if (dvrWindowListener != null && player.isCurrentMediaItemLive() && !isVod) {
       dvrWindowListener.onDvrWindowUpdate(realDurationMs > MIN_LENGTH_OF_DVR_MS);
     }
