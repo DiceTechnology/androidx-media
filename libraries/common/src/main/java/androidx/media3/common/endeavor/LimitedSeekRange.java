@@ -117,21 +117,7 @@ public class LimitedSeekRange {
     return limitedSeekRange.getDurationMs();
   }
 
-  public static long scaleTimestampToTimelineMs(long timeMs, LimitedSeekRange limitedSeekRange) {
-    if (shouldUseOriginal(timeMs, limitedSeekRange)) {
-      return timeMs;
-    }
-    return timeMs + limitedSeekRange.timestampOffsetMs;
-  }
-
-  public static long scaleTimestampToSeekbarMs(long timeMs, LimitedSeekRange limitedSeekRange) {
-    if (shouldUseOriginal(timeMs, limitedSeekRange)) {
-      return timeMs;
-    }
-    return timeMs - limitedSeekRange.timestampOffsetMs;
-  }
-
-  public static @Player.State int adjustPlaybackState(@Player.State int state, LimitedSeekRange limitedSeekRange) {
+  public static @Player.State int scalePlaybackState(@Player.State int state, LimitedSeekRange limitedSeekRange) {
     if (limitedSeekRange != null && limitedSeekRange.playbackEnded) {
       return Player.STATE_ENDED;
     }

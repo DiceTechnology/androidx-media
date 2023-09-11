@@ -1422,7 +1422,7 @@ public class PlayerControlView extends FrameLayout {
     // Apply the timeline converter.
     // int playbackState = player == null ? Player.STATE_IDLE : player.getPlaybackState();
     int realPlaybackState = player == null ? Player.STATE_IDLE : player.getPlaybackState();
-    int playbackState = LimitedSeekRange.adjustPlaybackState(realPlaybackState, limitedSeekRange);
+    int playbackState = LimitedSeekRange.scalePlaybackState(realPlaybackState, limitedSeekRange);
     if (player != null && player.isPlaying() && playbackState != Player.STATE_ENDED) {
       long mediaTimeDelayMs =
           timeBar != null ? timeBar.getPreferredUpdateDelay() : MAX_UPDATE_INTERVAL_MS;
