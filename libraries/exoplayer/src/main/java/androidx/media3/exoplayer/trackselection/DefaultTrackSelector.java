@@ -2388,7 +2388,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
     }
     int rendererCount = mappedTrackInfo.getRendererCount();
     // May update status of track collector for the preferredAudioName, blacklistUntilTimes and so on.
-    trackCollector.onMappedTrackInfoChanged(mappedTrackInfo, getOverrideDefinitions(mappedTrackInfo, parameters));
+    trackCollector.onMappedTrackInfoChanged(mappedTrackInfo, parameters, getOverrideDefinitions(mappedTrackInfo, parameters));
     ExoTrackSelection.@NullableType Definition[] definitions =
         selectAllTracks(
             mappedTrackInfo,
@@ -3161,7 +3161,7 @@ public class DefaultTrackSelector extends MappingTrackSelector {
    *     1 if the format language is undetermined and such a match is allowed, and a score of 0 if
    *     the languages don't match at all.
    */
-  protected static int getFormatLanguageScore(
+  public static int getFormatLanguageScore(
       Format format, @Nullable String language, boolean allowUndeterminedFormatLanguage) {
     if (!TextUtils.isEmpty(language) && language.equals(format.language)) {
       // Full literal match of non-empty languages, including matches of an explicit "und" query.

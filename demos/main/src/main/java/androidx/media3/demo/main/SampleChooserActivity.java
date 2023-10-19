@@ -280,6 +280,11 @@ public class SampleChooserActivity extends AppCompatActivity
                 List<MediaItem> mediaItems = playlistHolder.mediaItems;
                 if (result != null && result.localConfiguration != null) {
                   Log.i(TAG, "fetch video from backend - " + originUri.getQuery() + " >> " + result.localConfiguration.uri);
+                  if (playlistHolder.mediaItems.get(0).localConfiguration.subtitleConfigurations != null) {
+                    result = result.buildUpon()
+                        .setSubtitleConfigurations(playlistHolder.mediaItems.get(0).localConfiguration.subtitleConfigurations)
+                        .build();
+                  }
                   mediaItems = Collections.singletonList(result);
                 }
                 IntentUtil.addToIntent(mediaItems, intent);

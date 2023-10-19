@@ -229,6 +229,13 @@
         "uri": "https://dummy.imggaming.com/video?id=111449&live=true&dash=&realm=dce.wwe&usr=&pwd="
       },
       {
+        "name": "WWE vod, wwe",
+        "uri": "https://dummy.imggaming.com/video?id=530182&live=&dash=&realm=dce.wwe&usr=&pwd=",
+        "subtitle_uri": "https://dve-subtitles.imggaming.com/530182/741299/vtt/subtitle-en-US-199647-1697490152197.vtt",
+        "subtitle_mime_type": "text/vtt",
+        "subtitle_language": "en"
+      },
+      {
         "name": "450830 DRM, adjara",
         "uri": "https://dummy.imggaming.com/video?id=450830&live=&dash=true&realm=dce.adjara&usr=&pwd="
       }
