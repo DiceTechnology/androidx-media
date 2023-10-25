@@ -22,7 +22,6 @@ import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaLibraryInfo;
-import androidx.media3.common.endeavor.cmcd.CMCDCollector;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
@@ -54,7 +53,6 @@ public final class DataSpec {
     private @HttpMethod int httpMethod;
     @Nullable private byte[] httpBody;
     private Map<String, String> httpRequestHeaders;
-    @Nullable private CMCDCollector cmcdCollector;
     private long position;
     private long length;
     @Nullable private String key;
@@ -79,7 +77,6 @@ public final class DataSpec {
       httpMethod = dataSpec.httpMethod;
       httpBody = dataSpec.httpBody;
       httpRequestHeaders = dataSpec.httpRequestHeaders;
-      cmcdCollector = dataSpec.cmcdCollector;
       position = dataSpec.position;
       length = dataSpec.length;
       key = dataSpec.key;
@@ -164,17 +161,6 @@ public final class DataSpec {
     }
 
     /**
-     * Sets the {@link DataSpec#cmcdCollector}. The default value is {@code null}.
-     *
-     * @param cmcdCollector The {@link DataSpec#cmcdCollector}.
-     * @return The builder.
-     */
-    public Builder setCMCDCollector(@Nullable CMCDCollector cmcdCollector) {
-      this.cmcdCollector = cmcdCollector;
-      return this;
-    }
-
-    /**
      * Sets the {@link DataSpec#position}. The default value is 0.
      *
      * @param position The {@link DataSpec#position}.
@@ -248,7 +234,6 @@ public final class DataSpec {
           httpMethod,
           httpBody,
           httpRequestHeaders,
-          cmcdCollector,
           position,
           length,
           key,
@@ -388,11 +373,6 @@ public final class DataSpec {
   public final Map<String, String> httpRequestHeaders;
 
   /**
-   * CMCD data collector.
-   */
-  @Nullable private final CMCDCollector cmcdCollector;
-
-  /**
    * The absolute position of the data in the resource.
    *
    * @deprecated Use {@link #position} except for specific use cases where the absolute position
@@ -447,7 +427,6 @@ public final class DataSpec {
         HTTP_METHOD_GET,
         /* httpBody= */ null,
         /* httpRequestHeaders= */ Collections.emptyMap(),
-        null,
         position,
         length,
         /* key= */ null,
@@ -659,7 +638,6 @@ public final class DataSpec {
         httpMethod,
         httpBody,
         httpRequestHeaders,
-        null,
         position,
         length,
         key,
@@ -674,7 +652,6 @@ public final class DataSpec {
       @HttpMethod int httpMethod,
       @Nullable byte[] httpBody,
       Map<String, String> httpRequestHeaders,
-      @Nullable CMCDCollector cmcdCollector,
       long position,
       long length,
       @Nullable String key,
@@ -690,17 +667,12 @@ public final class DataSpec {
     this.httpMethod = httpMethod;
     this.httpBody = httpBody != null && httpBody.length != 0 ? httpBody : null;
     this.httpRequestHeaders = Collections.unmodifiableMap(new HashMap<>(httpRequestHeaders));
-    this.cmcdCollector = cmcdCollector;
     this.position = position;
     this.absoluteStreamPosition = uriPositionOffset + position;
     this.length = length;
     this.key = key;
     this.flags = flags;
     this.customData = customData;
-  }
-
-  public Map<String, String> buildCMCDHeaders() {
-    return cmcdCollector == null ? null : cmcdCollector.buildHeaders(uri);
   }
 
   /**
@@ -753,7 +725,6 @@ public final class DataSpec {
           httpMethod,
           httpBody,
           httpRequestHeaders,
-          cmcdCollector,
           position + offset,
           length,
           key,
@@ -775,7 +746,6 @@ public final class DataSpec {
         httpMethod,
         httpBody,
         httpRequestHeaders,
-        cmcdCollector,
         position,
         length,
         key,
@@ -797,7 +767,6 @@ public final class DataSpec {
         httpMethod,
         httpBody,
         httpRequestHeaders,
-        cmcdCollector,
         position,
         length,
         key,
@@ -822,7 +791,6 @@ public final class DataSpec {
         httpMethod,
         httpBody,
         httpRequestHeaders,
-        cmcdCollector,
         position,
         length,
         key,

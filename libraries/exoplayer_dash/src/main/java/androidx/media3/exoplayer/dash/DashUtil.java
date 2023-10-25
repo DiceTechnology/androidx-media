@@ -20,7 +20,6 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
-import androidx.media3.common.endeavor.cmcd.CMCDCollector;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DataSource;
@@ -63,18 +62,6 @@ public final class DashUtil {
         .setLength(requestUri.length)
         .setKey(resolveCacheKey(representation, requestUri))
         .setFlags(flags)
-        .build();
-  }
-
-  public static DataSpec buildDataSpec(
-      Representation representation, String baseUrl, RangedUri requestUri, int flags, CMCDCollector collector) {
-    return new DataSpec.Builder()
-        .setUri(requestUri.resolveUri(baseUrl))
-        .setPosition(requestUri.start)
-        .setLength(requestUri.length)
-        .setKey(resolveCacheKey(representation, requestUri))
-        .setFlags(flags)
-        .setCMCDCollector(collector)
         .build();
   }
 

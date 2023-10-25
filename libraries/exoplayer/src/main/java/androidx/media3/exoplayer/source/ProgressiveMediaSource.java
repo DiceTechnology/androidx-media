@@ -23,16 +23,12 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Timeline;
-import androidx.media3.common.endeavor.cmcd.CMCDContext;
-import androidx.media3.common.endeavor.cmcd.CMCDType;
-import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDStreamFormat;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.TransferListener;
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider;
-import androidx.media3.exoplayer.endeavor.CMCDManager;
 import androidx.media3.exoplayer.upstream.Allocator;
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy;
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy;
@@ -255,7 +251,6 @@ public final class ProgressiveMediaSource extends BaseMediaSource
   private boolean timelineIsSeekable;
   private boolean timelineIsLive;
   @Nullable private TransferListener transferListener;
-  @Nullable private CMCDContext cmcdContext;
 
   private ProgressiveMediaSource(
       MediaItem mediaItem,
@@ -283,7 +278,6 @@ public final class ProgressiveMediaSource extends BaseMediaSource
   @Override
   protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     transferListener = mediaTransferListener;
-    cmcdContext = prepareCMCDContext();
     drmSessionManager.setPlayer(
         /* playbackLooper= */ checkNotNull(Looper.myLooper()), getPlayerId());
     drmSessionManager.prepare();
@@ -312,7 +306,7 @@ public final class ProgressiveMediaSource extends BaseMediaSource
         this,
         allocator,
         localConfiguration.customCacheKey,
-        continueLoadingCheckIntervalBytes).setCMCDContext(cmcdContext);
+        continueLoadingCheckIntervalBytes);
   }
 
   @Override
@@ -323,10 +317,6 @@ public final class ProgressiveMediaSource extends BaseMediaSource
   @Override
   protected void releaseSourceInternal() {
     drmSessionManager.release();
-    if (cmcdContext != null) {
-      CMCDManager.getInstance().releaseContext(cmcdContext);
-      cmcdContext = null;
-    }
   }
 
   // ProgressiveMediaPeriod.Listener implementation.
@@ -350,15 +340,6 @@ public final class ProgressiveMediaSource extends BaseMediaSource
   }
 
   // Internal methods.
-
-  private CMCDContext prepareCMCDContext() {
-    CMCDContext context = CMCDManager.getInstance().createContext(getPlayerId());
-    if (context != null) {
-      String contentId = CMCDType.toUuidString(localConfiguration.uri.toString());
-      context.updateMediaInfo(contentId, CMCDStreamFormat.OTHER);
-    }
-    return context;
-  }
 
   private void notifySourceInfoRefreshed() {
     // TODO: Split up isDynamic into multiple fields to indicate which values may change. Then

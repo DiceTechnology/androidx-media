@@ -29,10 +29,6 @@ import androidx.media3.common.Metadata;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.ParserException;
 import androidx.media3.common.TrackGroup;
-import androidx.media3.common.endeavor.cmcd.CMCDCollector;
-import androidx.media3.common.endeavor.cmcd.CMCDContext;
-import androidx.media3.common.endeavor.cmcd.CMCDType;
-import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDObjectType;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.ConditionVariable;
 import androidx.media3.common.util.ParsableByteArray;
@@ -149,7 +145,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private int extractedSamplesCountAtStartOfLoad;
   private boolean loadingFinished;
   private boolean released;
-  @Nullable private CMCDContext cmcdContext;
 
   /**
    * @param uri The {@link Uri} of the media stream.
@@ -210,11 +205,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     dataType = C.DATA_TYPE_MEDIA;
   }
 
-  public ProgressiveMediaPeriod setCMCDContext(CMCDContext cmcdContext) {
-    this.cmcdContext = cmcdContext;
-    return this;
-  }
-
   public void release() {
     if (prepared) {
       // Discard as much as we can synchronously. We only do this if we're prepared, since otherwise
@@ -227,7 +217,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     handler.removeCallbacksAndMessages(null);
     callback = null;
     released = true;
-    cmcdContext = null;
   }
 
   @Override
@@ -1097,7 +1086,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
           .setFlags(
               DataSpec.FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN | DataSpec.FLAG_ALLOW_CACHE_FRAGMENTATION)
           .setHttpRequestHeaders(ICY_METADATA_HEADERS)
-          .setCMCDCollector(prepareCMCDCollector())
           .build();
     }
 
@@ -1107,46 +1095,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       pendingExtractorSeek = true;
       seenIcyMetadata = false;
     }
-  }
-
-  private CMCDCollector prepareCMCDCollector() {
-    CMCDCollector collector = CMCDContext.createCollector(cmcdContext);
-    if (collector != null) {
-      int bitrate = Format.NO_VALUE;
-      CMCDObjectType objectType = null;
-      if (prepared) {
-        boolean haveAudio = false;
-        Format primaryTrackFormat = null;
-        @C.TrackType int primaryTrackType = C.TRACK_TYPE_UNKNOWN;
-        int trackCount = trackState.tracks.length;
-        for (int i = 0; i < trackCount; i++) {
-          Format trackFormat = trackState.tracks.get(i).getFormat(0);
-          int trackType = MimeTypes.getTrackType(trackFormat.sampleMimeType);
-          haveAudio |= (trackType == C.TRACK_TYPE_AUDIO);
-          if (trackType == C.TRACK_TYPE_VIDEO) {
-            trackType = C.TRACK_TYPE_DEFAULT;
-          }
-          if (i == 0 || primaryTrackType > trackType) {
-            primaryTrackFormat = trackFormat;
-            primaryTrackType = trackType;
-          }
-        }
-        if (primaryTrackType == C.TRACK_TYPE_DEFAULT && haveAudio) {
-          objectType = CMCDObjectType.MUXED_AUDIO_VIDEO;
-          bitrate = Math.round(primaryTrackFormat.bitrate / 1024f);
-        } else if (primaryTrackFormat != null) {
-          objectType = CMCDObjectType.from(primaryTrackType);
-          bitrate = Math.round(primaryTrackFormat.bitrate / 1024f);
-        }
-      }
-      collector.updateEncodedBitrate(bitrate);
-      collector.updateObjectType(objectType);
-      collector.updateRequestedThroughput(CMCDType.calcRequestedThroughput(bitrate));
-      if (durationUs > 0) {
-        collector.updateObjectDuration((int) Util.usToMs(durationUs));
-      }
-    }
-    return collector;
   }
 
   /** Stores track state. */

@@ -59,7 +59,6 @@ import androidx.media3.datasource.DataSourceUtil;
 import androidx.media3.datasource.DataSpec;
 import androidx.media3.demo.main.upstream.PlaybackProvider;
 import androidx.media3.exoplayer.RenderersFactory;
-import androidx.media3.exoplayer.endeavor.CMCDManager;
 import androidx.media3.exoplayer.offline.DownloadService;
 import com.facebook.stetho.Stetho;
 import com.google.common.base.Objects;
@@ -107,7 +106,6 @@ public class SampleChooserActivity extends AppCompatActivity
 
     // Global Setting.
     Log.setLogLevel(Log.LOG_LEVEL_ALL);
-    CMCDManager.getInstance().setAllActivations(false);
     Stetho.initializeWithDefaults(getApplicationContext());
 
     Intent intent = getIntent();

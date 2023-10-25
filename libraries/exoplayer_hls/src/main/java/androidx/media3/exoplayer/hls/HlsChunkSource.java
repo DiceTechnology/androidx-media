@@ -28,9 +28,6 @@ import androidx.annotation.VisibleForTesting;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.TrackGroup;
-import androidx.media3.common.endeavor.cmcd.CMCDCollector;
-import androidx.media3.common.endeavor.cmcd.CMCDType;
-import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDObjectType;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.TimestampAdjuster;
 import androidx.media3.common.util.UriUtil;
@@ -147,7 +144,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private ExoTrackSelection trackSelection;
   private long liveEdgeInPeriodTimeUs;
   private boolean seenExpectedPlaylistError;
-  @Nullable private CMCDCollector cmcdCollector;
 
   /**
    * @param extractorFactory An {@link HlsExtractorFactory} from which to obtain the extractors for
@@ -201,11 +197,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     }
     trackSelection =
         new InitializationTrackSelection(trackGroup, Ints.toArray(initialTrackSelection));
-  }
-
-  public HlsChunkSource setCMCDCollector(CMCDCollector cmcdCollector) {
-    this.cmcdCollector = cmcdCollector;
-    return this;
   }
 
   /**
@@ -499,13 +490,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     @Nullable
     Uri initSegmentKeyUri =
         getFullEncryptionKeyUri(playlist, segmentBaseHolder.segmentBase.initializationSegment);
-    out.chunk = maybeCreateEncryptionChunkFor(initSegmentKeyUri, selectedTrackIndex, true);
+    out.chunk = maybeCreateEncryptionChunkFor(initSegmentKeyUri, selectedTrackIndex);
     if (out.chunk != null) {
       return;
     }
     @Nullable
     Uri mediaSegmentKeyUri = getFullEncryptionKeyUri(playlist, segmentBaseHolder.segmentBase);
-    out.chunk = maybeCreateEncryptionChunkFor(mediaSegmentKeyUri, selectedTrackIndex, false);
+    out.chunk = maybeCreateEncryptionChunkFor(mediaSegmentKeyUri, selectedTrackIndex);
     if (out.chunk != null) {
       return;
     }
@@ -539,8 +530,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
             /* mediaSegmentKey= */ keyCache.get(mediaSegmentKeyUri),
             /* initSegmentKey= */ keyCache.get(initSegmentKeyUri),
             shouldSpliceIn,
-            prepareChunkCollector(false, playlistFormats[selectedTrackIndex], playlist, segmentBaseHolder),
-            prepareChunkCollector(true, playlistFormats[selectedTrackIndex], playlist, segmentBaseHolder),
             playerId);
   }
 
@@ -911,7 +900,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   }
 
   @Nullable
-  private Chunk maybeCreateEncryptionChunkFor(@Nullable Uri keyUri, int selectedTrackIndex, boolean initSegment) {
+  private Chunk maybeCreateEncryptionChunkFor(@Nullable Uri keyUri, int selectedTrackIndex) {
     if (keyUri == null) {
       return null;
     }
@@ -924,9 +913,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       keyCache.put(keyUri, encryptionKey);
       return null;
     }
-    CMCDCollector collector = prepareEncryptionCollector(initSegment);
     DataSpec dataSpec =
-        new DataSpec.Builder().setUri(keyUri).setFlags(DataSpec.FLAG_ALLOW_GZIP).setCMCDCollector(collector).build();
+        new DataSpec.Builder().setUri(keyUri).setFlags(DataSpec.FLAG_ALLOW_GZIP).build();
     return new EncryptionKeyChunk(
         encryptionDataSource,
         dataSpec,
@@ -934,58 +922,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         trackSelection.getSelectionReason(),
         trackSelection.getSelectionData(),
         scratchSpace);
-  }
-
-  private CMCDCollector prepareEncryptionCollector(boolean initSegment) {
-    CMCDCollector collector = CMCDCollector.createCollector(cmcdCollector);
-    if (collector != null) {
-      collector.updateObjectType(CMCDObjectType.KEY);
-      collector.updateStartup(initSegment);
-    }
-    return collector;
-  }
-
-  private CMCDCollector prepareChunkCollector(
-      boolean initSegment,
-      Format format,
-      HlsMediaPlaylist playlist,
-      HlsChunkSource.SegmentBaseHolder holder) {
-    HlsMediaPlaylist.SegmentBase mediaSegment = holder.segmentBase;
-    if (initSegment && mediaSegment.initializationSegment == null) {
-      return null;
-    }
-    CMCDCollector collector = CMCDCollector.createCollector(cmcdCollector);
-    if (collector != null) {
-      int bitrate = Math.round(format.bitrate / 1024f);
-      collector.updateEncodedBitrate(bitrate);
-      collector.updateObjectType(CMCDObjectType.from(cmcdCollector));
-      if (initSegment) {
-        collector.updateStartup(true);
-      } else {
-        collector.updateObjectDuration((int) Util.usToMs(mediaSegment.durationUs));
-        collector.updateRequestedThroughput(CMCDType.calcRequestedThroughput(bitrate));
-
-        // Find the next object.
-        if (cmcdCollector.isActiveNextPayload()) {
-          long nextMediaSequence = holder.mediaSequence;
-          int nextPartIndex = holder.partIndex;
-          if (nextPartIndex == C.INDEX_UNSET) {
-            nextMediaSequence = (nextMediaSequence != C.INDEX_UNSET ? nextMediaSequence + 1 : C.INDEX_UNSET);
-          } else {
-            nextPartIndex += 1;
-          }
-          HlsChunkSource.SegmentBaseHolder nextHolder = getNextSegmentHolder(playlist, nextMediaSequence, nextPartIndex);
-          if (nextHolder != null) {
-            HlsMediaPlaylist.SegmentBase nextSegment = nextHolder.segmentBase;
-            Uri nextUri = UriUtil.resolveToUri(playlist.baseUri, nextSegment.url);
-            Uri mediaUri = UriUtil.resolveToUri(playlist.baseUri, mediaSegment.url);
-            collector.updateNextObjectRequest(CMCDType.buildNextObject(mediaUri, nextUri));
-            collector.updateNextRangeRequest(CMCDType.buildNextRange(nextSegment.byteRangeOffset, nextSegment.byteRangeLength));
-          }
-        }
-      }
-    }
-    return collector;
   }
 
   @Nullable

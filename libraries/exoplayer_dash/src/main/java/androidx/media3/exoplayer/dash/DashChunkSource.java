@@ -19,7 +19,6 @@ import android.os.SystemClock;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
-import androidx.media3.common.endeavor.cmcd.CMCDCollector;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.TransferListener;
 import androidx.media3.exoplayer.analytics.PlayerId;
@@ -72,10 +71,6 @@ public interface DashChunkSource extends ChunkSource {
         @Nullable PlayerTrackEmsgHandler playerEmsgHandler,
         @Nullable TransferListener transferListener,
         PlayerId playerId);
-  }
-
-  default DashChunkSource setCMCDCollector(CMCDCollector cmcdCollector) {
-    return this;
   }
 
   /**
