@@ -11,9 +11,11 @@ import androidx.media3.common.endeavor.TrackSwitcher;
 import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Log;
 import androidx.media3.exoplayer.source.TrackGroupArray;
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.media3.exoplayer.trackselection.ExoTrackSelection;
 import androidx.media3.exoplayer.trackselection.MappingTrackSelector;
 import androidx.media3.exoplayer.trackselection.TrackSelector;
+import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -43,6 +45,7 @@ public class TrackCollector {
   // May update status for the blacklistUntilTimes, videoTrackSelection, preferredAudioName and so on.
   public void onMappedTrackInfoChanged(
       MappingTrackSelector.MappedTrackInfo mappedTrackInfo,
+      DefaultTrackSelector.Parameters parameters,
       ExoTrackSelection.Definition[] overrideDefinitions) {
     this.noGroupConstraint = true;
     this.videoUseFixedSelection = false;
@@ -72,16 +75,9 @@ public class TrackCollector {
           Format format = overrideDefinitions[i].group.getFormat(overrideDefinitions[i].tracks[0]);
           preferredAudioName = getFormatName(format);
         } else if (preferredAudioName == null) {
-          preferredAudioName = "";
-          for (int j = 0; j < trackGroups.length; j++) {
-            TrackGroup track = trackGroups.get(j);
-            for (int k = 0; k < track.length; k++) {
-              Format format = track.getFormat(k);
-              if ((format.selectionFlags & C.SELECTION_FLAG_DEFAULT) != 0) {
-                preferredAudioName = getFormatName(format);
-                break;
-              }
-            }
+          preferredAudioName = getParametersPreferred(trackGroups, parameters.preferredAudioLanguages);
+          if (preferredAudioName == null) {
+            preferredAudioName = getDefaultPreferred(trackGroups);
           }
         }
       } else if (C.TRACK_TYPE_TEXT == mappedTrackInfo.getRendererType(i)) {
@@ -89,8 +85,12 @@ public class TrackCollector {
         if (overrideDefinitions[i] != null) {
           Format format = overrideDefinitions[i].group.getFormat(overrideDefinitions[i].tracks[0]);
           preferredTextName = getFormatName(format);
-        } else {
-          preferredTextName = "";
+        } else if (preferredTextName == null) {
+          TrackGroupArray trackGroups = mappedTrackInfo.getTrackGroups(i);
+          preferredTextName = getParametersPreferred(trackGroups, parameters.preferredTextLanguages);
+          if (preferredTextName == null) {
+            preferredTextName = "";
+          }
         }
       }
     }
@@ -303,6 +303,55 @@ public class TrackCollector {
       }
     }
     return new TrackGroupArray();
+  }
+
+  private String getParametersPreferred(
+      TrackGroupArray trackGroups,
+      ImmutableList<String> preferredLanguages) {
+    if (preferredLanguages.size() == 0) {
+      return null;
+    }
+
+    int bestLanguageScore = 0;
+    int bestLanguageIndex = Integer.MAX_VALUE;
+    String preferredName = null;
+    for (int i = 0; i < trackGroups.length; i++) {
+      TrackGroup trackGroup = trackGroups.get(i);
+      if (trackGroup.length == 0) {
+        continue;
+      }
+      Format format = trackGroup.getFormat(0);
+      for (int j = 0; j < preferredLanguages.size(); j++) {
+        int score = DefaultTrackSelector.getFormatLanguageScore(
+                format,
+                preferredLanguages.get(j),
+                /* allowUndeterminedFormatLanguage= */ false);
+        if (score > 0) {
+          if (j < bestLanguageIndex || (j == bestLanguageIndex && score > bestLanguageScore)) {
+            bestLanguageIndex = j;
+            bestLanguageScore = score;
+            preferredName = getFormatName(format);
+          }
+          break;
+        }
+      }
+    }
+    return preferredName;
+  }
+
+  private String getDefaultPreferred(TrackGroupArray trackGroups) {
+    String preferredName = "";
+    for (int i = 0; i < trackGroups.length; i++) {
+      TrackGroup trackGroup = trackGroups.get(i);
+      for (int j = 0; j < trackGroup.length; j++) {
+        Format format = trackGroup.getFormat(j);
+        if ((format.selectionFlags & C.SELECTION_FLAG_DEFAULT) != 0) {
+          preferredName = getFormatName(format);
+          break;
+        }
+      }
+    }
+    return preferredName;
   }
 
   private static int getMetadataEntrySize(Format format) {
