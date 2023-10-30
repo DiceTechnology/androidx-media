@@ -27,10 +27,6 @@ import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSpec;
 import androidx.media3.datasource.TransferListener;
 import androidx.media3.exoplayer.SeekParameters;
-import androidx.media3.common.endeavor.cmcd.CMCDCollector;
-import androidx.media3.common.endeavor.cmcd.CMCDType;
-import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDObjectType;
-import androidx.media3.common.util.Util;
 import androidx.media3.exoplayer.smoothstreaming.manifest.SsManifest;
 import androidx.media3.exoplayer.smoothstreaming.manifest.SsManifest.StreamElement;
 import androidx.media3.exoplayer.source.BehindLiveWindowException;
@@ -88,7 +84,6 @@ public class DefaultSsChunkSource implements SsChunkSource {
   private ExoTrackSelection trackSelection;
   private SsManifest manifest;
   private int currentManifestChunkOffset;
-  @Nullable private CMCDCollector cmcdCollector;
 
   @Nullable private IOException fatalError;
 
@@ -143,12 +138,6 @@ public class DefaultSsChunkSource implements SsChunkSource {
               track);
       chunkExtractors[i] = new BundledChunkExtractor(extractor, streamElement.type, format);
     }
-  }
-
-  @Override
-  public DefaultSsChunkSource setCMCDCollector(CMCDCollector cmcdCollector) {
-    this.cmcdCollector = cmcdCollector;
-    return this;
   }
 
   @Override
@@ -277,13 +266,6 @@ public class DefaultSsChunkSource implements SsChunkSource {
 
     int manifestTrackIndex = trackSelection.getIndexInTrackGroup(trackSelectionIndex);
     Uri uri = streamElement.buildRequestUri(manifestTrackIndex, chunkIndex);
-    CMCDCollector collector = prepareChunkCollector(
-        trackSelection.getSelectedFormat(),
-        chunkEndTimeUs - chunkStartTimeUs,
-        chunkIndex,
-        manifestTrackIndex,
-        uri,
-        streamElement);
 
     out.chunk =
         newMediaChunk(
@@ -294,34 +276,9 @@ public class DefaultSsChunkSource implements SsChunkSource {
             chunkStartTimeUs,
             chunkEndTimeUs,
             chunkSeekTimeUs,
-            collector,
             trackSelection.getSelectionReason(),
             trackSelection.getSelectionData(),
             chunkExtractor);
-  }
-
-  private CMCDCollector prepareChunkCollector(
-      Format format,
-      long durationUs,
-      int chunkIndex,
-      int trackIndex,
-      Uri mediaUri,
-      StreamElement streamElement) {
-    CMCDCollector collector = CMCDCollector.createCollector(cmcdCollector);
-    if (collector != null) {
-      int bitrate = Math.round(format.bitrate / 1024f);
-      collector.updateEncodedBitrate(bitrate);
-      collector.updateObjectType(CMCDObjectType.from(cmcdCollector));
-      collector.updateObjectDuration((int) Util.usToMs(durationUs));
-      collector.updateRequestedThroughput(CMCDType.calcRequestedThroughput(bitrate));
-
-      // Find the next object.
-      if (cmcdCollector.isActiveNextPayload() && chunkIndex != C.INDEX_UNSET && chunkIndex < streamElement.chunkCount - 1) {
-        Uri nextUri = streamElement.buildRequestUri(trackIndex, chunkIndex + 1);
-        collector.updateNextObjectRequest(CMCDType.buildNextObject(mediaUri, nextUri));
-      }
-    }
-    return collector;
   }
 
   @Override
@@ -363,11 +320,10 @@ public class DefaultSsChunkSource implements SsChunkSource {
       long chunkStartTimeUs,
       long chunkEndTimeUs,
       long chunkSeekTimeUs,
-      CMCDCollector collector,
       @C.SelectionReason int trackSelectionReason,
       @Nullable Object trackSelectionData,
       ChunkExtractor chunkExtractor) {
-    DataSpec dataSpec = new DataSpec.Builder().setUri(uri).setCMCDCollector(collector).build();
+    DataSpec dataSpec = new DataSpec(uri);
     // In SmoothStreaming each chunk contains sample timestamps relative to the start of the chunk.
     // To convert them the absolute timestamps, we need to set sampleOffsetUs to chunkStartTimeUs.
     long sampleOffsetUs = chunkStartTimeUs;

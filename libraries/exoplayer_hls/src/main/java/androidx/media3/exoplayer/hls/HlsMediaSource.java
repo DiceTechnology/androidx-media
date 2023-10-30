@@ -31,9 +31,6 @@ import androidx.media3.common.MediaItem.LiveConfiguration;
 import androidx.media3.common.MediaLibraryInfo;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.endeavor.WebUtil;
-import androidx.media3.common.endeavor.cmcd.CMCDContext;
-import androidx.media3.common.endeavor.cmcd.CMCDType;
-import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDStreamFormat;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -43,7 +40,6 @@ import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider;
-import androidx.media3.exoplayer.endeavor.CMCDManager;
 import androidx.media3.exoplayer.endeavor.DebugUtil;
 import androidx.media3.exoplayer.endeavor.LiveEdgeManger;
 import androidx.media3.exoplayer.hls.playlist.DefaultHlsPlaylistParserFactory;
@@ -391,7 +387,6 @@ public final class HlsMediaSource extends BaseMediaSource
 
   private MediaItem.LiveConfiguration liveConfiguration;
   @Nullable private TransferListener mediaTransferListener;
-  @Nullable private CMCDContext cmcdContext;
 
   private HlsMediaSource(
       MediaItem mediaItem,
@@ -429,13 +424,11 @@ public final class HlsMediaSource extends BaseMediaSource
   @Override
   protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     this.mediaTransferListener = mediaTransferListener;
-    this.cmcdContext = prepareCMCDContext();
     drmSessionManager.setPlayer(
         /* playbackLooper= */ checkNotNull(Looper.myLooper()), getPlayerId());
     drmSessionManager.prepare();
     MediaSourceEventListener.EventDispatcher eventDispatcher =
         createEventDispatcher(/* mediaPeriodId= */ null);
-    playlistTracker.setCMCDCollector(CMCDContext.createCollector(cmcdContext));
     playlistTracker.start(
         localConfiguration.uri, eventDispatcher, /* primaryPlaylistListener= */ this);
   }
@@ -463,7 +456,7 @@ public final class HlsMediaSource extends BaseMediaSource
         allowChunklessPreparation,
         metadataType,
         useSessionKeys,
-        getPlayerId()).setCMCDContext(cmcdContext);
+        getPlayerId());
   }
 
   @Override
@@ -475,10 +468,6 @@ public final class HlsMediaSource extends BaseMediaSource
   protected void releaseSourceInternal() {
     playlistTracker.stop();
     drmSessionManager.release();
-    if (cmcdContext != null) {
-      CMCDManager.getInstance().releaseContext(cmcdContext);
-      cmcdContext = null;
-    }
   }
 
   @Override
@@ -695,15 +684,6 @@ public final class HlsMediaSource extends BaseMediaSource
         Util.binarySearchFloor(
             segments, positionUs, /* inclusive= */ true, /* stayInBounds= */ true);
     return segments.get(segmentIndex);
-  }
-
-  private CMCDContext prepareCMCDContext() {
-    CMCDContext context = CMCDManager.getInstance().createContext(getPlayerId());
-    if (context != null) {
-      String contentId = CMCDType.toUuidString(localConfiguration.uri.toString());
-      context.updateMediaInfo(contentId, CMCDStreamFormat.HLS);
-    }
-    return context;
   }
 
   public HlsPlaylistTracker getPlaylistTracker() {

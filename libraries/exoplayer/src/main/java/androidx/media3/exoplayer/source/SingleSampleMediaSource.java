@@ -24,17 +24,10 @@ import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.Timeline;
-import androidx.media3.common.endeavor.cmcd.CMCDCollector;
-import androidx.media3.common.endeavor.cmcd.CMCDContext;
-import androidx.media3.common.endeavor.cmcd.CMCDType;
-import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDObjectType;
-import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDStreamFormat;
 import androidx.media3.common.util.UnstableApi;
-import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSpec;
 import androidx.media3.datasource.TransferListener;
-import androidx.media3.exoplayer.endeavor.CMCDManager;
 import androidx.media3.exoplayer.upstream.Allocator;
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy;
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy;
@@ -147,7 +140,7 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
     }
   }
 
-  private DataSpec dataSpec;
+  private final DataSpec dataSpec;
   private final DataSource.Factory dataSourceFactory;
   private final Format format;
   private final long durationUs;
@@ -157,7 +150,6 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
   private final MediaItem mediaItem;
 
   @Nullable private TransferListener transferListener;
-  @Nullable private CMCDContext cmcdContext;
 
   private SingleSampleMediaSource(
       @Nullable String trackId,
@@ -212,8 +204,6 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
   @Override
   protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     transferListener = mediaTransferListener;
-    cmcdContext = prepareCMCDContext();
-    dataSpec = dataSpec.buildUpon().setCMCDCollector(prepareCMCDCollector(format)).build();
     refreshSourceInfo(timeline);
   }
 
@@ -242,32 +232,6 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
 
   @Override
   protected void releaseSourceInternal() {
-    if (cmcdContext != null) {
-      CMCDManager.getInstance().releaseContext(cmcdContext);
-      cmcdContext = null;
-    }
-  }
-
-  private CMCDContext prepareCMCDContext() {
-    CMCDContext context = CMCDManager.getInstance().createContext(getPlayerId());
-    if (context != null) {
-      String contentId = CMCDType.toUuidString(dataSpec.uri.toString());
-      context.updateMediaInfo(contentId, CMCDStreamFormat.OTHER);
-    }
-    return context;
-  }
-
-  private CMCDCollector prepareCMCDCollector(Format format) {
-    CMCDCollector collector = CMCDContext.createCollector(cmcdContext);
-    if (collector != null) {
-      int bitrate = Math.round(format.bitrate / 1024f);
-      collector.updateEncodedBitrate(bitrate);
-      collector.updateObjectType(CMCDObjectType.from(MimeTypes.getTrackType(format.sampleMimeType)));
-      collector.updateRequestedThroughput(CMCDType.calcRequestedThroughput(bitrate));
-      if (durationUs > 0) {
-        collector.updateObjectDuration((int) Util.usToMs(durationUs));
-      }
-    }
-    return collector;
+    // Do nothing.
   }
 }

@@ -840,10 +840,6 @@ public class CronetDataSource extends BaseDataSource implements HttpDataSource {
     }
     requestHeaders.putAll(requestProperties.getSnapshot());
     requestHeaders.putAll(dataSpec.httpRequestHeaders);
-    Map<String, String> cmcdHeaders = dataSpec.buildCMCDHeaders();
-    if (cmcdHeaders != null) {
-      requestHeaders.putAll(cmcdHeaders);
-    }
 
     for (Entry<String, String> headerEntry : requestHeaders.entrySet()) {
       String key = headerEntry.getKey();

@@ -28,9 +28,6 @@ import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.TrackGroup;
-import androidx.media3.common.endeavor.cmcd.CMCDCollector;
-import androidx.media3.common.endeavor.cmcd.CMCDContext;
-import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDObjectType;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.TransferListener;
 import androidx.media3.exoplayer.SeekParameters;
@@ -111,7 +108,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   private DashManifest manifest;
   private int periodIndex;
   private List<EventStream> eventStreams;
-  @Nullable private CMCDContext cmcdContext;
 
   public DashMediaPeriod(
       int id,
@@ -164,11 +160,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     return "dash-id" + id + "-pid-" + period.id + "-start-" + period.startMs;
   }
 
-  public DashMediaPeriod setCMCDContext(CMCDContext cmcdContext) {
-    this.cmcdContext = cmcdContext;
-    return this;
-  }
-
   /**
    * Updates the {@link DashManifest} and the index of this period in the manifest.
    *
@@ -205,7 +196,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       sampleStream.release(this);
     }
     callback = null;
-    cmcdContext = null;
   }
 
   // ChunkSampleStream.ReleaseCallback implementation.
@@ -806,7 +796,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
             embeddedClosedCaptionTrackFormats,
             trackPlayerEmsgHandler,
             transferListener,
-            playerId).setCMCDCollector(prepareCMCDCollector(trackGroupInfo.trackType));
+            playerId);
     ChunkSampleStream<DashChunkSource> stream =
         new ChunkSampleStream<>(
             trackGroupInfo.trackType,
@@ -825,14 +815,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       trackEmsgHandlerBySampleStream.put(stream, trackPlayerEmsgHandler);
     }
     return stream;
-  }
-
-  private CMCDCollector prepareCMCDCollector(@C.TrackType int trackType) {
-    CMCDCollector collector = CMCDContext.createCollector(cmcdContext);
-    if (collector != null) {
-      collector.updateObjectType(CMCDObjectType.from(trackType));
-    }
-    return collector;
   }
 
   @Nullable

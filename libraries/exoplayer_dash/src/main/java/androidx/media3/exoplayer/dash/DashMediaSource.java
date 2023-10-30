@@ -39,11 +39,6 @@ import androidx.media3.common.Player;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.endeavor.WebUtil;
-import androidx.media3.common.endeavor.cmcd.CMCDCollector;
-import androidx.media3.common.endeavor.cmcd.CMCDContext;
-import androidx.media3.common.endeavor.cmcd.CMCDType;
-import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDObjectType;
-import androidx.media3.common.endeavor.cmcd.CMCDType.CMCDStreamFormat;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
@@ -62,7 +57,6 @@ import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider;
-import androidx.media3.exoplayer.endeavor.CMCDManager;
 import androidx.media3.exoplayer.endeavor.DebugUtil;
 import androidx.media3.exoplayer.endeavor.LiveEdgeManger;
 import androidx.media3.exoplayer.offline.FilteringManifestParser;
@@ -396,8 +390,6 @@ public final class DashMediaSource extends BaseMediaSource {
   private int firstPeriodId;
 
   private long manifestLiveOffsetMs;
-  @Nullable private CMCDContext cmcdContext;
-  @Nullable private CMCDCollector manifestCollector;
   
   private DashMediaSource(
       MediaItem mediaItem,
@@ -486,7 +478,6 @@ public final class DashMediaSource extends BaseMediaSource {
   @Override
   protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     this.mediaTransferListener = mediaTransferListener;
-    this.cmcdContext = prepareCMCDContext();
     drmSessionManager.setPlayer(/* playbackLooper= */ Looper.myLooper(), getPlayerId());
     drmSessionManager.prepare();
     if (sideloadedManifest) {
@@ -527,7 +518,7 @@ public final class DashMediaSource extends BaseMediaSource {
             allocator,
             compositeSequenceableLoaderFactory,
             playerEmsgCallback,
-            getPlayerId()).setCMCDContext(cmcdContext);
+            getPlayerId());
     if (DebugUtil.debug_dash) {
       Log.i("DASH", "** createPeriod " + mediaPeriod.getDebugInfo());
     }
@@ -566,10 +557,6 @@ public final class DashMediaSource extends BaseMediaSource {
     periodsById.clear();
     baseUrlExclusionList.reset();
     drmSessionManager.release();
-    if (cmcdContext != null) {
-      CMCDManager.getInstance().releaseContext(cmcdContext);
-      cmcdContext = null;
-    }
   }
 
   // PlayerEmsgCallback callbacks.
@@ -808,7 +795,7 @@ public final class DashMediaSource extends BaseMediaSource {
     Uri timingUri = UriUtil.resolveToUri(manifestUri.toString(), timingElement.value);
     startLoading(
         new ParsingLoadable<>(
-            dataSource, timingUri, null, C.DATA_TYPE_TIME_SYNCHRONIZATION, parser),
+            dataSource, timingUri, C.DATA_TYPE_TIME_SYNCHRONIZATION, parser),
         new UtcTimestampCallback(),
         1);
   }
@@ -905,7 +892,6 @@ public final class DashMediaSource extends BaseMediaSource {
             mediaItem,
             manifest.dynamic ? liveConfiguration : null);
     refreshSourceInfo(timeline);
-    updateCMCDPayload(lastPeriod);
 
     if (!sideloadedManifest) {
       // Remove any pending simulated refresh.
@@ -1085,7 +1071,7 @@ public final class DashMediaSource extends BaseMediaSource {
     }
     manifestLoadPending = false;
     startLoading(
-        new ParsingLoadable<>(dataSource, manifestUri, prepareManifestCollector(), C.DATA_TYPE_MANIFEST, manifestParser),
+        new ParsingLoadable<>(dataSource, manifestUri, C.DATA_TYPE_MANIFEST, manifestParser),
         manifestCallback,
         loadErrorHandlingPolicy.getMinimumLoadableRetryCount(C.DATA_TYPE_MANIFEST));
   }
@@ -1102,41 +1088,6 @@ public final class DashMediaSource extends BaseMediaSource {
     manifestEventDispatcher.loadStarted(
         new LoadEventInfo(loadable.loadTaskId, loadable.dataSpec, elapsedRealtimeMs),
         loadable.type);
-  }
-
-  private CMCDContext prepareCMCDContext() {
-    CMCDContext context = CMCDManager.getInstance().createContext(getPlayerId());
-    if (context != null) {
-      String contentId = (manifestUri == null ? null : CMCDType.toUuidString(manifestUri.toString()));
-      context.updateMediaInfo(contentId, CMCDStreamFormat.MPEG_DASH);
-    }
-    return context;
-  }
-
-  private CMCDCollector prepareManifestCollector() {
-    if (cmcdContext == null) {
-      return null;
-    }
-    if (manifestCollector == null) {
-      manifestCollector = CMCDContext.createCollector(cmcdContext);
-      manifestCollector.updateObjectType(CMCDObjectType.MANIFEST);
-    }
-    return manifestCollector;
-  }
-
-  private void updateCMCDPayload(Period period) {
-    if (manifestCollector == null) {
-      return;
-    }
-    int topBitrate = 0;
-    for (AdaptationSet adaptationSet : period.adaptationSets) {
-      for (Representation representation : adaptationSet.representations) {
-        if (topBitrate < representation.format.bitrate) {
-          topBitrate = representation.format.bitrate;
-        }
-      }
-    }
-    manifestCollector.updateTopBitrate(Math.round(topBitrate / 1024f));
   }
 
   private static long getIntervalUntilNextManifestRefreshMs(

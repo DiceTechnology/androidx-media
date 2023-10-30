@@ -23,7 +23,6 @@ import androidx.media3.common.C;
 import androidx.media3.common.DrmInitData;
 import androidx.media3.common.Format;
 import androidx.media3.common.Metadata;
-import androidx.media3.common.endeavor.cmcd.CMCDCollector;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.TimestampAdjuster;
@@ -94,8 +93,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       @Nullable byte[] mediaSegmentKey,
       @Nullable byte[] initSegmentKey,
       boolean shouldSpliceIn,
-      CMCDCollector mediaCollector,
-      CMCDCollector initCollector,
       PlayerId playerId) {
     // Media segment.
     HlsMediaPlaylist.SegmentBase mediaSegment = segmentBaseHolder.segmentBase;
@@ -105,7 +102,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
             .setPosition(mediaSegment.byteRangeOffset)
             .setLength(mediaSegment.byteRangeLength)
             .setFlags(segmentBaseHolder.isPreload ? FLAG_MIGHT_NOT_USE_FULL_NETWORK_SPEED : 0)
-            .setCMCDCollector(mediaCollector)
             .build();
     boolean mediaSegmentEncrypted = mediaSegmentKey != null;
     @Nullable
@@ -129,12 +125,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
               : null;
       Uri initSegmentUri = UriUtil.resolveToUri(mediaPlaylist.baseUri, initSegment.url);
       initDataSpec =
-          new DataSpec.Builder()
-              .setUri(initSegmentUri)
-              .setPosition(initSegment.byteRangeOffset)
-              .setLength(initSegment.byteRangeLength)
-              .setCMCDCollector(initCollector)
-              .build();
+          new DataSpec(initSegmentUri, initSegment.byteRangeOffset, initSegment.byteRangeLength);
       initDataSource = buildDataSource(dataSource, initSegmentKey, initSegmentIv);
     }
 
