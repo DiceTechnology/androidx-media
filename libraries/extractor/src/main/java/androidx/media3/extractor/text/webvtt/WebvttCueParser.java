@@ -517,8 +517,9 @@ public final class WebvttCueParser {
       case TAG_CLASS:
       case TAG_ITALIC:
       case TAG_LANG:
-      case TAG_RUBY:
-      case TAG_RUBY_TEXT:
+      // Ignore <ruby> and <rt> tags, see DORIS-2034.
+      // case TAG_RUBY:
+      // case TAG_RUBY_TEXT:
       case TAG_UNDERLINE:
       case TAG_VOICE:
         return true;

@@ -18,6 +18,7 @@ package androidx.media3.common.util;
 import android.graphics.Color;
 import android.text.TextUtils;
 import androidx.annotation.ColorInt;
+import androidx.annotation.NonNull;
 import com.google.common.base.Ascii;
 import java.util.HashMap;
 import java.util.Map;
@@ -78,6 +79,10 @@ public final class ColorParser {
     Assertions.checkArgument(!TextUtils.isEmpty(colorExpression));
     colorExpression = colorExpression.replace(" ", "");
     if (colorExpression.charAt(0) == '#') {
+      if (colorExpression.length() == 4 || colorExpression.length() == 5) {
+        // #RGB(A) to #RRGGBB(AA)
+        colorExpression = duplicateHexDigits(colorExpression);
+      }
       // Parse using Long to avoid failure when colorExpression is greater than #7FFFFFFF.
       int color = (int) Long.parseLong(colorExpression.substring(1), 16);
       if (colorExpression.length() == 7) {
@@ -119,6 +124,19 @@ public final class ColorParser {
       }
     }
     throw new IllegalArgumentException();
+  }
+
+  private static String duplicateHexDigits(@NonNull String hexString) {
+    if (hexString.length() == 0 || hexString.charAt(0) != '#') {
+      throw new IllegalArgumentException();
+    }
+    StringBuilder result = new StringBuilder();
+    result.append("#");
+    for (int i = 1; i < hexString.length(); i++) {
+      char c = hexString.charAt(i);
+      result.append(c).append(c);
+    }
+    return result.toString();
   }
 
   static {
