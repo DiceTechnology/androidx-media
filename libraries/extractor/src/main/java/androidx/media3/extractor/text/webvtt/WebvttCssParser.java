@@ -193,9 +193,17 @@ import java.util.regex.Pattern;
     }
     // At this point we have a presumably valid declaration, we need to parse it and fill the style.
     if (PROPERTY_COLOR.equals(property)) {
-      style.setFontColor(ColorParser.parseCssColor(value));
+      try {
+        style.setFontColor(ColorParser.parseCssColor(value));
+      } catch (IllegalArgumentException ex) {
+        // Ignore exception.
+      }
     } else if (PROPERTY_BGCOLOR.equals(property)) {
-      style.setBackgroundColor(ColorParser.parseCssColor(value));
+      try {
+        style.setBackgroundColor(ColorParser.parseCssColor(value));
+      } catch (IllegalArgumentException ex) {
+        // Ignore exception.
+      }
     } else if (PROPERTY_RUBY_POSITION.equals(property)) {
       if (VALUE_OVER.equals(value)) {
         style.setRubyPosition(TextAnnotation.POSITION_BEFORE);
