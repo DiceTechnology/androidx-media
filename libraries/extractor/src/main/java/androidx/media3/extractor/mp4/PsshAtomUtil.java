@@ -87,25 +87,18 @@ public final class PsshAtomUtil {
       return atom;
     }
     @Nullable PsshAtom parsedAtom = parsePsshAtom(atom);
-    if (parsedAtom == null) {
+    byte[] data = parsedAtom == null ? null : parsedAtom.schemeData;
+    if (data == null) {
       return atom;
     }
-    byte[] data = parsedAtom.schemeData;
-    if (data != null) {
-      String hex = Util.toHexString(data);
-      if (hex.endsWith(CBCS_PROTECT_DATA)) {
-        return atom;
-      }
-//      byte[] cp = Util.getBytesFromHexString(CBCS_PROTECT_DATA);
-//      int dataLength = data.length;
-//      byte[] newData = new byte[dataLength + cp.length];
-//      System.arraycopy(data, 0, newData, 0, dataLength);
-//      System.arraycopy(cp, 0, newData, dataLength, cp.length);
-//      data = newData;
-      data = Util.getBytesFromHexString(hex + CBCS_PROTECT_DATA);
-      Log.i(TAG, "rebuild pssh box for FireTV");
+    String hex = Util.toHexString(data);
+    if (hex.endsWith(CBCS_PROTECT_DATA)) {
+      return atom;
     }
-    UUID[] keyIds = null; // parsedAtom.keyIds;
+
+    Log.i(TAG, "rebuild pssh box for FireTV");
+    data = Util.getBytesFromHexString(hex + CBCS_PROTECT_DATA);
+    UUID[] keyIds = parsedAtom.keyIds;
     return buildPsshAtom(systemId, keyIds, data);
   }
 
