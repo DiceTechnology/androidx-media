@@ -16,9 +16,11 @@
 package androidx.media3.extractor.mp4;
 
 import androidx.annotation.Nullable;
+import androidx.media3.common.C;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.UnstableApi;
+import androidx.media3.common.util.Util;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
@@ -27,6 +29,8 @@ import java.util.UUID;
 public final class PsshAtomUtil {
 
   private static final String TAG = "PsshAtomUtil";
+  // CBCS Protection scheme identifying the encryption algorithm.
+  private static final String CBCS_PROTECT_DATA = "48F3C6899B06".toLowerCase();
 
   private PsshAtomUtil() {}
 
@@ -74,6 +78,35 @@ public final class PsshAtomUtil {
       psshBox.put(data);
     } // Else the last 4 bytes are a 0 DataSize.
     return psshBox.array();
+  }
+
+  public static byte[] adjustCBCSPsshAtomForFireTV(UUID systemId, String schemeType, @Nullable byte[] atom) {
+    if (!C.WIDEVINE_UUID.equals(systemId) ||
+        !"Amazon".equals(Util.MANUFACTURER) ||
+        !C.CENC_TYPE_cbcs.equals(schemeType)) {
+      return atom;
+    }
+    @Nullable PsshAtom parsedAtom = parsePsshAtom(atom);
+    if (parsedAtom == null) {
+      return atom;
+    }
+    byte[] data = parsedAtom.schemeData;
+    if (data != null) {
+      String hex = Util.toHexString(data);
+      if (hex.endsWith(CBCS_PROTECT_DATA)) {
+        return atom;
+      }
+//      byte[] cp = Util.getBytesFromHexString(CBCS_PROTECT_DATA);
+//      int dataLength = data.length;
+//      byte[] newData = new byte[dataLength + cp.length];
+//      System.arraycopy(data, 0, newData, 0, dataLength);
+//      System.arraycopy(cp, 0, newData, dataLength, cp.length);
+//      data = newData;
+      data = Util.getBytesFromHexString(hex + CBCS_PROTECT_DATA);
+      Log.i(TAG, "rebuild pssh box for FireTV");
+    }
+    UUID[] keyIds = null; // parsedAtom.keyIds;
+    return buildPsshAtom(systemId, keyIds, data);
   }
 
   /**

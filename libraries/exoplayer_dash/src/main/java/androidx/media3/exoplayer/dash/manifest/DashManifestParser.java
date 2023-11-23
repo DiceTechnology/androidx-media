@@ -624,6 +624,8 @@ public class DashManifestParser extends DefaultHandler
         if (uuid == null) {
           Log.w(TAG, "Skipping malformed cenc:pssh data");
           data = null;
+        } else  {
+          data = PsshAtomUtil.adjustCBCSPsshAtomForFireTV(uuid, schemeType, data);
         }
       } else if (data == null
           && C.PLAYREADY_UUID.equals(uuid)
