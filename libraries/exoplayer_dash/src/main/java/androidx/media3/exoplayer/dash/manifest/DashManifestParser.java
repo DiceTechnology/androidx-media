@@ -577,6 +577,7 @@ public class DashManifestParser extends DefaultHandler
     String licenseServerUrl = null;
     byte[] data = null;
     UUID uuid = null;
+    String schemeTypeForAdjust = null;
 
     String schemeIdUri = xpp.getAttributeValue(null, "schemeIdUri");
     if (schemeIdUri != null) {
@@ -599,6 +600,7 @@ public class DashManifestParser extends DefaultHandler
           uuid = C.PLAYREADY_UUID;
           break;
         case "urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed":
+          schemeTypeForAdjust = xpp.getAttributeValue(null, "value");
           uuid = C.WIDEVINE_UUID;
           break;
         case "urn:uuid:e2719d58-a985-b3c9-781a-b030af78d30e":
@@ -624,6 +626,8 @@ public class DashManifestParser extends DefaultHandler
         if (uuid == null) {
           Log.w(TAG, "Skipping malformed cenc:pssh data");
           data = null;
+        } else  {
+          data = PsshAtomUtil.adjustCBCSPsshAtomForFireTV(uuid, schemeTypeForAdjust, data);
         }
       } else if (data == null
           && C.PLAYREADY_UUID.equals(uuid)

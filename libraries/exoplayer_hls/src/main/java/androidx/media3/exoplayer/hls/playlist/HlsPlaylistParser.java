@@ -363,10 +363,10 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
       } else if (line.startsWith(TAG_SESSION_KEY)) {
         String keyFormat =
             parseOptionalStringAttr(line, REGEX_KEYFORMAT, KEYFORMAT_IDENTITY, variableDefinitions);
-        SchemeData schemeData = parseDrmSchemeData(line, keyFormat, variableDefinitions);
+        String method = parseStringAttr(line, REGEX_METHOD, variableDefinitions);
+        String scheme = parseEncryptionScheme(method);
+        SchemeData schemeData = parseDrmSchemeData(line, keyFormat, scheme, variableDefinitions);
         if (schemeData != null) {
-          String method = parseStringAttr(line, REGEX_METHOD, variableDefinitions);
-          String scheme = parseEncryptionScheme(method);
           sessionKeyDrmInitData.add(new DrmInitData(scheme, schemeData));
         }
       } else if (line.startsWith(TAG_STREAM_INF) || isIFrameOnlyVariant) {
@@ -834,7 +834,7 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
             if (encryptionScheme == null) {
               encryptionScheme = parseEncryptionScheme(method);
             }
-            SchemeData schemeData = parseDrmSchemeData(line, keyFormat, variableDefinitions);
+            SchemeData schemeData = parseDrmSchemeData(line, keyFormat, encryptionScheme, variableDefinitions);
             if (schemeData != null) {
               cachedDrmInitData = null;
               currentSchemeDatas.put(keyFormat, schemeData);
@@ -1138,16 +1138,18 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
 
   @Nullable
   private static SchemeData parseDrmSchemeData(
-      String line, String keyFormat, Map<String, String> variableDefinitions)
+      String line, String keyFormat, String schemeType, Map<String, String> variableDefinitions)
       throws ParserException {
     String keyFormatVersions =
         parseOptionalStringAttr(line, REGEX_KEYFORMATVERSIONS, "1", variableDefinitions);
     if (KEYFORMAT_WIDEVINE_PSSH_BINARY.equals(keyFormat)) {
       String uriString = parseStringAttr(line, REGEX_URI, variableDefinitions);
+      byte[] data = Base64.decode(uriString.substring(uriString.indexOf(',')), Base64.DEFAULT);
+      data = PsshAtomUtil.adjustCBCSPsshAtomForFireTV(C.WIDEVINE_UUID, schemeType, data);
       return new SchemeData(
           C.WIDEVINE_UUID,
           MimeTypes.VIDEO_MP4,
-          Base64.decode(uriString.substring(uriString.indexOf(',')), Base64.DEFAULT));
+          data);
     } else if (KEYFORMAT_WIDEVINE_PSSH_JSON.equals(keyFormat)) {
       return new SchemeData(C.WIDEVINE_UUID, "hls", Util.getUtf8Bytes(line));
     } else if (KEYFORMAT_PLAYREADY.equals(keyFormat) && "1".equals(keyFormatVersions)) {
