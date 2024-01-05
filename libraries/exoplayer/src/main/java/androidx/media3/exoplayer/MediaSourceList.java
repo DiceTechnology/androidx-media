@@ -22,10 +22,12 @@ import static java.lang.Math.min;
 import android.os.Handler;
 import android.util.Pair;
 import androidx.annotation.Nullable;
+import androidx.media3.common.MediaItem;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.HandlerWrapper;
 import androidx.media3.common.util.Log;
+import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.TransferListener;
 import androidx.media3.exoplayer.analytics.AnalyticsCollector;
@@ -52,7 +54,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
  * Concatenates multiple {@link MediaSource}s. The list of {@link MediaSource}s can be modified
@@ -251,6 +252,27 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     return createTimeline();
   }
 
+  /**
+   * Updates the specified media sources with new {@link MediaItem media items}.
+   *
+   * @param fromIndex The index of the first media source to update. This index must be in the range
+   *     of 0 &lt;= index &lt;= {@link #getSize()}.
+   * @param toIndex The index after the last media source to update. This index must be in the range
+   *     of {@code fromIndex} &lt;= index &lt;= {@link #getSize()}.
+   * @param mediaItems The new {@link MediaItem media items} for the specified range of media
+   *     sources. Must have a size of {@code toIndex - fromIndex}.
+   * @return The new {@link Timeline}.
+   */
+  public Timeline updateMediaSourcesWithMediaItems(
+      int fromIndex, int toIndex, List<MediaItem> mediaItems) {
+    Assertions.checkArgument(fromIndex >= 0 && fromIndex <= toIndex && toIndex <= getSize());
+    Assertions.checkArgument(mediaItems.size() == toIndex - fromIndex);
+    for (int i = fromIndex; i < toIndex; i++) {
+      mediaSourceHolders.get(i).mediaSource.updateMediaItem(mediaItems.get(i - fromIndex));
+    }
+    return createTimeline();
+  }
+
   /** Clears the playlist. */
   public Timeline clear(@Nullable ShuffleOrder shuffleOrder) {
     this.shuffleOrder = shuffleOrder != null ? shuffleOrder : this.shuffleOrder.cloneAndClear();
@@ -364,6 +386,11 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       windowOffset += mediaSourceHolder.mediaSource.getTimeline().getWindowCount();
     }
     return new PlaylistTimeline(mediaSourceHolders, shuffleOrder);
+  }
+
+  /** Returns the shuffle order */
+  public ShuffleOrder getShuffleOrder() {
+    return shuffleOrder;
   }
 
   // Internal methods.

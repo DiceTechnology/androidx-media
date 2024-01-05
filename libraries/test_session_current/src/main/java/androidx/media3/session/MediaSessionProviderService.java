@@ -16,6 +16,7 @@
 package androidx.media3.session;
 
 import static androidx.media3.common.Player.COMMAND_GET_TRACKS;
+import static androidx.media3.session.MediaSession.ConnectionResult.accept;
 import static androidx.media3.test.session.common.CommonConstants.ACTION_MEDIA3_SESSION;
 import static androidx.media3.test.session.common.CommonConstants.KEY_AUDIO_ATTRIBUTES;
 import static androidx.media3.test.session.common.CommonConstants.KEY_AVAILABLE_COMMANDS;
@@ -60,8 +61,13 @@ import static androidx.media3.test.session.common.MediaSessionConstants.KEY_COMM
 import static androidx.media3.test.session.common.MediaSessionConstants.KEY_CONTROLLER;
 import static androidx.media3.test.session.common.MediaSessionConstants.TEST_COMMAND_GET_TRACKS;
 import static androidx.media3.test.session.common.MediaSessionConstants.TEST_CONTROLLER_LISTENER_SESSION_REJECTS;
+import static androidx.media3.test.session.common.MediaSessionConstants.TEST_GET_CUSTOM_LAYOUT;
 import static androidx.media3.test.session.common.MediaSessionConstants.TEST_GET_SESSION_ACTIVITY;
 import static androidx.media3.test.session.common.MediaSessionConstants.TEST_IS_SESSION_COMMAND_AVAILABLE;
+import static androidx.media3.test.session.common.MediaSessionConstants.TEST_MEDIA_CONTROLLER_COMPAT_CALLBACK_WITH_MEDIA_SESSION_TEST;
+import static androidx.media3.test.session.common.MediaSessionConstants.TEST_ON_TRACKS_CHANGED_VIDEO_TO_AUDIO_TRANSITION;
+import static androidx.media3.test.session.common.MediaSessionConstants.TEST_ON_VIDEO_SIZE_CHANGED;
+import static androidx.media3.test.session.common.MediaSessionConstants.TEST_SET_SHOW_PLAY_BUTTON_IF_SUPPRESSED_TO_FALSE;
 import static androidx.media3.test.session.common.MediaSessionConstants.TEST_WITH_CUSTOM_COMMANDS;
 
 import android.app.PendingIntent;
@@ -89,7 +95,6 @@ import androidx.media3.common.Tracks;
 import androidx.media3.common.VideoSize;
 import androidx.media3.common.text.CueGroup;
 import androidx.media3.common.util.Log;
-import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.session.MediaSession.ControllerInfo;
 import androidx.media3.test.session.common.IRemoteMediaSession;
@@ -98,6 +103,7 @@ import androidx.media3.test.session.common.TestHandler;
 import androidx.media3.test.session.common.TestHandler.TestRunnable;
 import androidx.media3.test.session.common.TestUtils;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListenableFuture;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -108,9 +114,10 @@ import java.util.concurrent.Callable;
  * A Service that creates {@link MediaSession} and calls its methods according to the client app's
  * requests.
  */
-@UnstableApi
 public class MediaSessionProviderService extends Service {
 
+  public static final String KEY_ENABLE_FAKE_MEDIA_NOTIFICATION_MANAGER_CONTROLLER =
+      "key_enable_fake_media_notification_manager_controller";
   private static final String TAG = "MSProviderService";
 
   private Map<String, MediaSession> sessionMap = new HashMap<>();
@@ -162,15 +169,18 @@ public class MediaSessionProviderService extends Service {
 
     @Override
     public void create(String sessionId, Bundle tokenExtras) throws RemoteException {
+      if (tokenExtras == null) {
+        tokenExtras = Bundle.EMPTY;
+      }
+      boolean useFakeMediaNotificationManagerController =
+          tokenExtras.getBoolean(
+              KEY_ENABLE_FAKE_MEDIA_NOTIFICATION_MANAGER_CONTROLLER, /* defaultValue= */ false);
       MockPlayer mockPlayer =
           new MockPlayer.Builder().setApplicationLooper(handler.getLooper()).build();
       MediaSession.Builder builder =
           new MediaSession.Builder(MediaSessionProviderService.this, mockPlayer).setId(sessionId);
 
-      if (tokenExtras != null) {
-        builder.setExtras(tokenExtras);
-      }
-
+      builder.setExtras(tokenExtras);
       switch (sessionId) {
         case TEST_GET_SESSION_ACTIVITY:
           {
@@ -185,6 +195,23 @@ public class MediaSessionProviderService extends Service {
             builder.setSessionActivity(pendingIntent);
             break;
           }
+        case TEST_GET_CUSTOM_LAYOUT:
+          {
+            builder.setCallback(
+                new MediaSession.Callback() {
+                  @Override
+                  public MediaSession.ConnectionResult onConnect(
+                      MediaSession session, ControllerInfo controller) {
+                    return accept(
+                        new SessionCommands.Builder()
+                            .add(new SessionCommand("command1", Bundle.EMPTY))
+                            .add(new SessionCommand("command2", Bundle.EMPTY))
+                            .build(),
+                        Player.Commands.EMPTY);
+                  }
+                });
+            break;
+          }
         case TEST_WITH_CUSTOM_COMMANDS:
           {
             SessionCommands availableSessionCommands =
@@ -197,8 +224,7 @@ public class MediaSessionProviderService extends Service {
                   @Override
                   public MediaSession.ConnectionResult onConnect(
                       MediaSession session, ControllerInfo controller) {
-                    return MediaSession.ConnectionResult.accept(
-                        availableSessionCommands, Player.Commands.EMPTY);
+                    return accept(availableSessionCommands, Player.Commands.EMPTY);
                   }
                 });
             break;
@@ -225,8 +251,7 @@ public class MediaSessionProviderService extends Service {
                   @Override
                   public MediaSession.ConnectionResult onConnect(
                       MediaSession session, ControllerInfo controller) {
-                    return MediaSession.ConnectionResult.accept(
-                        availableSessionCommands, Player.Commands.EMPTY);
+                    return accept(availableSessionCommands, Player.Commands.EMPTY);
                   }
                 });
             break;
@@ -253,8 +278,44 @@ public class MediaSessionProviderService extends Service {
                         .getBoolean(KEY_COMMAND_GET_TASKS_UNAVAILABLE, /* defaultValue= */ false)) {
                       commandBuilder.remove(COMMAND_GET_TRACKS);
                     }
-                    return MediaSession.ConnectionResult.accept(
-                        SessionCommands.EMPTY, commandBuilder.build());
+                    return accept(SessionCommands.EMPTY, commandBuilder.build());
+                  }
+                });
+            break;
+          }
+        case TEST_ON_TRACKS_CHANGED_VIDEO_TO_AUDIO_TRANSITION:
+        case TEST_ON_VIDEO_SIZE_CHANGED:
+          {
+            mockPlayer.videoSize = MediaTestUtils.createDefaultVideoSize();
+            mockPlayer.currentTracks = MediaTestUtils.createDefaultVideoTracks();
+            break;
+          }
+        case TEST_SET_SHOW_PLAY_BUTTON_IF_SUPPRESSED_TO_FALSE:
+          {
+            builder.setShowPlayButtonIfPlaybackIsSuppressed(false);
+            break;
+          }
+        case TEST_MEDIA_CONTROLLER_COMPAT_CALLBACK_WITH_MEDIA_SESSION_TEST:
+          {
+            builder.setCallback(
+                new MediaSession.Callback() {
+                  @Override
+                  public MediaSession.ConnectionResult onConnect(
+                      MediaSession session, ControllerInfo controller) {
+                    MediaSession.ConnectionResult connectionResult =
+                        MediaSession.Callback.super.onConnect(session, controller);
+                    SessionCommands availableSessionCommands =
+                        connectionResult.availableSessionCommands;
+                    if (session.isMediaNotificationController(controller)) {
+                      availableSessionCommands =
+                          connectionResult
+                              .availableSessionCommands
+                              .buildUpon()
+                              .add(new SessionCommand("command1", Bundle.EMPTY))
+                              .build();
+                    }
+                    return accept(
+                        availableSessionCommands, connectionResult.availablePlayerCommands);
                   }
                 });
             break;
@@ -266,6 +327,22 @@ public class MediaSessionProviderService extends Service {
           () -> {
             MediaSession session = builder.build();
             session.setSessionPositionUpdateDelayMs(0L);
+            if (useFakeMediaNotificationManagerController) {
+              Bundle connectionHints = new Bundle();
+              connectionHints.putBoolean("androidx.media3.session.MediaNotificationManager", true);
+              //noinspection unused
+              ListenableFuture<MediaController> unusedFuture =
+                  new MediaController.Builder(getApplicationContext(), session.getToken())
+                      .setListener(
+                          new MediaController.Listener() {
+                            @Override
+                            public void onDisconnected(MediaController controller) {
+                              controller.release();
+                            }
+                          })
+                      .setConnectionHints(connectionHints)
+                      .buildAsync();
+            }
             sessionMap.put(sessionId, session);
           });
     }
@@ -423,6 +500,11 @@ public class MediaSessionProviderService extends Service {
           () -> {
             MediaSession session = sessionMap.get(sessionId);
             List<ControllerInfo> controllerInfos = MediaTestUtils.getTestControllerInfos(session);
+            if (controllerInfos.isEmpty()) {
+              Log.e(
+                  TAG,
+                  "No connected controllers to receive custom command. sessionId=" + sessionId);
+            }
             for (ControllerInfo info : controllerInfos) {
               session.sendCustomCommand(info, SessionCommand.CREATOR.fromBundle(command), args);
             }
@@ -445,6 +527,11 @@ public class MediaSessionProviderService extends Service {
           () -> {
             MediaSession session = sessionMap.get(sessionId);
             List<ControllerInfo> controllerInfos = MediaTestUtils.getTestControllerInfos(session);
+            if (controllerInfos.isEmpty()) {
+              Log.e(
+                  TAG,
+                  "No connected controllers to receive available commands. sessionId=" + sessionId);
+            }
             for (ControllerInfo info : controllerInfos) {
               session.setAvailableCommands(
                   info,
@@ -492,6 +579,12 @@ public class MediaSessionProviderService extends Service {
               }
             }
           });
+    }
+
+    @Override
+    public void setSessionActivity(String sessionId, PendingIntent sessionActivity)
+        throws RemoteException {
+      runOnHandler(() -> sessionMap.get(sessionId).setSessionActivity(sessionActivity));
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -661,6 +754,46 @@ public class MediaSessionProviderService extends Service {
             MediaSession session = sessionMap.get(sessionId);
             MockPlayer player = (MockPlayer) session.getPlayer();
             player.currentAdGroupIndex = currentAdGroupIndex;
+          });
+    }
+
+    @Override
+    public void setDeviceVolume(String sessionId, int volume, int flags) throws RemoteException {
+      runOnHandler(
+          () -> {
+            MediaSession session = sessionMap.get(sessionId);
+            MockPlayer player = (MockPlayer) session.getPlayer();
+            player.setDeviceVolume(volume, flags);
+          });
+    }
+
+    @Override
+    public void decreaseDeviceVolume(String sessionId, int flags) throws RemoteException {
+      runOnHandler(
+          () -> {
+            MediaSession session = sessionMap.get(sessionId);
+            MockPlayer player = (MockPlayer) session.getPlayer();
+            player.decreaseDeviceVolume(flags);
+          });
+    }
+
+    @Override
+    public void increaseDeviceVolume(String sessionId, int flags) throws RemoteException {
+      runOnHandler(
+          () -> {
+            MediaSession session = sessionMap.get(sessionId);
+            MockPlayer player = (MockPlayer) session.getPlayer();
+            player.increaseDeviceVolume(flags);
+          });
+    }
+
+    @Override
+    public void setDeviceMuted(String sessionId, boolean muted, int flags) throws RemoteException {
+      runOnHandler(
+          () -> {
+            MediaSession session = sessionMap.get(sessionId);
+            MockPlayer player = (MockPlayer) session.getPlayer();
+            player.setDeviceMuted(muted, flags);
           });
     }
 
@@ -876,7 +1009,6 @@ public class MediaSessionProviderService extends Service {
             MediaSession session = sessionMap.get(sessionId);
             MockPlayer player = (MockPlayer) session.getPlayer();
             player.setVolume(volume);
-            player.notifyVolumeChanged();
           });
     }
 
@@ -981,36 +1113,21 @@ public class MediaSessionProviderService extends Service {
     }
 
     @Override
-    public void notifyDeviceVolumeChanged(String sessionId, int volume, boolean muted)
-        throws RemoteException {
+    public void notifyVolumeChanged(String sessionId) throws RemoteException {
       runOnHandler(
           () -> {
             MediaSession session = sessionMap.get(sessionId);
             MockPlayer player = (MockPlayer) session.getPlayer();
-            player.deviceVolume = volume;
-            player.deviceMuted = muted;
-            player.notifyDeviceVolumeChanged();
+            player.notifyVolumeChanged();
           });
     }
 
     @Override
-    public void decreaseDeviceVolume(String sessionId) throws RemoteException {
+    public void notifyDeviceVolumeChanged(String sessionId) throws RemoteException {
       runOnHandler(
           () -> {
             MediaSession session = sessionMap.get(sessionId);
             MockPlayer player = (MockPlayer) session.getPlayer();
-            player.decreaseDeviceVolume();
-            player.notifyDeviceVolumeChanged();
-          });
-    }
-
-    @Override
-    public void increaseDeviceVolume(String sessionId) throws RemoteException {
-      runOnHandler(
-          () -> {
-            MediaSession session = sessionMap.get(sessionId);
-            MockPlayer player = (MockPlayer) session.getPlayer();
-            player.increaseDeviceVolume();
             player.notifyDeviceVolumeChanged();
           });
     }

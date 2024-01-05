@@ -41,6 +41,7 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.util.ConditionVariable;
 import androidx.media3.common.util.Log;
+import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.Util;
 import androidx.media3.session.MediaLibraryService.LibraryParams;
 import androidx.media3.session.MediaSession.ControllerCb;
@@ -58,7 +59,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
  * Implementation of {@link MediaBrowserServiceCompat} for interoperability between {@link
@@ -197,12 +197,12 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       @Nullable Bundle options) {
     @Nullable ControllerInfo controller = getCurrentController();
     if (controller == null) {
-      result.sendError(/* extras= */ null);
+      result.sendResult(/* result= */ null);
       return;
     }
     if (TextUtils.isEmpty(parentId)) {
       Log.w(TAG, "onLoadChildren(): Ignoring empty parentId from " + controller);
-      result.sendError(/* extras= */ null);
+      result.sendResult(/* result= */ null);
       return;
     }
     result.detach();
@@ -212,7 +212,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
           if (!getConnectedControllersManager()
               .isSessionCommandAvailable(
                   controller, SessionCommand.COMMAND_CODE_LIBRARY_GET_CHILDREN)) {
-            result.sendError(/* extras= */ null);
+            result.sendResult(/* result= */ null);
             return;
           }
           if (options != null) {
@@ -260,12 +260,12 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   public void onLoadItem(String itemId, Result<MediaBrowserCompat.MediaItem> result) {
     @Nullable ControllerInfo controller = getCurrentController();
     if (controller == null) {
-      result.sendError(/* extras= */ null);
+      result.sendResult(/* result= */ null);
       return;
     }
     if (TextUtils.isEmpty(itemId)) {
       Log.w(TAG, "Ignoring empty itemId from " + controller);
-      result.sendError(/* extras= */ null);
+      result.sendResult(/* result= */ null);
       return;
     }
     result.detach();
@@ -275,7 +275,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
           if (!getConnectedControllersManager()
               .isSessionCommandAvailable(
                   controller, SessionCommand.COMMAND_CODE_LIBRARY_GET_ITEM)) {
-            result.sendError(/* extras= */ null);
+            result.sendResult(/* result= */ null);
             return;
           }
           ListenableFuture<LibraryResult<MediaItem>> future =
@@ -291,12 +291,12 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       String query, @Nullable Bundle extras, Result<List<MediaBrowserCompat.MediaItem>> result) {
     @Nullable ControllerInfo controller = getCurrentController();
     if (controller == null) {
-      result.sendError(/* extras= */ null);
+      result.sendResult(/* result= */ null);
       return;
     }
     if (TextUtils.isEmpty(query)) {
       Log.w(TAG, "Ignoring empty query from " + controller);
-      result.sendError(/* extras= */ null);
+      result.sendResult(/* result= */ null);
       return;
     }
     if (!(controller.getControllerCb() instanceof BrowserLegacyCb)) {
@@ -308,7 +308,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         () -> {
           if (!getConnectedControllersManager()
               .isSessionCommandAvailable(controller, SessionCommand.COMMAND_CODE_LIBRARY_SEARCH)) {
-            result.sendError(/* extras= */ null);
+            result.sendResult(/* result= */ null);
             return;
           }
           BrowserLegacyCb cb = (BrowserLegacyCb) checkStateNotNull(controller.getControllerCb());
@@ -371,7 +371,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
             SessionResult sessionResult =
                 checkNotNull(future.get(), "SessionResult must not be null");
             result.sendResult(sessionResult.extras);
-          } catch (CancellationException | ExecutionException | InterruptedException unused) {
+          } catch (CancellationException | ExecutionException | InterruptedException e) {
+            Log.w(TAG, "Custom action failed", e);
             result.sendError(/* extras= */ null);
           }
         },
@@ -386,8 +387,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
           try {
             MediaBrowserCompat.MediaItem mediaItem = future.get();
             result.sendResult(mediaItem);
-          } catch (CancellationException | ExecutionException | InterruptedException unused) {
-            result.sendError(/* extras= */ null);
+          } catch (CancellationException | ExecutionException | InterruptedException e) {
+            Log.w(TAG, "Library operation failed", e);
+            result.sendResult(/* result= */ null);
           }
         },
         MoreExecutors.directExecutor());
@@ -404,8 +406,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
                 (mediaItems == null)
                     ? null
                     : MediaUtils.truncateListBySize(mediaItems, TRANSACTION_SIZE_LIMIT_IN_BYTES));
-          } catch (CancellationException | ExecutionException | InterruptedException unused) {
-            result.sendError(/* extras= */ null);
+          } catch (CancellationException | ExecutionException | InterruptedException e) {
+            Log.w(TAG, "Library operation failed", e);
+            result.sendResult(/* result= */ null);
           }
         },
         MoreExecutors.directExecutor());
@@ -477,7 +480,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         try {
           bitmap = Futures.getDone(future);
         } catch (CancellationException | ExecutionException e) {
-          Log.d(TAG, "Failed to get bitmap");
+          Log.d(TAG, "Failed to get bitmap", e);
         }
       }
       outputMediaItems.add(MediaUtils.convertToBrowserItem(mediaItems.get(i), bitmap));
@@ -526,7 +529,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
             try {
               bitmap = Futures.getDone(bitmapFuture);
             } catch (CancellationException | ExecutionException e) {
-              Log.d(TAG, "failed to get bitmap");
+              Log.d(TAG, "failed to get bitmap", e);
             }
             outputFuture.set(MediaUtils.convertToBrowserItem(mediaItem, bitmap));
           },

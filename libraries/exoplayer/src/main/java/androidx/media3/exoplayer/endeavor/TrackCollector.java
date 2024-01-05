@@ -25,7 +25,7 @@ public class TrackCollector {
   private final SlidingCounter counter;
   private final TrackSwitcher switcher;
   private final TrackSelector callback;
-  private final Map<Format, Long> blacklistUntilTimes = new HashMap<>();
+  private final Map<Format, Long> excludeUntilTimes = new HashMap<>();
 
   private boolean noGroupConstraint = true;
   private boolean videoUseFixedSelection;
@@ -42,7 +42,7 @@ public class TrackCollector {
     this.callback = callback;
   }
 
-  // May update status for the blacklistUntilTimes, videoTrackSelection, preferredAudioName and so on.
+  // May update status for the excludeUntilTimes, videoTrackSelection, preferredAudioName and so on.
   public void onMappedTrackInfoChanged(
       MappingTrackSelector.MappedTrackInfo mappedTrackInfo,
       DefaultTrackSelector.Parameters parameters,
@@ -95,9 +95,9 @@ public class TrackCollector {
       }
     }
 
-    // Clean the expired blacklist records.
+    // Clean the expired exclude records.
     long nowMs = SystemClock.elapsedRealtime();
-    Iterator<Long> iterator = blacklistUntilTimes.values().iterator();
+    Iterator<Long> iterator = excludeUntilTimes.values().iterator();
     while (iterator.hasNext()) {
       Long exist = iterator.next();
       if (exist <= nowMs) {
@@ -197,25 +197,25 @@ public class TrackCollector {
     callback.invalidate();
   }
 
-  // Notify the blacklist event to update the blacklist list for global.
+  // Notify the exclude event to update the exclude list for global.
   @SuppressLint("DefaultLocale")
-  public void setBlacklist(Format format, long blackedTimeMs) {
+  public void setExcludeTrack(Format format, long blackedTimeMs) {
     if (noGroupConstraint || format == null) {
       return;
     }
-    blacklistUntilTimes.put(format, blackedTimeMs);
+    excludeUntilTimes.put(format, blackedTimeMs);
 
     int trackType = getTrackType(format);
     if (trackType == C.TRACK_TYPE_VIDEO) {
       if (videoUseFixedSelection) {
         reselectTracks();
       }
-      Log.i(WebUtil.DEBUG, String.format("track blacklist [%d, %s], timeMs %d", format.bitrate, getAudioGroupId(format), blackedTimeMs));
+      Log.i(WebUtil.DEBUG, String.format("track exclude [%d, %s], timeMs %d", format.bitrate, getAudioGroupId(format), blackedTimeMs));
     } else {
       if (trackType == C.TRACK_TYPE_AUDIO) {
         reselectTracks();
       }
-      Log.i(WebUtil.DEBUG, String.format("track blacklist [%s, %s], timeMs %d", getFormatName(format), getFormatGroupId(format), blackedTimeMs));
+      Log.i(WebUtil.DEBUG, String.format("track exclude [%s, %s], timeMs %d", getFormatName(format), getFormatGroupId(format), blackedTimeMs));
     }
   }
 
@@ -239,10 +239,10 @@ public class TrackCollector {
     return C.TRACK_TYPE_UNKNOWN;
   }
 
-  // Override the isBlacklisted() to apply group constraint.
-  public boolean isBlacklisted(Format format, long nowMs) {
-    // Check this format is blacklisted by self or not.
-    if (isSelfBlacklisted(format, nowMs)) {
+  // Override the isTrackExcluded() to apply group constraint.
+  public boolean isTrackExcluded(Format format, long nowMs) {
+    // Check this format is excluded by self or not.
+    if (isSelfExcluded(format, nowMs)) {
       return true;
     }
     // Need to check group constraint of this format or not.
@@ -251,29 +251,29 @@ public class TrackCollector {
     if (WebUtil.empty(audioGroupId) && WebUtil.empty(subtitleGroupId)) {
       return false;
     }
-    // Check this format is blacklisted by audio group or not.
-    if (isGroupBlacklisted(WebUtil.emptyIfNull(preferredAudioName), audioGroupId, C.TRACK_TYPE_AUDIO, nowMs)) {
+    // Check this format is excluded by audio group or not.
+    if (isGroupExcluded(WebUtil.emptyIfNull(preferredAudioName), audioGroupId, C.TRACK_TYPE_AUDIO, nowMs)) {
       return true;
     }
-    // Check this format is blacklisted by subtitle group or not.
-    return isGroupBlacklisted(WebUtil.emptyIfNull(preferredTextName), subtitleGroupId, C.TRACK_TYPE_TEXT, nowMs);
+    // Check this format is excluded by subtitle group or not.
+    return isGroupExcluded(WebUtil.emptyIfNull(preferredTextName), subtitleGroupId, C.TRACK_TYPE_TEXT, nowMs);
   }
 
-  // Check this format is blacklisted by self or not.
-  private boolean isSelfBlacklisted(Format format, long nowMs) {
-    Long exist = (blacklistUntilTimes.get(format));
+  // Check this format is excluded by self or not.
+  private boolean isSelfExcluded(Format format, long nowMs) {
+    Long exist = (excludeUntilTimes.get(format));
     return (exist != null && exist > nowMs);
   }
 
-  // Check this format is blacklisted by the specified group constrain or not.
-  private boolean isGroupBlacklisted(String name, String groupId, int trackType, long nowMs) {
+  // Check this format is excluded by the specified group constrain or not.
+  private boolean isGroupExcluded(String name, String groupId, int trackType, long nowMs) {
     boolean nameIsEmpty = WebUtil.empty(name);
     boolean groupIdIsEmpty = WebUtil.empty(groupId);
     if (nameIsEmpty && groupIdIsEmpty) {
       return false;
     }
 
-    boolean groupBlacklisted = false;
+    boolean groupExcluded = false;
     TrackGroupArray trackGroup = getTrackGroups(trackType);
     for (int i = 0; i < trackGroup.length; i++) {
       TrackGroup track = trackGroup.get(i);
@@ -282,14 +282,14 @@ public class TrackCollector {
         String formatName = getFormatName(format);
         String formatGroupId = getFormatGroupId(format);
         if ((nameIsEmpty || formatName.equals(name)) && (groupIdIsEmpty || formatGroupId.equals(groupId))) {
-          if (!isSelfBlacklisted(format, nowMs)) {
+          if (!isSelfExcluded(format, nowMs)) {
             return false;
           }
-          groupBlacklisted = true;
+          groupExcluded = true;
         }
       }
     }
-    return groupBlacklisted;
+    return groupExcluded;
   }
 
   // Find the trackGroups mapped to the renderer at the specified index.

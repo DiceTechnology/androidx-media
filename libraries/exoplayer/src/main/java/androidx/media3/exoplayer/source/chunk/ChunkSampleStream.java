@@ -28,6 +28,7 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.decoder.DecoderInputBuffer;
 import androidx.media3.exoplayer.FormatHolder;
+import androidx.media3.exoplayer.LoadingInfo;
 import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.drm.DrmSession;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
@@ -576,7 +577,7 @@ public class ChunkSampleStream<T extends ChunkSource>
   // SequenceableLoader implementation
 
   @Override
-  public boolean continueLoading(long positionUs) {
+  public boolean continueLoading(LoadingInfo loadingInfo) {
     if (loadingFinished || loader.isLoading() || loader.hasFatalError()) {
       return false;
     }
@@ -591,7 +592,7 @@ public class ChunkSampleStream<T extends ChunkSource>
       chunkQueue = readOnlyMediaChunks;
       loadPositionUs = getLastMediaChunk().endTimeUs;
     }
-    chunkSource.getNextChunk(positionUs, loadPositionUs, chunkQueue, nextChunkHolder);
+    chunkSource.getNextChunk(loadingInfo, loadPositionUs, chunkQueue, nextChunkHolder);
     boolean endOfStream = nextChunkHolder.endOfStream;
     @Nullable Chunk loadable = nextChunkHolder.chunk;
     nextChunkHolder.clear();
@@ -601,7 +602,7 @@ public class ChunkSampleStream<T extends ChunkSource>
       loadingFinished = true;
 
       if (DebugUtil.debug_dash) {
-        Log.i("DASH", "** onLoadFinished at (" + positionUs + ", " + loadPositionUs + "), " + getDebugInfo());
+        Log.i("DASH", "** onLoadFinished at (" + loadingInfo.playbackPositionUs + ", " + loadPositionUs + "), " + getDebugInfo());
       }
       return true;
     }
@@ -644,7 +645,7 @@ public class ChunkSampleStream<T extends ChunkSource>
         loadable.startTimeUs,
         loadable.endTimeUs);
     if (DebugUtil.debug_dash) {
-      Log.i("DASH", "onLoadStart at (" + positionUs + ", " + loadPositionUs + "), ("
+      Log.i("DASH", "onLoadStart at (" + loadingInfo.playbackPositionUs + ", " + loadPositionUs + "), ("
           + loadable.startTimeUs + ", " + loadable.endTimeUs + "), " + getDebugInfo() + ", " + loadable.dataSpec.uri);
     }
     return true;

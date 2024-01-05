@@ -195,10 +195,13 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
    * @param childSourceId The unique id used to prepare the child source.
    * @param mediaTimeMs A media time in the {@link MediaPeriod} of the child source, in
    *     milliseconds.
+   * @param mediaPeriodId The {@link MediaPeriodId} of the {@link MediaPeriod} of the child source,
+   *     or null if the time does not relate to a specific {@link MediaPeriod}.
    * @return The corresponding media time in the {@link MediaPeriod} of the composite source, in
    *     milliseconds.
    */
-  protected long getMediaTimeForChildMediaTime(@UnknownNull T childSourceId, long mediaTimeMs) {
+  protected long getMediaTimeForChildMediaTime(
+      @UnknownNull T childSourceId, long mediaTimeMs, @Nullable MediaPeriodId mediaPeriodId) {
     return mediaTimeMs;
   }
 
@@ -241,7 +244,7 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
         MediaLoadData mediaLoadData) {
       if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {
         mediaSourceEventDispatcher.loadStarted(
-            loadEventData, maybeUpdateMediaLoadData(mediaLoadData));
+            loadEventData, maybeUpdateMediaLoadData(mediaLoadData, mediaPeriodId));
       }
     }
 
@@ -253,7 +256,7 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
         MediaLoadData mediaLoadData) {
       if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {
         mediaSourceEventDispatcher.loadCompleted(
-            loadEventData, maybeUpdateMediaLoadData(mediaLoadData));
+            loadEventData, maybeUpdateMediaLoadData(mediaLoadData, mediaPeriodId));
       }
     }
 
@@ -265,7 +268,7 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
         MediaLoadData mediaLoadData) {
       if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {
         mediaSourceEventDispatcher.loadCanceled(
-            loadEventData, maybeUpdateMediaLoadData(mediaLoadData));
+            loadEventData, maybeUpdateMediaLoadData(mediaLoadData, mediaPeriodId));
       }
     }
 
@@ -279,7 +282,10 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
         boolean wasCanceled) {
       if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {
         mediaSourceEventDispatcher.loadError(
-            loadEventData, maybeUpdateMediaLoadData(mediaLoadData), error, wasCanceled);
+            loadEventData,
+            maybeUpdateMediaLoadData(mediaLoadData, mediaPeriodId),
+            error,
+            wasCanceled);
       }
     }
 
@@ -295,7 +301,8 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
     public void onUpstreamDiscarded(
         int windowIndex, @Nullable MediaPeriodId mediaPeriodId, MediaLoadData mediaLoadData) {
       if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {
-        mediaSourceEventDispatcher.upstreamDiscarded(maybeUpdateMediaLoadData(mediaLoadData));
+        mediaSourceEventDispatcher.upstreamDiscarded(
+            maybeUpdateMediaLoadData(mediaLoadData, mediaPeriodId));
       }
     }
 
@@ -303,7 +310,8 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
     public void onDownstreamFormatChanged(
         int windowIndex, @Nullable MediaPeriodId mediaPeriodId, MediaLoadData mediaLoadData) {
       if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {
-        mediaSourceEventDispatcher.downstreamFormatChanged(maybeUpdateMediaLoadData(mediaLoadData));
+        mediaSourceEventDispatcher.downstreamFormatChanged(
+            maybeUpdateMediaLoadData(mediaLoadData, mediaPeriodId));
       }
     }
 
@@ -380,8 +388,7 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
       int windowIndex = getWindowIndexForChildWindowIndex(id, childWindowIndex);
       if (mediaSourceEventDispatcher.windowIndex != windowIndex
           || !Util.areEqual(mediaSourceEventDispatcher.mediaPeriodId, mediaPeriodId)) {
-        mediaSourceEventDispatcher =
-            createEventDispatcher(windowIndex, mediaPeriodId, /* mediaTimeOffsetMs= */ 0);
+        mediaSourceEventDispatcher = createEventDispatcher(windowIndex, mediaPeriodId);
       }
       if (drmEventDispatcher.windowIndex != windowIndex
           || !Util.areEqual(drmEventDispatcher.mediaPeriodId, mediaPeriodId)) {
@@ -390,9 +397,12 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
       return true;
     }
 
-    private MediaLoadData maybeUpdateMediaLoadData(MediaLoadData mediaLoadData) {
-      long mediaStartTimeMs = getMediaTimeForChildMediaTime(id, mediaLoadData.mediaStartTimeMs);
-      long mediaEndTimeMs = getMediaTimeForChildMediaTime(id, mediaLoadData.mediaEndTimeMs);
+    private MediaLoadData maybeUpdateMediaLoadData(
+        MediaLoadData mediaLoadData, @Nullable MediaPeriodId childMediaPeriodId) {
+      long mediaStartTimeMs =
+          getMediaTimeForChildMediaTime(id, mediaLoadData.mediaStartTimeMs, childMediaPeriodId);
+      long mediaEndTimeMs =
+          getMediaTimeForChildMediaTime(id, mediaLoadData.mediaEndTimeMs, childMediaPeriodId);
       if (mediaStartTimeMs == mediaLoadData.mediaStartTimeMs
           && mediaEndTimeMs == mediaLoadData.mediaEndTimeMs) {
         return mediaLoadData;

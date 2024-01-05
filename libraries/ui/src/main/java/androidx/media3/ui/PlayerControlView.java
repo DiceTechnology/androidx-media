@@ -19,11 +19,9 @@ import static androidx.media3.common.Player.COMMAND_GET_CURRENT_MEDIA_ITEM;
 import static androidx.media3.common.Player.COMMAND_GET_TIMELINE;
 import static androidx.media3.common.Player.COMMAND_GET_TRACKS;
 import static androidx.media3.common.Player.COMMAND_PLAY_PAUSE;
-import static androidx.media3.common.Player.COMMAND_PREPARE;
 import static androidx.media3.common.Player.COMMAND_SEEK_BACK;
 import static androidx.media3.common.Player.COMMAND_SEEK_FORWARD;
 import static androidx.media3.common.Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM;
-import static androidx.media3.common.Player.COMMAND_SEEK_TO_DEFAULT_POSITION;
 import static androidx.media3.common.Player.COMMAND_SEEK_TO_MEDIA_ITEM;
 import static androidx.media3.common.Player.COMMAND_SEEK_TO_NEXT;
 import static androidx.media3.common.Player.COMMAND_SEEK_TO_PREVIOUS;
@@ -75,7 +73,6 @@ import androidx.media3.common.Format;
 import androidx.media3.common.MediaLibraryInfo;
 import androidx.media3.common.Player;
 import androidx.media3.common.Player.Events;
-import androidx.media3.common.Player.State;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.TrackSelectionOverride;
@@ -261,15 +258,20 @@ public class PlayerControlView extends FrameLayout {
 
   /** The default show timeout, in milliseconds. */
   public static final int DEFAULT_SHOW_TIMEOUT_MS = 5_000;
+
   /** The default repeat toggle modes. */
   public static final @RepeatModeUtil.RepeatToggleModes int DEFAULT_REPEAT_TOGGLE_MODES =
       RepeatModeUtil.REPEAT_TOGGLE_MODE_NONE;
+
   /** The default minimum interval between time bar position updates. */
   public static final int DEFAULT_TIME_BAR_MIN_UPDATE_INTERVAL_MS = 200;
+
   /** The maximum number of windows that can be shown in a multi-window time bar. */
   public static final int MAX_WINDOWS_FOR_MULTI_WINDOW_TIME_BAR = 100;
+
   /** The maximum interval between time bar position updates. */
   private static final int MAX_UPDATE_INTERVAL_MS = 1_000;
+
   // LINT.IfChange(playback_speeds)
   private static final float[] PLAYBACK_SPEEDS =
       new float[] {0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f};
@@ -358,6 +360,7 @@ public class PlayerControlView extends FrameLayout {
   private boolean isFullScreen;
   private boolean isAttachedToWindow;
   private boolean showMultiWindowTimeBar;
+  private boolean showPlayButtonIfSuppressed;
   private boolean multiWindowTimeBar;
   private boolean scrubbing;
   private int showTimeoutMs;
@@ -383,7 +386,10 @@ public class PlayerControlView extends FrameLayout {
     this(context, attrs, defStyleAttr, attrs);
   }
 
+  // TODO: b/301602565 - See if there's a reasonable non-null root view group we could use below to
+  //  resolve InflateParams lint.
   @SuppressWarnings({
+    "InflateParams",
     "nullness:argument",
     "nullness:assignment",
     "nullness:method.invocation",
@@ -396,6 +402,7 @@ public class PlayerControlView extends FrameLayout {
       @Nullable AttributeSet playbackAttrs) {
     super(context, attrs, defStyleAttr);
     int controllerLayoutId = R.layout.exo_player_control_view;
+    showPlayButtonIfSuppressed = true;
     showTimeoutMs = DEFAULT_SHOW_TIMEOUT_MS;
     repeatToggleModes = DEFAULT_REPEAT_TOGGLE_MODES;
     timeBarMinUpdateIntervalMs = DEFAULT_TIME_BAR_MIN_UPDATE_INTERVAL_MS;
@@ -695,16 +702,27 @@ public class PlayerControlView extends FrameLayout {
   }
 
   /**
-   * Sets whether the time bar should show all windows, as opposed to just the current one. If the
-   * timeline has a period with unknown duration or more than {@link
-   * #MAX_WINDOWS_FOR_MULTI_WINDOW_TIME_BAR} windows the time bar will fall back to showing a single
-   * window.
-   *
-   * @param showMultiWindowTimeBar Whether the time bar should show all windows.
+   * @deprecated Replace multi-window time bar display by merging source windows together instead,
+   *     for example using ExoPlayer's {@code ConcatenatingMediaSource2}.
    */
+  @Deprecated
   public void setShowMultiWindowTimeBar(boolean showMultiWindowTimeBar) {
     this.showMultiWindowTimeBar = showMultiWindowTimeBar;
     updateTimeline();
+  }
+
+  /**
+   * Sets whether a play button is shown if playback is {@linkplain
+   * Player#getPlaybackSuppressionReason() suppressed}.
+   *
+   * <p>The default is {@code true}.
+   *
+   * @param showPlayButtonIfSuppressed Whether to show a play button if playback is {@linkplain
+   *     Player#getPlaybackSuppressionReason() suppressed}.
+   */
+  public void setShowPlayButtonIfPlaybackIsSuppressed(boolean showPlayButtonIfSuppressed) {
+    this.showPlayButtonIfSuppressed = showPlayButtonIfSuppressed;
+    updatePlayPauseButton();
   }
 
   /**
@@ -1094,17 +1112,17 @@ public class PlayerControlView extends FrameLayout {
       return;
     }
     if (playPauseButton != null) {
-      boolean shouldShowPauseButton = shouldShowPauseButton();
+      boolean shouldShowPlayButton = Util.shouldShowPlayButton(player, showPlayButtonIfSuppressed);
       @DrawableRes
       int drawableRes =
-          shouldShowPauseButton
-              ? R.drawable.exo_styled_controls_pause
-              : R.drawable.exo_styled_controls_play;
+          shouldShowPlayButton
+              ? R.drawable.exo_styled_controls_play
+              : R.drawable.exo_styled_controls_pause;
       @StringRes
       int stringRes =
-          shouldShowPauseButton
-              ? R.string.exo_controls_pause_description
-              : R.string.exo_controls_play_description;
+          shouldShowPlayButton
+              ? R.string.exo_controls_play_description
+              : R.string.exo_controls_pause_description;
       ((ImageView) playPauseButton)
           .setImageDrawable(getDrawable(getContext(), resources, drawableRes));
       playPauseButton.setContentDescription(resources.getString(stringRes));
@@ -1113,14 +1131,14 @@ public class PlayerControlView extends FrameLayout {
       updateButton(enablePlayPause, playPauseButton);
     } else if (playButton != null && pauseButton != null) {
       boolean requestPlayPauseFocus = false;
-      boolean shouldShowPauseButton = shouldShowPauseButton();
+      boolean shouldShowPlayButton = Util.shouldShowPlayButton(player, showPlayButtonIfSuppressed);
       if (playButton != null) {
-        requestPlayPauseFocus |= shouldShowPauseButton && playButton.isFocused();
-        playButton.setVisibility(shouldShowPauseButton ? GONE : VISIBLE);
+        requestPlayPauseFocus |= !shouldShowPlayButton && playButton.isFocused();
+        playButton.setVisibility(shouldShowPlayButton ? VISIBLE : GONE);
       }
       if (pauseButton != null) {
-        requestPlayPauseFocus |= !shouldShowPauseButton && pauseButton.isFocused();
-        pauseButton.setVisibility(shouldShowPauseButton ? VISIBLE : GONE);
+        requestPlayPauseFocus |= shouldShowPlayButton && pauseButton.isFocused();
+        pauseButton.setVisibility(shouldShowPlayButton ? GONE : VISIBLE);
       }
       if (requestPlayPauseFocus) {
         requestPlayPauseFocus();
@@ -1498,8 +1516,8 @@ public class PlayerControlView extends FrameLayout {
     if (playPauseButton != null) {
       playPauseButton.requestFocus();
     } else if (playButton != null && pauseButton != null) {
-      boolean shouldShowPauseButton = shouldShowPauseButton();
-      if (!shouldShowPauseButton) {
+      boolean shouldShowPlayButton = Util.shouldShowPlayButton(player, showPlayButtonIfSuppressed);
+      if (shouldShowPlayButton) {
         playButton.requestFocus();
       } else {
         pauseButton.requestFocus();
@@ -1630,13 +1648,13 @@ public class PlayerControlView extends FrameLayout {
         switch (keyCode) {
           case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
           case KeyEvent.KEYCODE_HEADSETHOOK:
-            dispatchPlayPause(player);
+            Util.handlePlayPauseButtonAction(player, showPlayButtonIfSuppressed);
             break;
           case KeyEvent.KEYCODE_MEDIA_PLAY:
-            dispatchPlay(player);
+            Util.handlePlayButtonAction(player);
             break;
           case KeyEvent.KEYCODE_MEDIA_PAUSE:
-            dispatchPause(player);
+            Util.handlePauseButtonAction(player);
             break;
           case KeyEvent.KEYCODE_MEDIA_NEXT:
             if (player.isCommandAvailable(COMMAND_SEEK_TO_NEXT)) {
@@ -1690,41 +1708,6 @@ public class PlayerControlView extends FrameLayout {
         && player.isCommandAvailable(COMMAND_PLAY_PAUSE)
         && (!player.isCommandAvailable(COMMAND_GET_TIMELINE)
             || !player.getCurrentTimeline().isEmpty());
-  }
-
-  private boolean shouldShowPauseButton() {
-    return player != null
-        && player.getPlaybackState() != Player.STATE_ENDED
-        && player.getPlaybackState() != Player.STATE_IDLE
-        && player.getPlayWhenReady();
-  }
-
-  private void dispatchPlayPause(Player player) {
-    @State int state = player.getPlaybackState();
-    if (state == Player.STATE_IDLE || state == Player.STATE_ENDED || !player.getPlayWhenReady()) {
-      dispatchPlay(player);
-    } else {
-      dispatchPause(player);
-    }
-  }
-
-  private void dispatchPlay(Player player) {
-    @State int state = player.getPlaybackState();
-    if (state == Player.STATE_IDLE && player.isCommandAvailable(COMMAND_PREPARE)) {
-      player.prepare();
-    } else if (state == Player.STATE_ENDED
-        && player.isCommandAvailable(COMMAND_SEEK_TO_DEFAULT_POSITION)) {
-      player.seekToDefaultPosition();
-    }
-    if (player.isCommandAvailable(COMMAND_PLAY_PAUSE)) {
-      player.play();
-    }
-  }
-
-  private void dispatchPause(Player player) {
-    if (player.isCommandAvailable(COMMAND_PLAY_PAUSE)) {
-      player.pause();
-    }
   }
 
   @SuppressLint("InlinedApi")
@@ -1901,11 +1884,11 @@ public class PlayerControlView extends FrameLayout {
           player.seekBack();
         }
       } else if (playPauseButton == view) {
-        dispatchPlayPause(player);
+        Util.handlePlayPauseButtonAction(player, showPlayButtonIfSuppressed);
       } else if (playButton == view) {
-        dispatchPlay(player);
+        Util.handlePlayButtonAction(player);
       } else if (pauseButton == view) {
-        dispatchPause(player);
+        Util.handlePauseButtonAction(player);
       } else if (repeatToggleButton == view) {
         if (player.isCommandAvailable(COMMAND_SET_REPEAT_MODE)) {
           player.setRepeatMode(
