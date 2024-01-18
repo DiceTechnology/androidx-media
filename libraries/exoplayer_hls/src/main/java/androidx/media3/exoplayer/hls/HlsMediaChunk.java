@@ -23,6 +23,7 @@ import androidx.media3.common.C;
 import androidx.media3.common.DrmInitData;
 import androidx.media3.common.Format;
 import androidx.media3.common.Metadata;
+import androidx.media3.common.endeavor.DebugUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.TimestampAdjuster;
@@ -424,6 +425,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         loadMedia();
       }
       loadCompleted = !loadCanceled;
+    }
+    if (DebugUtil.isDebugSampleSegmentAllowed()) {
+      extractor.debugSamples();
+      DebugUtil.i("loaded media " + dataSpec.uri);
     }
   }
 

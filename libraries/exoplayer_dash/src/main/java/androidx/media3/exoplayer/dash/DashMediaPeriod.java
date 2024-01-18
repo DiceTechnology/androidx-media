@@ -164,11 +164,6 @@ import java.util.regex.Pattern;
     trackGroupInfos = result.second;
   }
 
-  public String getDebugInfo() {
-    Period period = manifest.getPeriod(periodIndex);
-    return "dash-id" + id + "-pid-" + period.id + "-start-" + period.startMs;
-  }
-
   /**
    * Updates the {@link DashManifest} and the index of this period in the manifest.
    *

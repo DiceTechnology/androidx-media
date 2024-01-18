@@ -1892,6 +1892,11 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       delegate.sampleMetadata(timeUs, flags, sampleSize, offset, cryptoData);
     }
 
+    @Override
+    public void debugSamples() {
+      delegate.debugSamples();
+    }
+
     private boolean emsgContainsExpectedWrappedFormat(EventMessage emsg) {
       @Nullable Format wrappedMetadataFormat = emsg.getWrappedMetadataFormat();
       return wrappedMetadataFormat != null

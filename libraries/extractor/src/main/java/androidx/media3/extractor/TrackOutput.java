@@ -169,6 +169,15 @@ public interface TrackOutput {
     sampleData(data, length, SAMPLE_DATA_PART_MAIN);
   }
 
+  default void debugSamples() {
+  }
+
+  static void debugSamples(TrackOutput output) {
+    if (output != null) {
+      output.debugSamples();
+    }
+  }
+
   /**
    * Called to write sample data to the output.
    *

@@ -22,12 +22,12 @@ import static java.lang.Math.max;
 import android.os.SystemClock;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem.LiveConfiguration;
+import androidx.media3.common.endeavor.DebugUtil;
 import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
-import androidx.media3.exoplayer.endeavor.DebugUtil;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 
 /**
@@ -96,7 +96,6 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
    */
   public static final long DEFAULT_MAX_LIVE_OFFSET_ERROR_MS_FOR_UNIT_SPEED = 20;
 
-  public static final boolean DEBUG_DETAIL = false;
   public static final String TAG = "PlaybackSpeedControl";
 
   /** Builder for a {@link DefaultLivePlaybackSpeedControl}. */
@@ -365,7 +364,7 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
     }
     lastPlaybackSpeedUpdateMs = SystemClock.elapsedRealtime();
 
-    StringBuilder builder = (DebugUtil.debug_lowlatency ? new StringBuilder(1024) : null);
+    StringBuilder builder = (DebugUtil.isDebugLowLatencyAllowed() ? new StringBuilder(1024) : null);
     if (builder != null) {
       long minPossibleLiveOffsetUs = liveOffsetUs - bufferedDurationUs;
       builder.append("calc speed: target [").append(WebUtil.us2s(mediaConfigurationTargetLiveOffsetUs));
@@ -400,7 +399,7 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
       builder.append(", current [").append(WebUtil.us2s(currentTargetLiveOffsetUs));
       builder.append(", speed ").append(adjustedPlaybackSpeed);
       builder.append("]");
-      Log.i(TAG, builder.toString());
+      DebugUtil.i(builder.toString());
     }
     return adjustedPlaybackSpeed;
   }
@@ -457,19 +456,14 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
               minPossibleLiveOffsetDeviationUs,
               minPossibleLiveOffsetSmoothingFactor);
     }
-    if (DEBUG_DETAIL && Log.isDebugEnabled()) {
-      StringBuilder builder = new StringBuilder(1024);
-      builder.append("update speed: smooth [current ").append(WebUtil.us2s(liveOffsetUs));
-      builder.append(", ").append(WebUtil.us2s(bufferedDurationUs));
-      builder.append(", ").append(WebUtil.us2s(minPossibleLiveOffsetUs));
-      builder.append(", possible ").append(WebUtil.us2s(smoothedMinPossibleLiveOffsetUs));
-      builder.append(", ").append(WebUtil.us2s(abs(minPossibleLiveOffsetUs - smoothedMinPossibleLiveOffsetUs)));
-      builder.append(", deviation ").append(WebUtil.us2s(smoothedMinPossibleLiveOffsetDeviationUs));
-      builder.append(", ").append(WebUtil.us2s(smoothedMinPossibleLiveOffsetUs + 3 * smoothedMinPossibleLiveOffsetDeviationUs));
-      builder.append(", speed ").append(adjustedPlaybackSpeed);
-      builder.append(", ").append(WebUtil.us2s(currentTargetLiveOffsetUs));
-      builder.append("]");
-      Log.i(TAG, builder.toString());
+    if (DebugUtil.isDebugLowLatencyAllowed()) {
+      DebugUtil.i("update speed: smooth [current " + WebUtil.us2s(liveOffsetUs)
+          + ", " + WebUtil.us2s(bufferedDurationUs) + ", " + WebUtil.us2s(minPossibleLiveOffsetUs)
+          + ", possible " + WebUtil.us2s(smoothedMinPossibleLiveOffsetUs)
+          + ", " + WebUtil.us2s(abs(minPossibleLiveOffsetUs - smoothedMinPossibleLiveOffsetUs))
+          + ", deviation " + WebUtil.us2s(smoothedMinPossibleLiveOffsetDeviationUs)
+          + ", " + WebUtil.us2s(smoothedMinPossibleLiveOffsetUs + 3 * smoothedMinPossibleLiveOffsetDeviationUs)
+          + ", speed " + adjustedPlaybackSpeed + ", " + WebUtil.us2s(currentTargetLiveOffsetUs) + "]");
     }
   }
 

@@ -66,6 +66,11 @@ public final class BundledHlsMediaChunkExtractor implements HlsMediaChunkExtract
   }
 
   @Override
+  public void debugSamples() {
+    extractor.debugSamples();
+  }
+
+  @Override
   public boolean read(ExtractorInput extractorInput) throws IOException {
     return extractor.read(extractorInput, POSITION_HOLDER) == Extractor.RESULT_CONTINUE;
   }

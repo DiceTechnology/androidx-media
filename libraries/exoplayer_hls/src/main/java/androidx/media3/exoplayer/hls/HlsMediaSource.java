@@ -31,6 +31,7 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaItem.LiveConfiguration;
 import androidx.media3.common.MediaLibraryInfo;
 import androidx.media3.common.StreamKey;
+import androidx.media3.common.endeavor.DebugUtil;
 import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
@@ -41,7 +42,6 @@ import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider;
-import androidx.media3.exoplayer.endeavor.DebugUtil;
 import androidx.media3.exoplayer.endeavor.LiveEdgeManger;
 import androidx.media3.exoplayer.hls.playlist.DefaultHlsPlaylistParserFactory;
 import androidx.media3.exoplayer.hls.playlist.DefaultHlsPlaylistTracker;
@@ -573,8 +573,8 @@ public final class HlsMediaSource extends BaseMediaSource
     } else {
       // Decide target offset from playlist.
       targetLiveOffsetUs = getTargetLiveOffsetUs(playlist, edgeAdjuster.second);
-      if (DebugUtil.debug_lowlatency) {
-        Log.i(WebUtil.DEBUG, "Set HLS targetLiveOffsetUs to " + targetLiveOffsetUs
+      if (DebugUtil.isDebugLowLatencyAllowed()) {
+        DebugUtil.i("Set HLS targetLiveOffsetUs to " + targetLiveOffsetUs
             + " with applyEdgeOffsetUs " + edgeAdjuster.second
             + ", liveEdgeOffsetUs " + liveEdgeOffsetUs);
       }

@@ -24,13 +24,11 @@ import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackGroup;
-import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Clock;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
-import androidx.media3.exoplayer.endeavor.DebugUtil;
 import androidx.media3.exoplayer.endeavor.TrackCollector;
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId;
 import androidx.media3.exoplayer.source.chunk.MediaChunk;
@@ -499,9 +497,6 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
   // May need to reselect tracks because the audio group constraint is changed.
   private void applySelectedIndex(int prevSelectedIndex, int newSelectedIndex) {
     if (newSelectedIndex != prevSelectedIndex) {
-      if (DebugUtil.debug_track) {
-        Log.d(WebUtil.DEBUG, String.format("adaptiveTrackChanged, apply!!!, %d -> %d", prevSelectedIndex, newSelectedIndex));
-      }
       if (trackCollector != null) {
         trackCollector.onAdaptiveTrackChanged(getSelectedFormat(), getFormat(newSelectedIndex));
       }
@@ -550,12 +545,6 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
             break;
           }
         }
-        Log.d(WebUtil.DEBUG,
-            String.format("Initial video selection (%d), selected format [%d, %s] %s",
-                tracks.length,
-                videoSelected.bitrate,
-                TrackCollector.getAudioGroupId(videoSelected),
-                (index == C.INDEX_UNSET ? "not found!!!" : "used")));
       }
       // Apply the bandwidth constraint.
       if (index == C.INDEX_UNSET) {

@@ -32,6 +32,7 @@ import androidx.media3.common.DataReader;
 import androidx.media3.common.DrmInitData;
 import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
+import androidx.media3.common.endeavor.DebugUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.NullableType;
@@ -431,6 +432,12 @@ public class SampleQueue implements TrackOutput {
             /* formatRequired= */ (readFlags & FLAG_REQUIRE_FORMAT) != 0,
             loadingFinished,
             extrasHolder);
+    if (DebugUtil.isDebugSampleReadAllowed(upstreamFormat)
+        || DebugUtil.isDebugSampleReadAllowed(downstreamFormat)) {
+      DebugUtil.i("read data, queue [" + hashCode() + "], result " + result
+          + ", timeUs " + buffer.timeUs + ", holder [" + extrasHolder.size + ", " + extrasHolder.offset + "]");
+      debugSamples("print queued samples");
+    }
     if (result == C.RESULT_BUFFER_READ && !buffer.isEndOfStream()) {
       boolean peek = (readFlags & FLAG_PEEK) != 0;
       if ((readFlags & FLAG_OMIT_SAMPLE_DATA) == 0) {
@@ -599,12 +606,20 @@ public class SampleQueue implements TrackOutput {
   public final int sampleData(
       DataReader input, int length, boolean allowEndOfInput, @SampleDataPart int sampleDataPart)
       throws IOException {
+    if (DebugUtil.isDebugSampleWriteAllowed(upstreamFormat)
+        || DebugUtil.isDebugSampleWriteAllowed(downstreamFormat)) {
+      DebugUtil.i("write data, queue [" + hashCode() + "], mode 1, length " + length);
+    }
     return sampleDataQueue.sampleData(input, length, allowEndOfInput);
   }
 
   @Override
   public final void sampleData(
       ParsableByteArray data, int length, @SampleDataPart int sampleDataPart) {
+    if (DebugUtil.isDebugSampleWriteAllowed(upstreamFormat)
+        || DebugUtil.isDebugSampleWriteAllowed(downstreamFormat)) {
+      DebugUtil.i("write data, queue [" + hashCode() + "], mode 2, length " + length);
+    }
     sampleDataQueue.sampleData(data, length);
   }
 
@@ -615,6 +630,11 @@ public class SampleQueue implements TrackOutput {
       int size,
       int offset,
       @Nullable CryptoData cryptoData) {
+    if (DebugUtil.isDebugSampleWriteAllowed(upstreamFormat)
+        || DebugUtil.isDebugSampleWriteAllowed(downstreamFormat)) {
+      DebugUtil.i("write meta, queue [" + hashCode() + "], timeUs " + timeUs
+          + ", size " + size + ", offset " + offset);
+    }
     if (upstreamFormatAdjustmentRequired) {
       format(Assertions.checkStateNotNull(unadjustedUpstreamFormat));
     }
@@ -653,6 +673,43 @@ public class SampleQueue implements TrackOutput {
 
     long absoluteOffset = sampleDataQueue.getTotalBytesWritten() - size - offset;
     commitSample(timeUs, flags, absoluteOffset, size, cryptoData);
+  }
+
+  @Override
+  public void debugSamples() {
+    debugSamples("print queued samples");
+  }
+
+  private void debugSamples(String msg) {
+    DebugUtil.i("queue meta [" + hashCode() + "], " + msg + ", capacity " + capacity
+        + ", length " + length + ", first " + relativeFirstIndex + ", read " + getReadIndex()
+        + ", end " + getRelativeIndex(length) + ", largeUs " + largestQueuedTimestampUs
+        + ", startUs " + startTimeUs + ", offsetUs " + sampleOffsetUs
+        + ", upstream [" + Format.toLogString(upstreamFormat)
+        + "], downstream [" + Format.toLogString(downstreamFormat)
+        + "], details index-timeUs-size-offset-sourceId");
+
+    int count = 0;
+    int index = 0;
+    String info = "meta [" + hashCode() + "]";
+    while (index < length) {
+      info += (count == 0 ? " " : ", ") + getDebugInfo(index);
+      if (++count % 10 == 0) {
+        DebugUtil.i(info);
+        info = "meta [" + hashCode() + "]";
+      }
+      index++;
+    }
+    DebugUtil.i(info);
+    sampleDataQueue.debugDatas();
+  }
+
+  private String getDebugInfo(int index) {
+    if (index < 0 || index >= length) {
+      return "-1-1-1-1-1";
+    }
+    int i = getRelativeIndex(index);
+    return index + "-" + timesUs[i] + "-" + sizes[i] + "-" + offsets[i] + "-" + sourceIds[i];
   }
 
   /**

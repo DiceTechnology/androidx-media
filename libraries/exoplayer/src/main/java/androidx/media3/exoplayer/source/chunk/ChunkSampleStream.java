@@ -33,7 +33,6 @@ import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.exoplayer.drm.DrmSession;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
-import androidx.media3.exoplayer.endeavor.DebugUtil;
 import androidx.media3.exoplayer.source.LoadEventInfo;
 import androidx.media3.exoplayer.source.MediaLoadData;
 import androidx.media3.exoplayer.source.MediaSourceEventListener;
@@ -161,17 +160,6 @@ public class ChunkSampleStream<T extends ChunkSource>
     chunkOutput = new BaseMediaChunkOutput(trackTypes, sampleQueues);
     pendingResetPositionUs = positionUs;
     lastSeekPositionUs = positionUs;
-    if (DebugUtil.debug_dash) {
-      Log.i("DASH", "** createSampleQueue, " + getDebugInfo());
-    }
-  }
-
-  public String getDebugInfo() {
-    return "sample-" + Util.getTrackTypeString(primaryTrackType)
-        + "-first-" + primarySampleQueue.getFirstTimestampUs() + "-" + primarySampleQueue.getFirstIndex()
-        + "-read-" + primarySampleQueue.getLargestReadTimestampUs() + "-" + primarySampleQueue.getReadIndex()
-        + "-write-" + primarySampleQueue.getLargestQueuedTimestampUs() + "-" + primarySampleQueue.getWriteIndex()
-        + "-buffer-" + getBufferedPositionUs();
   }
 
   /**
@@ -451,9 +439,6 @@ public class ChunkSampleStream<T extends ChunkSource>
         loadable.trackSelectionData,
         loadable.startTimeUs,
         loadable.endTimeUs);
-    if (DebugUtil.debug_dash) {
-      Log.i("DASH", "onLoadCompleted (" + loadable.startTimeUs + ", " + loadable.endTimeUs + "), " + getDebugInfo());
-    }
     callback.onContinueLoadingRequested(this);
   }
 
@@ -601,9 +586,6 @@ public class ChunkSampleStream<T extends ChunkSource>
       pendingResetPositionUs = C.TIME_UNSET;
       loadingFinished = true;
 
-      if (DebugUtil.debug_dash) {
-        Log.i("DASH", "** onLoadFinished at (" + loadingInfo.playbackPositionUs + ", " + loadPositionUs + "), " + getDebugInfo());
-      }
       return true;
     }
 
@@ -644,10 +626,6 @@ public class ChunkSampleStream<T extends ChunkSource>
         loadable.trackSelectionData,
         loadable.startTimeUs,
         loadable.endTimeUs);
-    if (DebugUtil.debug_dash) {
-      Log.i("DASH", "onLoadStart at (" + loadingInfo.playbackPositionUs + ", " + loadPositionUs + "), ("
-          + loadable.startTimeUs + ", " + loadable.endTimeUs + "), " + getDebugInfo() + ", " + loadable.dataSpec.uri);
-    }
     return true;
   }
 

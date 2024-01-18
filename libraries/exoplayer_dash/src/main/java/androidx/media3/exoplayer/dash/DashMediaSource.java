@@ -39,6 +39,7 @@ import androidx.media3.common.ParserException;
 import androidx.media3.common.Player;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.Timeline;
+import androidx.media3.common.endeavor.DebugUtil;
 import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
@@ -58,7 +59,6 @@ import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.drm.DrmSessionEventListener;
 import androidx.media3.exoplayer.drm.DrmSessionManager;
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider;
-import androidx.media3.exoplayer.endeavor.DebugUtil;
 import androidx.media3.exoplayer.endeavor.LiveEdgeManger;
 import androidx.media3.exoplayer.offline.FilteringManifestParser;
 import androidx.media3.exoplayer.source.BaseMediaSource;
@@ -637,9 +637,6 @@ public final class DashMediaSource extends BaseMediaSource {
             playerEmsgCallback,
             getPlayerId(),
             subtitleParserFactory);
-    if (DebugUtil.debug_dash) {
-      Log.i("DASH", "** createPeriod " + mediaPeriod.getDebugInfo());
-    }
     periodsById.put(mediaPeriod.id, mediaPeriod);
     return mediaPeriod;
   }
@@ -713,12 +710,6 @@ public final class DashMediaSource extends BaseMediaSource {
     while (removedPeriodCount < oldPeriodCount
         && manifest.getPeriod(removedPeriodCount).startMs < newFirstPeriodStartTimeMs) {
       removedPeriodCount++;
-    }
-
-    if (DebugUtil.debug_dash) {
-      int periodCount = newManifest.getPeriodCount();
-      long startMs = newManifest.getPeriod(periodCount - 1).startMs;
-      Log.i("DASH", "updateManifest " + startMs + ", periodCount " + periodCount);
     }
 
     if (newManifest.dynamic) {
@@ -1108,8 +1099,8 @@ public final class DashMediaSource extends BaseMediaSource {
       targetOffsetMs = liveConfiguration.targetOffsetMs;
     } else {
       targetOffsetMs = getTargetLiveOffsetMs(Util.usToMs(edgeAdjuster.second));
-      if (DebugUtil.debug_lowlatency) {
-        Log.i(WebUtil.DEBUG, "Set DASH targetLiveOffsetMs to " + targetOffsetMs
+      if (DebugUtil.isDebugLowLatencyAllowed()) {
+        DebugUtil.i("Set DASH targetLiveOffsetMs to " + targetOffsetMs
             + " with applyEdgeOffsetUs " + edgeAdjuster.second
             + ", liveEdgeOffsetUs " + liveEdgeOffsetUs);
       }

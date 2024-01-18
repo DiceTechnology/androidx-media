@@ -22,6 +22,8 @@ import java.util.Map;
 
 public class TrackCollector {
 
+  public static final long debug_switch_ms = 0; // 0, 45000
+
   private final SlidingCounter counter;
   private final TrackSwitcher switcher;
   private final TrackSelector callback;
@@ -38,7 +40,7 @@ public class TrackCollector {
 
   public TrackCollector(TrackSelector callback) {
     this.counter = new SlidingCounter(10, 60000);
-    this.switcher = (DebugUtil.debug_switch_ms > 0 ? new TrackSwitcher(DebugUtil.debug_switch_ms) : null);
+    this.switcher = (debug_switch_ms > 0 ? new TrackSwitcher(debug_switch_ms) : null);
     this.callback = callback;
   }
 

@@ -32,6 +32,9 @@ public interface HlsMediaChunkExtractor {
    */
   void init(ExtractorOutput extractorOutput);
 
+  default void debugSamples() {
+  }
+
   /**
    * Extracts data read from a provided {@link ExtractorInput}. Must not be called before {@link
    * #init(ExtractorOutput)}.

@@ -252,6 +252,11 @@ public final class BundledChunkExtractor implements ExtractorOutput, ChunkExtrac
     }
 
     @Override
+    public void debugSamples() {
+      TrackOutput.debugSamples(trackOutput);
+    }
+
+    @Override
     public void format(Format format) {
       sampleFormat =
           manifestFormat != null ? format.withManifestFormatInfo(manifestFormat) : format;

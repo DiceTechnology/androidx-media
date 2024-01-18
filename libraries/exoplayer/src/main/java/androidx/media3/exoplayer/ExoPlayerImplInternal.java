@@ -46,6 +46,7 @@ import androidx.media3.common.Player.PlayWhenReadyChangeReason;
 import androidx.media3.common.Player.PlaybackSuppressionReason;
 import androidx.media3.common.Player.RepeatMode;
 import androidx.media3.common.Timeline;
+import androidx.media3.common.endeavor.DebugUtil;
 import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Clock;
@@ -58,7 +59,6 @@ import androidx.media3.exoplayer.DefaultMediaClock.PlaybackParametersListener;
 import androidx.media3.exoplayer.analytics.AnalyticsCollector;
 import androidx.media3.exoplayer.analytics.PlayerId;
 import androidx.media3.exoplayer.drm.DrmSession;
-import androidx.media3.exoplayer.endeavor.DebugUtil;
 import androidx.media3.exoplayer.metadata.MetadataRenderer;
 import androidx.media3.exoplayer.source.BehindLiveWindowException;
 import androidx.media3.exoplayer.source.MediaPeriod;
@@ -1024,7 +1024,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
   }
 
   private void debugSpeedControl(float oldSpeed, float newSpeed) {
-    if (!DebugUtil.debug_lowlatency || !Log.isDebugEnabled()) {
+    if (!DebugUtil.isDebugLowLatencyAllowed()) {
       return;
     }
 
@@ -1061,7 +1061,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
     builder.append(", now ").append(WebUtil.stime0(nowMs)).append("[").append(WebUtil.ms2s(nowMs - System.currentTimeMillis())).append("]");
     builder.append(", buffer0 ").append(WebUtil.us2s(loadWallMs - playWallUs));
     builder.append(", speed0 ").append(mediaClock.getPlaybackParameters().speed);
-    Log.i(DefaultLivePlaybackSpeedControl.TAG, builder.toString());
+    DebugUtil.i(builder.toString());
   }
 
   private void setMediaClockPlaybackParameters(PlaybackParameters playbackParameters) {

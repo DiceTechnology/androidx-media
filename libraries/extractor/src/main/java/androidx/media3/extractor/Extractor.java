@@ -123,6 +123,9 @@ public interface Extractor {
   /** Releases all kept resources. */
   void release();
 
+  default void debugSamples() {
+  }
+
   /**
    * Returns the 'real' {@code Extractor} implementation if this is a delegating instance, or {@code
    * this} if this instance does the extraction directly without delegating (the default behaviour).

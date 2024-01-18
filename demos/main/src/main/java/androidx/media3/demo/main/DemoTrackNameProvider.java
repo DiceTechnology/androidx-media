@@ -13,7 +13,7 @@ import androidx.media3.exoplayer.endeavor.TrackCollector;
 import androidx.media3.ui.TrackNameProvider;
 import java.util.Locale;
 
-// Based on androidx.media3.ui.DefaultTrackNameProvider, media3:lib-ui
+// Based on androidx.media3.ui.DefaultTrackNameProvider, media3:media3-ui
 // Modify the label name of audio tracks, also show the audio groupId.
 @UnstableApi
 public class DemoTrackNameProvider implements TrackNameProvider {

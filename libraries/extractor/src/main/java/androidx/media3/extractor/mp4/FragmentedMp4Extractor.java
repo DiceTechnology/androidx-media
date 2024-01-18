@@ -33,6 +33,7 @@ import androidx.media3.common.DrmInitData.SchemeData;
 import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.ParserException;
+import androidx.media3.common.endeavor.DebugUtil;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.TimestampAdjuster;
@@ -278,6 +279,10 @@ public class FragmentedMp4Extractor implements Extractor {
     extractorOutput = ExtractorOutput.PLACEHOLDER;
     emsgTrackOutputs = new TrackOutput[0];
     ceaTrackOutputs = new TrackOutput[0];
+
+    if (DebugUtil.isDebugSampleAllowed()) {
+      DebugUtil.i(getDebugInfo(", create"));
+    }
   }
 
   @Override
@@ -392,6 +397,10 @@ public class FragmentedMp4Extractor implements Extractor {
       throw ParserException.createForUnsupportedContainerFeature(
           "Atom size less than header length (unsupported).");
     }
+    if (DebugUtil.isDebugCmafAtomAllowed()) {
+      DebugUtil.i("atom header [" + Atom.getAtomTypeString(atomType) + "], size " + atomSize
+          + ", read " + atomHeaderBytesRead);
+    }
 
     long atomPosition = input.getPosition() - atomHeaderBytesRead;
     if (atomType == Atom.TYPE_moof || atomType == Atom.TYPE_mdat) {
@@ -456,6 +465,10 @@ public class FragmentedMp4Extractor implements Extractor {
 
   private void readAtomPayload(ExtractorInput input) throws IOException {
     int atomPayloadSize = (int) atomSize - atomHeaderBytesRead;
+    if (DebugUtil.isDebugCmafAtomAllowed()) {
+      DebugUtil.i("atom payload [" + Atom.getAtomTypeString(atomType)
+          + "], read " + atomPayloadSize);
+    }
     @Nullable ParsableByteArray atomData = this.atomData;
     if (atomData != null) {
       input.readFully(atomData.getData(), Atom.HEADER_SIZE, atomPayloadSize);
@@ -671,6 +684,8 @@ public class FragmentedMp4Extractor implements Extractor {
       emsgTrackOutput.sampleData(encodedEventMessage, sampleSize);
     }
 
+    String msg = DebugUtil.isDebugSampleMetaWriteAllowed() ? "timeUs " + sampleTimeUs : null;
+
     // Output the sample metadata.
     if (sampleTimeUs == C.TIME_UNSET) {
       // We're processing a v0 emsg atom, which contains a presentation time delta, and cannot yet
@@ -686,6 +701,9 @@ public class FragmentedMp4Extractor implements Extractor {
       pendingMetadataSampleInfos.addLast(
           new MetadataSampleInfo(sampleTimeUs, /* sampleTimeIsRelative= */ false, sampleSize));
       pendingMetadataSampleBytes += sampleSize;
+      if (msg != null) {
+        msg = ", pending emsg, " + msg;
+      }
     } else if (timestampAdjuster != null && !timestampAdjuster.isInitialized()) {
       // We also need to defer outputting metadata if the timestampAdjuster is not initialized,
       // else we will set a wrong timestampOffsetUs in timestampAdjuster. See:
@@ -693,6 +711,9 @@ public class FragmentedMp4Extractor implements Extractor {
       pendingMetadataSampleInfos.addLast(
           new MetadataSampleInfo(sampleTimeUs, /* sampleTimeIsRelative= */ false, sampleSize));
       pendingMetadataSampleBytes += sampleSize;
+      if (msg != null) {
+        msg = ", pending emsg without initialized, " + msg;
+      }
     } else {
       // We can output the sample metadata immediately.
       if (timestampAdjuster != null) {
@@ -702,6 +723,14 @@ public class FragmentedMp4Extractor implements Extractor {
         emsgTrackOutput.sampleMetadata(
             sampleTimeUs, C.BUFFER_FLAG_KEY_FRAME, sampleSize, /* offset= */ 0, null);
       }
+      if (msg != null) {
+        msg = ", output emsg directly, " + msg + " -> " + sampleTimeUs;
+      }
+    }
+    if (msg != null) {
+      DebugUtil.i(getDebugInfo(msg) + ", pending [count " + pendingMetadataSampleInfos.size()
+          + ", length " + pendingMetadataSampleBytes + "], version " + version
+          + ", sampleSize " + sampleSize + ", dataSize " + messageData.length);
     }
   }
 
@@ -1327,7 +1356,39 @@ public class FragmentedMp4Extractor implements Extractor {
           "Offset to encryption data was negative.", /* cause= */ null);
     }
     input.skipFully(bytesToSkip);
+    if (DebugUtil.isDebugCmafAtomAllowed()) {
+      DebugUtil.i("atom encrypt data [" + Atom.getAtomTypeString(atomType)
+          + "], " + getDebugTrackInfo(nextTrackBundle));
+    }
     nextTrackBundle.fragment.fillEncryptionData(input);
+  }
+
+  @Override
+  public void debugSamples() {
+    DebugUtil.i(getDebugInfo(", print samples"));
+    int trackBundlesSize = trackBundles.size();
+    for (int i = 0; i < trackBundlesSize; i++) {
+      TrackBundle bundle = trackBundles.valueAt(i);
+      DebugUtil.i("track #" + i + ", " + getDebugTrackInfo(bundle));
+      TrackOutput.debugSamples(bundle == null ? null : bundle.output);
+    }
+    for (int i = 0; i < emsgTrackOutputs.length; i++) {
+      DebugUtil.i("emsg #" + i);
+      TrackOutput.debugSamples(emsgTrackOutputs[i]);
+    }
+  }
+
+  private String getDebugInfo(String msg) {
+    return "extractor [" + hashCode() + "]" + msg + ", "
+        + TimestampAdjuster.getDebugInfo("", timestampAdjuster);
+  }
+
+  private String getDebugTrackInfo(TrackBundle bundle) {
+    if (bundle == null) {
+      return "track [-]";
+    }
+    return "track ["+ Format.toLogString(bundle.moovSampleTable.track.format)
+        + "], fragment [" + bundle.fragment.trunCount + ", " + bundle.fragment.sampleCount + "]";
   }
 
   /**
@@ -1523,6 +1584,11 @@ public class FragmentedMp4Extractor implements Extractor {
             metadataSampleInfo.size,
             pendingMetadataSampleBytes,
             null);
+      }
+      if (DebugUtil.isDebugSampleMetaWriteAllowed()) {
+        DebugUtil.i(getDebugInfo(", output emsg pending, ")
+            + ", size " + pendingMetadataSampleInfos.size() + ", bytes " + pendingMetadataSampleBytes
+            + ", timeUs " + metadataSampleInfo.sampleTimeUs + "-> " + metadataSampleTimeUs);
       }
     }
   }

@@ -21,6 +21,7 @@ import static androidx.media3.common.util.Assertions.checkState;
 import android.os.SystemClock;
 import androidx.annotation.GuardedBy;
 import androidx.media3.common.C;
+import androidx.media3.common.endeavor.DebugUtil;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -182,6 +183,18 @@ public final class TimestampAdjuster {
     this.firstSampleTimestampUs = firstSampleTimestampUs;
     timestampOffsetUs = firstSampleTimestampUs == MODE_NO_OFFSET ? 0 : C.TIME_UNSET;
     lastUnadjustedTimestampUs = C.TIME_UNSET;
+    if (DebugUtil.isDebugSampleAllowed()) {
+      DebugUtil.i(getDebugInfo(" create/reset", this));
+    }
+  }
+
+  public static String getDebugInfo(String msg, TimestampAdjuster adjuster) {
+    if (adjuster == null) {
+      return "adjuster [-]";
+    }
+    return "adjuster [" + adjuster.hashCode() + "]" + msg
+        + ", first " + adjuster.firstSampleTimestampUs
+        + ", offset " + (adjuster.isInitialized() ? adjuster.timestampOffsetUs : "-");
   }
 
   /**
@@ -225,6 +238,10 @@ public final class TimestampAdjuster {
               ? checkNotNull(nextSampleTimestampUs.get())
               : firstSampleTimestampUs;
       timestampOffsetUs = desiredSampleTimestampUs - timeUs;
+      if (DebugUtil.isDebugSampleAllowed()) {
+        DebugUtil.i(getDebugInfo(" init", this)
+            + ", adjust " + timeUs+ " -> " + desiredSampleTimestampUs);
+      }
       // Notify threads waiting for the timestamp offset to be determined.
       notifyAll();
     }
