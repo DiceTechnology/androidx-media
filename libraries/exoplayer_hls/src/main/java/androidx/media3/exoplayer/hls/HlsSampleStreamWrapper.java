@@ -1889,7 +1889,11 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       int sampleSize = sampleForDelegate.bytesLeft();
 
       delegate.sampleData(sampleForDelegate, sampleSize);
-      delegate.sampleMetadata(timeUs, flags, sampleSize, offset, cryptoData);
+      // To fix offset issue of cmaf emsg samples, we should pass offset to 0, details tickets:
+      // https://github.com/androidx/media/issues/1002
+      // https://dicetech.atlassian.net/browse/DORIS-2103
+      delegate.sampleMetadata(timeUs, flags, sampleSize, 0, cryptoData);
+      // delegate.sampleMetadata(timeUs, flags, sampleSize, offset, cryptoData);
     }
 
     @Override
