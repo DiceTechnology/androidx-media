@@ -134,6 +134,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
   private long lastSetPlayWhenReadyCalledTimeMs;
   @Nullable private PlayerInfo pendingPlayerInfo;
   @Nullable private BundlingExclusions pendingBundlingExclusions;
+  private Bundle sessionExtras;
 
   public MediaControllerImplBase(
       Context context,
@@ -173,6 +174,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
                 .getInstance()
                 .runOnApplicationLooper(MediaControllerImplBase.this.getInstance()::release);
     surfaceCallback = new SurfaceCallback();
+    sessionExtras = Bundle.EMPTY;
 
     serviceConnection =
         (this.token.getType() == SessionToken.TYPE_SESSION)
@@ -314,7 +316,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
     ListenableFuture<SessionResult> future =
         dispatchRemoteSessionTask(iSession, task, /* addToPendingMaskingOperations= */ true);
     try {
-      MediaUtils.getFutureResult(future, /* timeoutMs= */ 3_000);
+      LegacyConversions.getFutureResult(future, /* timeoutMs= */ 3_000);
     } catch (ExecutionException e) {
       // Never happens because future.setException will not be called.
       throw new IllegalStateException(e);
@@ -725,6 +727,11 @@ import org.checkerframework.checker.nullness.qual.NonNull;
   @Override
   public ImmutableList<CommandButton> getCustomLayout() {
     return customLayout;
+  }
+
+  @Override
+  public Bundle getSessionExtras() {
+    return sessionExtras;
   }
 
   @Override
@@ -1937,8 +1944,8 @@ import org.checkerframework.checker.nullness.qual.NonNull;
     List<Window> windows = new ArrayList<>();
     List<Period> periods = new ArrayList<>();
     for (int i = 0; i < mediaItems.size(); i++) {
-      windows.add(MediaUtils.convertToWindow(mediaItems.get(i), i));
-      periods.add(MediaUtils.convertToPeriod(i));
+      windows.add(LegacyConversions.convertToWindow(mediaItems.get(i), i));
+      periods.add(LegacyConversions.convertToPeriod(i));
     }
 
     Timeline newTimeline = createMaskingTimeline(windows, periods);
@@ -2545,6 +2552,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
             token.getPackageName(),
             result.sessionBinder,
             result.tokenExtras);
+    sessionExtras = result.sessionExtras;
     getInstance().notifyAccepted();
   }
 
@@ -2763,6 +2771,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
     if (!isConnected()) {
       return;
     }
+    sessionExtras = extras;
     getInstance()
         .notifyControllerListener(listener -> listener.onExtrasChanged(getInstance(), extras));
   }

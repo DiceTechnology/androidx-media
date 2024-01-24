@@ -122,6 +122,7 @@ import androidx.media3.common.Player.PositionInfo;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.Timeline.Window;
 import androidx.media3.common.TrackGroup;
+import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.VideoSize;
@@ -10595,6 +10596,57 @@ public final class ExoPlayerTest {
   }
 
   @Test
+  public void targetLiveOffsetInMedia_withUserSeekOutsideMaxLivOffset_adjustsLiveOffsetToSeek()
+      throws Exception {
+    long windowStartUnixTimeMs = 987_654_321_000L;
+    long nowUnixTimeMs = windowStartUnixTimeMs + 20_000;
+    ExoPlayer player =
+        new TestExoPlayerBuilder(context)
+            .setClock(
+                new FakeClock(/* initialTimeMs= */ nowUnixTimeMs, /* isAutoAdvancing= */ true))
+            .build();
+    Timeline timeline =
+        new FakeTimeline(
+            new TimelineWindowDefinition(
+                /* periodCount= */ 1,
+                /* id= */ 0,
+                /* isSeekable= */ true,
+                /* isDynamic= */ true,
+                /* isLive= */ true,
+                /* isPlaceholder= */ false,
+                /* durationUs= */ 1000 * C.MICROS_PER_SECOND,
+                /* defaultPositionUs= */ 8 * C.MICROS_PER_SECOND,
+                /* windowOffsetInFirstPeriodUs= */ Util.msToUs(windowStartUnixTimeMs),
+                ImmutableList.of(AdPlaybackState.NONE),
+                new MediaItem.Builder()
+                    .setUri(Uri.EMPTY)
+                    .setLiveConfiguration(
+                        new MediaItem.LiveConfiguration.Builder()
+                            .setTargetOffsetMs(9_000)
+                            .setMaxOffsetMs(10_000)
+                            .build())
+                    .build()));
+    player.pause();
+    player.setMediaSource(new FakeMediaSource(timeline));
+    player.prepare();
+    TestPlayerRunHelper.runUntilPlaybackState(player, Player.STATE_READY);
+    long liveOffsetAtStart = player.getCurrentLiveOffset();
+    // Verify test setup (now = 20 seconds in live window, default start position = 8 seconds).
+    assertThat(liveOffsetAtStart).isIn(Range.closed(11_900L, 12_100L));
+
+    // Seek to a live offset of 15 seconds (outside of declared max offset of 10 seconds).
+    player.seekTo(5_000);
+    // Play until close to the end of the available live window.
+    TestPlayerRunHelper.playUntilPosition(
+        player, /* mediaItemIndex= */ 0, /* positionMs= */ 999_000);
+    long liveOffsetAtEnd = player.getCurrentLiveOffset();
+    player.release();
+
+    // Assert the live offset adjustment was permanent.
+    assertThat(liveOffsetAtEnd).isIn(Range.closed(14_100L, 15_900L));
+  }
+
+  @Test
   public void targetLiveOffsetInMedia_withTimelineUpdate_adjustsLiveOffsetToLatestTimeline()
       throws Exception {
     long windowStartUnixTimeMs = 987_654_321_000L;
@@ -14048,6 +14100,53 @@ public final class ExoPlayerTest {
         .isSameInstanceAs(mediaItem1);
     assertThat(timelinesOnStreamChange.get(1).getWindow(0, new Window()).mediaItem)
         .isSameInstanceAs(mediaItem2);
+  }
+
+  @Test
+  public void seekToZeroAndTrackSelection_withNonZeroDefaultPosition_startsPlaybackAtZero()
+      throws Exception {
+    // Create a timeline with a non-zero default position. It's important to use a
+    // windowOffsetInFirstPeriodUs of zero to ensure that our later manual seek to zero could be
+    // mistaken for the initial placeholder start position of zero
+    // (see https://github.com/google/ExoPlayer/issues/9347).
+    Timeline timeline =
+        new FakeTimeline(
+            new TimelineWindowDefinition(
+                /* periodCount= */ 1,
+                /* id= */ new Object(),
+                /* isSeekable= */ true,
+                /* isDynamic= */ true,
+                /* isLive= */ true,
+                /* isPlaceholder= */ false,
+                /* durationUs= */ 10_000_000,
+                /* defaultPositionUs= */ 9_000_000,
+                /* windowOffsetInFirstPeriodUs= */ 0,
+                /* adPlaybackState= */ AdPlaybackState.NONE));
+    FakeMediaSource mediaSource =
+        new FakeMediaSource(
+            timeline, ExoPlayerTestRunner.VIDEO_FORMAT, ExoPlayerTestRunner.AUDIO_FORMAT);
+    // Make sure the player has to use its placeholder values initially.
+    mediaSource.setAllowPreparation(false);
+    ExoPlayer player = new TestExoPlayerBuilder(context).build();
+    player.setMediaSource(mediaSource);
+    player.prepare();
+    runUntilPendingCommandsAreFullyHandled(player);
+    mediaSource.setAllowPreparation(true);
+    runUntilPlaybackState(player, Player.STATE_READY);
+    long positionAfterPrepare = player.getCurrentPosition();
+
+    // Manually seek back to zero and force to reselect tracks.
+    player.seekTo(0);
+    player.setTrackSelectionParameters(
+        new TrackSelectionParameters.Builder(context)
+            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, /* disabled= */ true)
+            .build());
+    runUntilPendingCommandsAreFullyHandled(player);
+    long positionAfterSeek = player.getContentPosition();
+    player.release();
+
+    assertThat(positionAfterPrepare).isEqualTo(9000);
+    assertThat(positionAfterSeek).isEqualTo(0);
   }
 
   // Internal methods.

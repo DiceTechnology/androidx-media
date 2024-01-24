@@ -490,6 +490,15 @@ public final class Util {
     return TextUtils.isEmpty(scheme) || "file".equals(scheme);
   }
 
+  /** Returns true if the code path is currently running on an emulator. */
+  @UnstableApi
+  public static boolean isRunningOnEmulator() {
+    String deviceName = Ascii.toLowerCase(Util.DEVICE);
+    return deviceName.contains("emulator")
+        || deviceName.contains("emu64a")
+        || deviceName.contains("generic");
+  }
+
   /**
    * Tests two objects for {@link Object#equals(Object)} equality, handling the case where one or
    * both may be null.
@@ -3225,7 +3234,13 @@ public final class Util {
     // bounds. From API 29, if the app targets API 29 or later, the {@link
     // MediaFormat#KEY_ALLOW_FRAME_DROP} key prevents frame dropping even when the surface is
     // full.
-    return Util.SDK_INT < 29 || context.getApplicationInfo().targetSdkVersion < 29;
+    // Some API 30 devices might drop frames despite setting {@link
+    // MediaFormat#KEY_ALLOW_FRAME_DROP} to 0. See b/307518793 and b/289983935.
+    return SDK_INT < 29
+        || context.getApplicationInfo().targetSdkVersion < 29
+        || (SDK_INT == 30
+            && (Ascii.equalsIgnoreCase(MODEL, "moto g(20)")
+                || Ascii.equalsIgnoreCase(MODEL, "rmx3231")));
   }
 
   /**

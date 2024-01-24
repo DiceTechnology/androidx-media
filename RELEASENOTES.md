@@ -2,6 +2,93 @@
 
 ## 1.2
 
+### 1.2.1 (2024-01-09)
+
+This release includes the following changes since the
+[1.2.0 release](#120-2023-11-15):
+
+*   ExoPlayer:
+    *   Fix issue where manual seeks outside of the
+        `LiveConfiguration.min/maxOffset` range keep adjusting the offset back
+        to `min/maxOffset`.
+    *   Fix issue that OPUS and VORBIS channel layouts are wrong for 3, 5, 6, 7
+        and 8 channels
+        ([#8396](https://github.com/google/ExoPlayer/issues/8396)).
+    *   Fix issue where track selections after seek to zero in a live stream
+        incorrectly let the stream start at its default position
+        ([#9347](https://github.com/google/ExoPlayer/issues/9347)).
+    *   Fix the issue where new instances of `CmcdData.Factory` were receiving
+        negative values for `bufferedDurationUs` from chunk sources, resulting
+        in an `IllegalArgumentException`
+        ([#888](https://github.com/androidx/media/issues/888)).
+*   Transformer:
+    *   Work around an issue where the encoder would throw at configuration time
+        due to setting a high operating rate.
+*   Extractors:
+    *   Mark secondary (unplayable) HEVC tracks in JPEG motion photos as
+        `ROLE_FLAG_ALTERNATE` to prevent them being automatically selected for
+        playback because of their higher resolution.
+    *   Fix wrong keyframe detection for TS H264 streams
+        ([#864](https://github.com/androidx/media/pull/864)).
+    *   Fix duration estimation of TS streams that are longer than 47721 seconds
+        ([#855](https://github.com/androidx/media/issues/855)).
+*   Audio:
+    *   Fix handling of EOS for `SilenceSkippingAudioProcessor` when called
+        multiple times ([#712](https://github.com/androidx/media/issues/712)).
+*   Video:
+    *   Add workaround for a device issue on Galaxy Tab S7 FE, Chromecast with
+        Google TV, and Lenovo M10 FHD Plus that causes 60fps AVC streams to be
+        marked as unsupported
+        ([#693](https://github.com/androidx/media/issues/693)).
+*   Metadata:
+    *   Fix bug where `MediaMetadata` was only populated from Vorbis comments
+        with upper-case keys
+        ([#876](https://github.com/androidx/media/issues/876)).
+    *   Catch `OutOfMemoryError` when parsing very large ID3 frames, meaning
+        playback can continue without the tag info instead of playback failing
+        completely.
+*   DRM:
+    *   Extend workaround for spurious ClearKey `https://default.url` license
+        URL to API 33+ (previously the workaround only applied on API 33
+        exactly) ([#837](https://github.com/androidx/media/pull/837)).
+    *   Fix `ERROR_DRM_SESSION_NOT_OPENED` when switching from encrypted to
+        clear content without a surface attached to the player. The error was
+        due to incorrectly using a secure decoder to play the clear content.
+*   Session:
+    *   Put the custom keys and values in `MediaMetadataCompat` to
+        `MediaMetadata.extras` and `MediaMetadata.extras` to
+        `MediaMetadataCompat`
+        ([#756](https://github.com/androidx/media/issues/756),
+        [#802](https://github.com/androidx/media/issues/802)).
+    *   Fix broadcasting `notifyChildrenChanged` for legacy controllers
+        ([#644](https://github.com/androidx/media/issues/644)).
+    *   Fix a bug where setting a negative time for a disabled `setWhen` timer
+        of the notification caused a crash on some devices
+        ([#903](https://github.com/androidx/media/issues/903)).
+    *   Fix `IllegalStateException` when the media notification controller
+        hasn't completed connecting when the first notification update is
+        requested ([#917](https://github.com/androidx/media/issues/917)).
+*   UI:
+    *   Fix issue where forward and rewind buttons are not visible when used
+        with Material Design in a BottomSheetDialogFragment
+        ([#511](https://github.com/androidx/media/issues/511)).
+    *   Fix issue where the numbers in the fast forward button of the
+        `PlayerControlView` were misaligned
+        ([#547](https://github.com/androidx/media/issues/547)).
+*   DASH Extension:
+    *   Parse "f800" as channel count of 5 for Dolby in DASH manifest
+        ([#688](https://github.com/androidx/media/issues/688)).
+*   Decoder Extensions (FFmpeg, VP9, AV1, MIDI, etc.):
+    *   MIDI: Fix issue where seeking forward skips the Program Change events
+        ([#704](https://github.com/androidx/media/issues/704)).
+    *   Migrate to FFmpeg 6.0 and update supported NDK to `r26b`
+        ([#707](https://github.com/androidx/media/pull/707),
+        [#867](https://github.com/androidx/media/pull/867)).
+*   Cast Extension:
+    *   Sanitize creation of a `Timeline` to not crash the app when loading
+        media fails on the cast device
+        ([#708](https://github.com/androidx/media/issues/708)).
+
 ### 1.2.0 (2023-11-15)
 
 This release includes the following changes since the
