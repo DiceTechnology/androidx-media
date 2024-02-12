@@ -37,6 +37,7 @@ import android.text.style.ForegroundColorSpan;
 import android.util.DisplayMetrics;
 import androidx.annotation.Nullable;
 import androidx.media3.common.text.Cue;
+import androidx.media3.common.text.TextShadow;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.Util;
@@ -78,6 +79,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private int windowColor;
   private int edgeColor;
   private @CaptionStyleCompat.EdgeType int edgeType;
+  @Nullable private TextShadow cueTextShadow;
   private float defaultTextSizePx;
   private float cueTextSizePx;
   private float bottomPaddingFraction;
@@ -177,6 +179,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         && this.windowColor == windowColor
         && this.edgeType == style.edgeType
         && this.edgeColor == style.edgeColor
+        && this.cueTextShadow == cue.textShadow
         && Util.areEqual(this.textPaint.getTypeface(), style.typeface)
         && this.defaultTextSizePx == defaultTextSizePx
         && this.cueTextSizePx == cueTextSizePx
@@ -205,6 +208,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     this.windowColor = windowColor;
     this.edgeType = style.edgeType;
     this.edgeColor = style.edgeColor;
+    this.cueTextShadow = cue.textShadow;
     this.textPaint.setTypeface(style.typeface);
     this.defaultTextSizePx = defaultTextSizePx;
     this.cueTextSizePx = cueTextSizePx;
@@ -443,6 +447,19 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       textPaint.setShadowLayer(shadowRadius, -offset, -offset, colorUp);
       edgeLayout.draw(canvas);
       textPaint.setShadowLayer(shadowRadius, offset, offset, colorDown);
+    }
+
+    if (cueTextShadow != null) {
+      textPaint.setColor(foregroundColor);
+      textPaint.setStyle(Style.FILL);
+      for (TextShadow.Component shadow : cueTextShadow.getComponents()) {
+        textPaint.setShadowLayer(
+            shadow.radius < 1 ? 1 : shadowRadius,
+            shadow.dx,
+            shadow.dy,
+            shadow.color);
+        edgeLayout.draw(canvas);
+      }
     }
 
     textPaint.setColor(foregroundColor);
