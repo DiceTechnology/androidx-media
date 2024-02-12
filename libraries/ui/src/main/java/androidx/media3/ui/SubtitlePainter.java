@@ -454,7 +454,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       textPaint.setStyle(Style.FILL);
       for (TextShadow.Component shadow : cueTextShadow.getComponents()) {
         textPaint.setShadowLayer(
-            shadow.radius < 1 ? 1 : shadowRadius,
+            Math.max(shadow.radius, 1),
             shadow.dx,
             shadow.dy,
             shadow.color);
