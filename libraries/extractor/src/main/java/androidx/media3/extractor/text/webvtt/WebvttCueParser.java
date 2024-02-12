@@ -724,7 +724,6 @@ public final class WebvttCueParser {
             end,
             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         break;
-
       case WebvttCssStyle.FONT_SIZE_UNIT_EM:
         SpanUtil.addOrReplaceSpan(
             spannedText,
