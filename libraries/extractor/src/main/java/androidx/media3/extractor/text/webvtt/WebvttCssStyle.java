@@ -22,6 +22,7 @@ import android.text.TextUtils;
 import androidx.annotation.ColorInt;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
+import androidx.media3.common.text.TextShadow;
 import androidx.media3.common.text.TextAnnotation;
 import androidx.media3.common.util.UnstableApi;
 import com.google.common.base.Ascii;
@@ -98,6 +99,7 @@ public final class WebvttCssStyle {
   private boolean hasFontColor;
   private int backgroundColor;
   private boolean hasBackgroundColor;
+  @Nullable private TextShadow textShadow;
   private @OptionalBoolean int linethrough;
   private @OptionalBoolean int underline;
   private @OptionalBoolean int bold;
@@ -115,6 +117,7 @@ public final class WebvttCssStyle {
     fontFamily = null;
     hasFontColor = false;
     hasBackgroundColor = false;
+    textShadow = null;
     linethrough = UNSPECIFIED;
     underline = UNSPECIFIED;
     bold = UNSPECIFIED;
@@ -272,6 +275,17 @@ public final class WebvttCssStyle {
 
   public boolean hasBackgroundColor() {
     return hasBackgroundColor;
+  }
+
+  @CanIgnoreReturnValue
+  public WebvttCssStyle setTextShadow(TextShadow textShadow) {
+    this.textShadow = textShadow;
+    return this;
+  }
+
+  @Nullable
+  public TextShadow getTextShadow() {
+    return textShadow;
   }
 
   @CanIgnoreReturnValue

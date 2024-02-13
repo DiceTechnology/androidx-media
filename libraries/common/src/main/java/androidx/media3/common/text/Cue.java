@@ -301,6 +301,11 @@ public final class Cue implements Bundleable {
   public final float shearDegrees;
 
   /**
+   * The shadow to be applied to this clue.
+   */
+  @Nullable public final TextShadow textShadow;
+
+  /**
    * Creates a text cue whose {@link #textAlignment} is null, whose type parameters are set to
    * {@link #TYPE_UNSET} and whose dimension parameters are set to {@link #DIMEN_UNSET}.
    *
@@ -405,7 +410,8 @@ public final class Cue implements Bundleable {
         /* windowColorSet= */ false,
         /* windowColor= */ Color.BLACK,
         /* verticalType= */ TYPE_UNSET,
-        /* shearDegrees= */ 0f);
+        /* shearDegrees= */ 0f,
+        /* textShadow */ null);
   }
 
   /**
@@ -453,7 +459,8 @@ public final class Cue implements Bundleable {
         windowColorSet,
         windowColor,
         /* verticalType= */ TYPE_UNSET,
-        /* shearDegrees= */ 0f);
+        /* shearDegrees= */ 0f,
+        /* textShadow */ null);
   }
 
   private Cue(
@@ -473,7 +480,8 @@ public final class Cue implements Bundleable {
       boolean windowColorSet,
       int windowColor,
       @VerticalType int verticalType,
-      float shearDegrees) {
+      float shearDegrees,
+      @Nullable TextShadow textShadow) {
     // Exactly one of text or bitmap should be set.
     if (text == null) {
       Assertions.checkNotNull(bitmap);
@@ -503,6 +511,7 @@ public final class Cue implements Bundleable {
     this.textSize = textSize;
     this.verticalType = verticalType;
     this.shearDegrees = shearDegrees;
+    this.textShadow = textShadow;
   }
 
   /** Returns a new {@link Cue.Builder} initialized with the same values as this Cue. */
@@ -538,7 +547,8 @@ public final class Cue implements Bundleable {
         && textSizeType == that.textSizeType
         && textSize == that.textSize
         && verticalType == that.verticalType
-        && shearDegrees == that.shearDegrees;
+        && shearDegrees == that.shearDegrees
+        && textShadow == that.textShadow;
   }
 
   @Override
@@ -560,7 +570,8 @@ public final class Cue implements Bundleable {
         textSizeType,
         textSize,
         verticalType,
-        shearDegrees);
+        shearDegrees,
+        textShadow);
   }
 
   /** A builder for {@link Cue} objects. */
@@ -583,6 +594,7 @@ public final class Cue implements Bundleable {
     @ColorInt private int windowColor;
     private @VerticalType int verticalType;
     private float shearDegrees;
+    @Nullable private TextShadow textShadow;
 
     public Builder() {
       text = null;
@@ -601,6 +613,7 @@ public final class Cue implements Bundleable {
       windowColorSet = false;
       windowColor = Color.BLACK;
       verticalType = TYPE_UNSET;
+      textShadow = null;
     }
 
     private Builder(Cue cue) {
@@ -621,6 +634,7 @@ public final class Cue implements Bundleable {
       windowColor = cue.windowColor;
       verticalType = cue.verticalType;
       shearDegrees = cue.shearDegrees;
+      textShadow = cue.textShadow;
     }
 
     /**
@@ -943,6 +957,24 @@ public final class Cue implements Bundleable {
       return this;
     }
 
+    /** Sets shadow for this Cue. */
+    @CanIgnoreReturnValue
+    public Builder setTextShadow(@Nullable TextShadow textShadow) {
+      this.textShadow = textShadow;
+      return this;
+    }
+
+    /**
+     * Gets the shadow of the cue text.
+     *
+     * @see Cue#textShadow
+     */
+    @Pure
+    @Nullable
+    public TextShadow getShadow() {
+      return textShadow;
+    }
+
     /**
      * Gets the vertical formatting for this Cue.
      *
@@ -972,7 +1004,8 @@ public final class Cue implements Bundleable {
           windowColorSet,
           windowColor,
           verticalType,
-          shearDegrees);
+          shearDegrees,
+          textShadow);
     }
   }
 
@@ -995,6 +1028,7 @@ public final class Cue implements Bundleable {
   private static final String FIELD_WINDOW_COLOR_SET = Util.intToStringMaxRadix(14);
   private static final String FIELD_VERTICAL_TYPE = Util.intToStringMaxRadix(15);
   private static final String FIELD_SHEAR_DEGREES = Util.intToStringMaxRadix(16);
+  private static final String FIELD_SHADOW = Util.intToStringMaxRadix(17);
 
   @UnstableApi
   @Override
@@ -1017,6 +1051,7 @@ public final class Cue implements Bundleable {
     bundle.putInt(FIELD_WINDOW_COLOR, windowColor);
     bundle.putInt(FIELD_VERTICAL_TYPE, verticalType);
     bundle.putFloat(FIELD_SHEAR_DEGREES, shearDegrees);
+    bundle.putSerializable(FIELD_SHADOW, textShadow);
     return bundle;
   }
 
@@ -1073,6 +1108,11 @@ public final class Cue implements Bundleable {
     }
     if (bundle.containsKey(FIELD_SHEAR_DEGREES)) {
       builder.setShearDegrees(bundle.getFloat(FIELD_SHEAR_DEGREES));
+    }
+    @Nullable
+    TextShadow textShadow = (TextShadow) bundle.getSerializable(FIELD_SHADOW);
+    if (textShadow != null) {
+      builder.setTextShadow(textShadow);
     }
     return builder.build();
   }
