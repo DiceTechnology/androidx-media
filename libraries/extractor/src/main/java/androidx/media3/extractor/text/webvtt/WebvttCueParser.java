@@ -43,6 +43,8 @@ import androidx.media3.common.text.HorizontalTextInVerticalContextSpan;
 import androidx.media3.common.text.RubySpan;
 import androidx.media3.common.text.SpanUtil;
 import androidx.media3.common.text.TextAnnotation;
+import androidx.media3.common.text.TextShadow;
+import androidx.media3.common.text.TextShadowSpan;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.ParsableByteArray;
@@ -363,7 +365,14 @@ public final class WebvttCueParser {
       }
       textBuilder.append(line.trim());
     }
-    builder.text = parseCueText(id, textBuilder.toString(), styles);
+    SpannedString spannedCueText = parseCueText(id, textBuilder.toString(), styles);
+    TextShadowSpan[] textShadowSpans = spannedCueText.getSpans(
+        /* queryStart */ 0,
+        /* queryEnd */ spannedCueText.length(), TextShadowSpan.class);
+    if (textShadowSpans.length > 0) {
+      builder.textShadow = textShadowSpans[0].getTextShadow();
+    }
+    builder.text = spannedCueText;
     return builder.build();
   }
 
@@ -686,10 +695,17 @@ public final class WebvttCueParser {
           end,
           Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
     }
-    if (style.hasBackgroundColor()) {
+    SpanUtil.addOrReplaceSpan(
+        spannedText,
+        new BackgroundColorSpan(
+            style.hasBackgroundColor() ? style.getBackgroundColor() : Color.TRANSPARENT),
+        start,
+        end,
+        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    if (style.getTextShadow() != null) {
       SpanUtil.addOrReplaceSpan(
           spannedText,
-          new BackgroundColorSpan(style.getBackgroundColor()),
+          new TextShadowSpan(style.getTextShadow()),
           start,
           end,
           Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -768,6 +784,7 @@ public final class WebvttCueParser {
     public long startTimeUs;
     public long endTimeUs;
     public @MonotonicNonNull CharSequence text;
+    public @Nullable TextShadow textShadow;
     public @TextAlignment int textAlignment;
     public float line;
     // Equivalent to WebVTT's snap-to-lines flag:
@@ -816,7 +833,8 @@ public final class WebvttCueParser {
               .setPosition(position)
               .setPositionAnchor(positionAnchor)
               .setSize(min(size, deriveMaxSize(positionAnchor, position)))
-              .setVerticalType(verticalType);
+              .setVerticalType(verticalType)
+              .setTextShadow(textShadow);
 
       if (text != null) {
         cueBuilder.setText(text);

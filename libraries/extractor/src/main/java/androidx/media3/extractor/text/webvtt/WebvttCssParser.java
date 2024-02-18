@@ -18,6 +18,7 @@ package androidx.media3.extractor.text.webvtt;
 import android.text.TextUtils;
 import androidx.annotation.Nullable;
 import androidx.media3.common.text.TextAnnotation;
+import androidx.media3.common.text.TextShadow;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.ColorParser;
 import androidx.media3.common.util.Log;
@@ -41,6 +42,8 @@ import java.util.regex.Pattern;
   private static final String RULE_END = "}";
   private static final String PROPERTY_COLOR = "color";
   private static final String PROPERTY_BGCOLOR = "background-color";
+  private static final String PROPERTY_BG = "background";
+  private static final String PROPERTY_TEXT_SHADOW = "text-shadow";
   private static final String PROPERTY_FONT_FAMILY = "font-family";
   private static final String PROPERTY_FONT_WEIGHT = "font-weight";
   private static final String PROPERTY_FONT_SIZE = "font-size";
@@ -175,10 +178,12 @@ import java.util.regex.Pattern;
       return;
     }
     skipWhitespaceAndComments(input);
+    int propertyValueStartIndex = input.getPosition();
     String value = parsePropertyValue(input, stringBuilder);
     if (value == null || "".equals(value)) {
       return;
     }
+    int propertyValueEndIndex = input.getPosition();
     int position = input.getPosition();
     String token = parseNextToken(input, stringBuilder);
     if (";".equals(token)) {
@@ -198,9 +203,22 @@ import java.util.regex.Pattern;
       } catch (IllegalArgumentException ex) {
         // Ignore exception.
       }
-    } else if (PROPERTY_BGCOLOR.equals(property)) {
+    } else if (PROPERTY_BG.equals(property) || PROPERTY_BGCOLOR.equals(property)) {
       try {
         style.setBackgroundColor(ColorParser.parseCssColor(value));
+      } catch (IllegalArgumentException ex) {
+        // Ignore exception.
+      }
+    } else if (PROPERTY_TEXT_SHADOW.equals(property)) {
+      try {
+        // Save original position.
+        int originalPosition = input.getPosition();
+        // Set back position to the value's start index to read it with whitespaces.
+        int length = propertyValueEndIndex - propertyValueStartIndex;
+        input.setPosition(propertyValueStartIndex);
+        style.setTextShadow(parseTextShadow(input.readString(length)));
+        // Set back original position.
+        input.setPosition(originalPosition);
       } catch (IllegalArgumentException ex) {
         // Ignore exception.
       }
@@ -405,4 +423,41 @@ import java.util.regex.Pattern;
       style.setTargetClasses(Util.nullSafeArrayCopyOfRange(classDivision, 1, classDivision.length));
     }
   }
+
+  private static TextShadow parseTextShadow(@Nullable String value) {
+    if (value == null) {
+      throw new IllegalArgumentException();
+    }
+    List<TextShadow.Component> shadowComponents = new ArrayList<>();
+    // Split multiple shadows "1px 1px black, 1px 1px black" -> ["1px 1px black", "1px 1px black"]
+    String[] shadows = value.split(",");
+    Pattern pattern = Pattern.compile("-?\\d+");
+    for (String shadow : shadows) {
+      // Split into components "1px 1px black" -> ["1px", "1px", "black"]
+      String[] components = shadow.trim().split(" ");
+      for (int i = 0; i < components.length; i++) {
+        Matcher matcher = pattern.matcher(components[i]);
+        if (matcher.find()) {
+          // Extract numbers ("1px" -> "1")
+          components[i] = matcher.group();
+        }
+      }
+
+      if (components.length >= 3) {
+        int dx = Integer.parseInt(components[0]);
+        int dy = Integer.parseInt(components[1]);
+        int blur = 0;
+        String colorComponent = components[components.length - 1];
+
+        if (components.length == 4) {
+          blur = Integer.parseInt(components[2]);
+        }
+
+        shadowComponents.add(
+            new TextShadow.Component(dx, dy, blur, ColorParser.parseCssColor(colorComponent)));
+      }
+    }
+    return new TextShadow(shadowComponents);
+  }
 }
+
