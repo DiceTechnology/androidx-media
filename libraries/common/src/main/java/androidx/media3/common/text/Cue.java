@@ -50,8 +50,11 @@ import org.checkerframework.dataflow.qual.Pure;
 // information around in a sidecar object.
 public final class Cue implements Bundleable {
 
-  /** The empty cue. */
-  public static final Cue EMPTY = new Cue.Builder().setText("").build();
+  /**
+   * @deprecated There's no general need for a cue with an empty text string. If you need one,
+   *     create it yourself.
+   */
+  @Deprecated public static final Cue EMPTY = new Cue.Builder().setText("").build();
 
   /** An unset position, width or size. */
   // Note: We deliberately don't use Float.MIN_VALUE because it's positive & very close to zero.
@@ -304,164 +307,6 @@ public final class Cue implements Bundleable {
    * The shadow to be applied to this clue.
    */
   @Nullable public final TextShadow textShadow;
-
-  /**
-   * Creates a text cue whose {@link #textAlignment} is null, whose type parameters are set to
-   * {@link #TYPE_UNSET} and whose dimension parameters are set to {@link #DIMEN_UNSET}.
-   *
-   * @param text See {@link #text}.
-   * @deprecated Use {@link Builder}.
-   */
-  @UnstableApi
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  public Cue(CharSequence text) {
-    this(
-        text,
-        /* textAlignment= */ null,
-        /* line= */ DIMEN_UNSET,
-        /* lineType= */ TYPE_UNSET,
-        /* lineAnchor= */ TYPE_UNSET,
-        /* position= */ DIMEN_UNSET,
-        /* positionAnchor= */ TYPE_UNSET,
-        /* size= */ DIMEN_UNSET);
-  }
-
-  /**
-   * Creates a text cue.
-   *
-   * @param text See {@link #text}.
-   * @param textAlignment See {@link #textAlignment}.
-   * @param line See {@link #line}.
-   * @param lineType See {@link #lineType}.
-   * @param lineAnchor See {@link #lineAnchor}.
-   * @param position See {@link #position}.
-   * @param positionAnchor See {@link #positionAnchor}.
-   * @param size See {@link #size}.
-   * @deprecated Use {@link Builder}.
-   */
-  @UnstableApi
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  public Cue(
-      CharSequence text,
-      @Nullable Alignment textAlignment,
-      float line,
-      @LineType int lineType,
-      @AnchorType int lineAnchor,
-      float position,
-      @AnchorType int positionAnchor,
-      float size) {
-    this(
-        text,
-        textAlignment,
-        line,
-        lineType,
-        lineAnchor,
-        position,
-        positionAnchor,
-        size,
-        /* windowColorSet= */ false,
-        /* windowColor= */ Color.BLACK);
-  }
-
-  /**
-   * Creates a text cue.
-   *
-   * @param text See {@link #text}.
-   * @param textAlignment See {@link #textAlignment}.
-   * @param line See {@link #line}.
-   * @param lineType See {@link #lineType}.
-   * @param lineAnchor See {@link #lineAnchor}.
-   * @param position See {@link #position}.
-   * @param positionAnchor See {@link #positionAnchor}.
-   * @param size See {@link #size}.
-   * @param textSizeType See {@link #textSizeType}.
-   * @param textSize See {@link #textSize}.
-   * @deprecated Use {@link Builder}.
-   */
-  @UnstableApi
-  @Deprecated
-  public Cue(
-      CharSequence text,
-      @Nullable Alignment textAlignment,
-      float line,
-      @LineType int lineType,
-      @AnchorType int lineAnchor,
-      float position,
-      @AnchorType int positionAnchor,
-      float size,
-      @TextSizeType int textSizeType,
-      float textSize) {
-    this(
-        text,
-        textAlignment,
-        /* multiRowAlignment= */ null,
-        /* bitmap= */ null,
-        line,
-        lineType,
-        lineAnchor,
-        position,
-        positionAnchor,
-        textSizeType,
-        textSize,
-        size,
-        /* bitmapHeight= */ DIMEN_UNSET,
-        /* windowColorSet= */ false,
-        /* windowColor= */ Color.BLACK,
-        /* verticalType= */ TYPE_UNSET,
-        /* shearDegrees= */ 0f,
-        /* textShadow */ null);
-  }
-
-  /**
-   * Creates a text cue.
-   *
-   * @param text See {@link #text}.
-   * @param textAlignment See {@link #textAlignment}.
-   * @param line See {@link #line}.
-   * @param lineType See {@link #lineType}.
-   * @param lineAnchor See {@link #lineAnchor}.
-   * @param position See {@link #position}.
-   * @param positionAnchor See {@link #positionAnchor}.
-   * @param size See {@link #size}.
-   * @param windowColorSet See {@link #windowColorSet}.
-   * @param windowColor See {@link #windowColor}.
-   * @deprecated Use {@link Builder}.
-   */
-  @UnstableApi
-  @Deprecated
-  public Cue(
-      CharSequence text,
-      @Nullable Alignment textAlignment,
-      float line,
-      @LineType int lineType,
-      @AnchorType int lineAnchor,
-      float position,
-      @AnchorType int positionAnchor,
-      float size,
-      boolean windowColorSet,
-      int windowColor) {
-    this(
-        text,
-        textAlignment,
-        /* multiRowAlignment= */ null,
-        /* bitmap= */ null,
-        line,
-        lineType,
-        lineAnchor,
-        position,
-        positionAnchor,
-        /* textSizeType= */ TYPE_UNSET,
-        /* textSize= */ DIMEN_UNSET,
-        size,
-        /* bitmapHeight= */ DIMEN_UNSET,
-        windowColorSet,
-        windowColor,
-        /* verticalType= */ TYPE_UNSET,
-        /* shearDegrees= */ 0f,
-        /* textShadow */ null);
-  }
 
   private Cue(
       @Nullable CharSequence text,
@@ -1034,10 +879,14 @@ public final class Cue implements Bundleable {
   @Override
   public Bundle toBundle() {
     Bundle bundle = new Bundle();
-    bundle.putCharSequence(FIELD_TEXT, text);
+    if (text != null) {
+      bundle.putCharSequence(FIELD_TEXT, text);
+    }
     bundle.putSerializable(FIELD_TEXT_ALIGNMENT, textAlignment);
     bundle.putSerializable(FIELD_MULTI_ROW_ALIGNMENT, multiRowAlignment);
-    bundle.putParcelable(FIELD_BITMAP, bitmap);
+    if (bitmap != null) {
+      bundle.putParcelable(FIELD_BITMAP, bitmap);
+    }
     bundle.putFloat(FIELD_LINE, line);
     bundle.putInt(FIELD_LINE_TYPE, lineType);
     bundle.putInt(FIELD_LINE_ANCHOR, lineAnchor);

@@ -318,7 +318,7 @@ public final class SpliceInfoDecoderTest {
   @Test
   public void decodeFailsIfBufferHasNoArray() {
     MetadataInputBuffer buffer = createMetadataInputBuffer(createByteArray(1, 2, 3));
-    buffer.data = buffer.data.asReadOnlyBuffer();
+    buffer.data = Util.createReadOnlyByteBuffer(buffer.data);
 
     assertThrows(IllegalArgumentException.class, () -> decoder.decode(buffer));
   }

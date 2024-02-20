@@ -20,6 +20,7 @@ import static java.lang.Math.min;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.DataReader;
+import androidx.media3.common.endeavor.DebugUtil;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.Util;
@@ -146,11 +147,11 @@ import java.util.Arrays;
   /**
    * Advances the read position to the specified absolute position.
    *
-   * @param absolutePosition The new absolute read position. May be {@link C#POSITION_UNSET}, in
-   *     which case calling this method is a no-op.
+   * @param absolutePosition The new absolute read position. May be {@link C#INDEX_UNSET}, in which
+   *     case calling this method is a no-op.
    */
   public void discardDownstreamTo(long absolutePosition) {
-    if (absolutePosition == C.POSITION_UNSET) {
+    if (absolutePosition == C.INDEX_UNSET) {
       return;
     }
     while (absolutePosition >= firstAllocationNode.endPosition) {
@@ -458,17 +459,50 @@ import java.util.Arrays;
     return allocationNode;
   }
 
+  protected void debugDatas() {
+    DebugUtil.i("queue data, read " +  getDebugInfo(readAllocationNode) + ", write "
+        + getDebugInfo(writeAllocationNode) + ", first " + getDebugInfo(firstAllocationNode)
+        + ", details index-start-end-offset (bytes)");
+
+    int count = 0;
+    String info = "";
+    AllocationNode allocationNode = firstAllocationNode;
+    while (allocationNode != null) {
+      count++;
+      info += (info.length() == 0 ? "" : ", ") + count + "-" + getDebugInfo(allocationNode);
+      if (count % 10 == 0) {
+        DebugUtil.i(info);
+        info = "";
+      }
+      allocationNode = allocationNode.next;
+    }
+    if (info.length() > 0) {
+      DebugUtil.i(info);
+    }
+  }
+
+  private static String getDebugInfo(AllocationNode allocationNode) {
+    if (allocationNode == null) {
+      return "-1-1-1";
+    }
+    return allocationNode.startPosition + "-" + allocationNode.endPosition + "-"
+        + (allocationNode.allocation == null ? "" : allocationNode.allocation.offset);
+  }
+
   /** A node in a linked list of {@link Allocation}s held by the output. */
   private static final class AllocationNode implements Allocator.AllocationNode {
 
     /** The absolute position of the start of the data (inclusive). */
     public long startPosition;
+
     /** The absolute position of the end of the data (exclusive). */
     public long endPosition;
+
     /**
      * The {@link Allocation}, or {@code null} if the node is not {@link #initialize initialized}.
      */
     @Nullable public Allocation allocation;
+
     /**
      * The next {@link AllocationNode} in the list, or {@code null} if the node is not {@link
      * #initialize initialized}.

@@ -6,37 +6,27 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import android.os.AsyncTask;
 import androidx.media3.common.C;
 import androidx.media3.common.util.Log;
-import androidx.media3.common.util.ParsableByteArray;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 public class WebUtil {
 
   private static final String TAG = "WebUtil";
   public static final String DEBUG = "====DEBUG====";
-  public static final String DEV = "===dev===";
   public static final SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
   public static final SimpleDateFormat df2 = new SimpleDateFormat("mm:ss.SSS", Locale.US);
   public static final SimpleDateFormat df3 = new SimpleDateFormat("HHmmss.SSS", Locale.US);
-  public static final String queueUid = "sampleQ:999";
-
-  public static final int MAX_PID_PLUS_ONE = 0x2000;
-  public static final int METADATA_PID = 0x10A0;
 
   public static final long TIMEOUT_MS = 6000;
-  public static final long CONNECT_TIMEOUT_MS = 6000;
   public static final long MANIFEST_LOAD_UNTIL_MS = 36000;
 
   public static final float LOW_LATENCY_MIN_PLAYBACK_SPEED = 0.90f;
@@ -70,15 +60,6 @@ public class WebUtil {
     return df3.format(new Date(time > 0 ? time : System.currentTimeMillis()));
   }
 
-  public static SimpleDateFormat getDateFormat(String format, String zone) {
-    SimpleDateFormat df = new SimpleDateFormat(format, Locale.US);
-    if (!empty(zone)) {
-      TimeZone time_zone = TimeZone.getTimeZone(zone);
-      df.setTimeZone(time_zone);
-    }
-    return df;
-  }
-
   private static String filter(long val) {
     if (val == Long.MIN_VALUE) {
       return "vmin";
@@ -97,7 +78,7 @@ public class WebUtil {
     } else if (ms == 0) {
       return "0";
     } else if (ms < -1 && ms > -86400000) {
-      return "-" + stime(0 - ms);
+      return "-" + stime(-ms);
     }
     return stime(ms);
   }
@@ -124,64 +105,6 @@ public class WebUtil {
     return (ret == null ? String.valueOf(ms / 1000f) : ret);
   }
 
-  public static String md5(String origin) {
-    if (empty(origin)) {
-      return "";
-    }
-    try {
-      MessageDigest md = MessageDigest.getInstance("MD5");
-      md.reset();
-      byte[] result = md.digest(origin.getBytes());
-      return bytes2hexs(result);
-    } catch (Exception ex) {
-    }
-    return "";
-  }
-
-  public static String bytes2hexs(ParsableByteArray data, int length) {
-    int left = (data == null ? 0 : data.bytesLeft());
-    if (left < 1) {
-      return "";
-    }
-    if (length < 1 || left < length) {
-      length = left;
-    }
-
-    int pos = data.getPosition(), limit = data.limit();
-    byte[] arr = new byte[length];
-    data.readBytes(arr, 0, length);
-    data.setPosition(pos);
-    data.setLimit(limit);
-    return bytes2hexs(arr);
-  }
-
-  public static String bytes2hexs(byte[] data) {
-    if (data == null || data.length == 0) {
-      return "";
-    }
-
-    final int length = data.length;
-    final char[] chars = new char[length * 2];
-    for (int i = 0; i < length; i++) {
-      final int n = ((int) data[i]) & 0xff;
-      chars[2 * i] = Character.forDigit((n >> 4) & 0xf, 16);
-      chars[2 * i + 1] = Character.forDigit(n & 0xf, 16);
-    }
-    return new String(chars);
-  }
-
-  public static byte[] hexs2bytes(String s) {
-    if (empty(s)) {
-      return new byte[0];
-    }
-    int len = s.length();
-    byte[] data = new byte[len / 2];
-    for (int i = 0; i < len; i += 2) {
-      data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16));
-    }
-    return data;
-  }
-
   public static byte[] in2bytes(InputStream is) throws IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     int len = -1;
@@ -193,10 +116,6 @@ public class WebUtil {
 
     is.close();
     return baos.toByteArray();
-  }
-
-  public static InputStream bytes2in(byte[] bytes) {
-    return new ByteArrayInputStream(bytes);
   }
 
   public static String loadToken(String token) {

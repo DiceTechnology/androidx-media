@@ -24,12 +24,11 @@ import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackGroup;
-import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Clock;
 import androidx.media3.common.util.Log;
+import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
-import androidx.media3.exoplayer.endeavor.DebugUtil;
 import androidx.media3.exoplayer.endeavor.TrackCollector;
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId;
 import androidx.media3.exoplayer.source.chunk.MediaChunk;
@@ -42,7 +41,6 @@ import com.google.common.collect.MultimapBuilder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
  * A bandwidth based adaptive {@link ExoTrackSelection}, whose selected track is updated to be the
@@ -322,6 +320,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
   private @C.SelectionReason int reason;
   private long lastBufferEvaluationMs;
   @Nullable private MediaChunk lastBufferEvaluationMediaChunk;
+  private long latestBitrateEstimate;
 
   private boolean useTwoPhaseSwitch;
   private int selectingIndex;
@@ -417,6 +416,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
     playbackSpeed = 1f;
     reason = C.SELECTION_REASON_UNKNOWN;
     lastBufferEvaluationMs = C.TIME_UNSET;
+    latestBitrateEstimate = C.RATE_UNSET_INT;
   }
 
   @CallSuper
@@ -466,7 +466,8 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
       previousReason = Iterables.getLast(queue).trackSelectionReason;
     }
     int newSelectedIndex = determineIdealSelectedIndex(nowMs, chunkDurationUs);
-    if (!isBlacklisted(previousSelectedIndex, nowMs)) {
+    if (newSelectedIndex != previousSelectedIndex
+        && !isTrackExcluded(previousSelectedIndex, nowMs)) {
       // Revert back to the previous selection if conditions are not suitable for switching.
       Format currentFormat = getFormat(previousSelectedIndex);
       Format selectedFormat = getFormat(newSelectedIndex);
@@ -496,9 +497,6 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
   // May need to reselect tracks because the audio group constraint is changed.
   private void applySelectedIndex(int prevSelectedIndex, int newSelectedIndex) {
     if (newSelectedIndex != prevSelectedIndex) {
-      if (DebugUtil.debug_track) {
-        Log.d(WebUtil.DEBUG, String.format("adaptiveTrackChanged, apply!!!, %d -> %d", prevSelectedIndex, newSelectedIndex));
-      }
       if (trackCollector != null) {
         trackCollector.onAdaptiveTrackChanged(getSelectedFormat(), getFormat(newSelectedIndex));
       }
@@ -547,12 +545,6 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
             break;
           }
         }
-        Log.d(WebUtil.DEBUG,
-            String.format("Initial video selection (%d), selected format [%d, %s] %s",
-                tracks.length,
-                videoSelected.bitrate,
-                TrackCollector.getAudioGroupId(videoSelected),
-                (index == C.INDEX_UNSET ? "not found!!!" : "used")));
       }
       // Apply the bandwidth constraint.
       if (index == C.INDEX_UNSET) {
@@ -639,6 +631,11 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
     return queueSize;
   }
 
+  @Override
+  public long getLatestBitrateEstimate() {
+    return latestBitrateEstimate;
+  }
+
   /**
    * Called when updating the selected track to determine whether a candidate track can be selected.
    *
@@ -693,7 +690,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
     effectiveBitrateStr = String.format(", estBitrate %.2fM", effectiveBitrate / 1000000f);
     int lowestBitrateAllowedIndex = 0;
     for (int i = 0; i < length; i++) {
-      if (nowMs == Long.MIN_VALUE || !isGlobalBlacklisted(i, nowMs)) {
+      if (nowMs == Long.MIN_VALUE || !isGlobalTrackExcluded(i, nowMs)) {
         Format format = getFormat(i);
         if (canSelectFormat(format, format.bitrate, effectiveBitrate)) {
           return switchIndex(i);
@@ -705,9 +702,9 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
     return switchIndex(lowestBitrateAllowedIndex);
   }
 
-  // Override the isBlacklisted() to apply group constraint.
-  private boolean isGlobalBlacklisted(int index, long nowMs) {
-    return (trackCollector == null ? isBlacklisted(index, nowMs) : trackCollector.isBlacklisted(getFormat(index), nowMs));
+  // Override the isTrackExcluded() to apply group constraint.
+  private boolean isGlobalTrackExcluded(int index, long nowMs) {
+    return (trackCollector == null ? isTrackExcluded(index, nowMs) : trackCollector.isTrackExcluded(getFormat(index), nowMs));
   }
 
   private long minDurationForQualityIncreaseUs(long availableDurationUs, long chunkDurationUs) {
@@ -786,8 +783,8 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
   }
 
   private long getTotalAllocatableBandwidth(long chunkDurationUs) {
-    long cautiousBandwidthEstimate =
-        (long) (bandwidthMeter.getBitrateEstimate() * bandwidthFraction);
+    latestBitrateEstimate = bandwidthMeter.getBitrateEstimate();
+    long cautiousBandwidthEstimate = (long) (latestBitrateEstimate * bandwidthFraction);
     long timeToFirstByteEstimateUs = bandwidthMeter.getTimeToFirstByteEstimateUs();
     if (timeToFirstByteEstimateUs == C.TIME_UNSET || chunkDurationUs == C.TIME_UNSET) {
       return (long) (cautiousBandwidthEstimate / playbackSpeed);
@@ -931,6 +928,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
 
     /** Total bandwidth in bits per second at which this checkpoint applies. */
     public final long totalBandwidth;
+
     /** Allocated bandwidth at this checkpoint in bits per second. */
     public final long allocatedBandwidth;
 

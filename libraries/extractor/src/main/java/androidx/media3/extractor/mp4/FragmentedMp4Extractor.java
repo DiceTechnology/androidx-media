@@ -33,11 +33,13 @@ import androidx.media3.common.DrmInitData.SchemeData;
 import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.ParserException;
+import androidx.media3.common.endeavor.DebugUtil;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.TimestampAdjuster;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
+import androidx.media3.container.NalUnitUtil;
 import androidx.media3.extractor.Ac4Util;
 import androidx.media3.extractor.CeaUtil;
 import androidx.media3.extractor.ChunkIndex;
@@ -46,7 +48,6 @@ import androidx.media3.extractor.ExtractorInput;
 import androidx.media3.extractor.ExtractorOutput;
 import androidx.media3.extractor.ExtractorsFactory;
 import androidx.media3.extractor.GaplessInfoHolder;
-import androidx.media3.extractor.NalUnitUtil;
 import androidx.media3.extractor.PositionHolder;
 import androidx.media3.extractor.SeekMap;
 import androidx.media3.extractor.TrackOutput;
@@ -92,6 +93,7 @@ public class FragmentedMp4Extractor implements Extractor {
         FLAG_WORKAROUND_IGNORE_EDIT_LISTS
       })
   public @interface Flags {}
+
   /**
    * Flag to work around an issue in some video streams where every frame is marked as a sync frame.
    * The workaround overrides the sync frame flags in the stream, forcing them to false except for
@@ -100,8 +102,10 @@ public class FragmentedMp4Extractor implements Extractor {
    * <p>This flag does nothing if the stream is not a video stream.
    */
   public static final int FLAG_WORKAROUND_EVERY_VIDEO_FRAME_IS_SYNC_FRAME = 1;
+
   /** Flag to ignore any tfdt boxes in the stream. */
   public static final int FLAG_WORKAROUND_IGNORE_TFDT_BOX = 1 << 1; // 2
+
   /**
    * Flag to indicate that the extractor should output an event message metadata track. Any event
    * messages in the stream will be delivered as samples to this track.
@@ -275,6 +279,10 @@ public class FragmentedMp4Extractor implements Extractor {
     extractorOutput = ExtractorOutput.PLACEHOLDER;
     emsgTrackOutputs = new TrackOutput[0];
     ceaTrackOutputs = new TrackOutput[0];
+
+    if (DebugUtil.isDebugSampleAllowed()) {
+      DebugUtil.i(getDebugInfo(", create"));
+    }
   }
 
   @Override
@@ -389,6 +397,10 @@ public class FragmentedMp4Extractor implements Extractor {
       throw ParserException.createForUnsupportedContainerFeature(
           "Atom size less than header length (unsupported).");
     }
+    if (DebugUtil.isDebugCmafAtomAllowed()) {
+      DebugUtil.i("atom header [" + Atom.getAtomTypeString(atomType) + "], size " + atomSize
+          + ", read " + atomHeaderBytesRead);
+    }
 
     long atomPosition = input.getPosition() - atomHeaderBytesRead;
     if (atomType == Atom.TYPE_moof || atomType == Atom.TYPE_mdat) {
@@ -453,6 +465,10 @@ public class FragmentedMp4Extractor implements Extractor {
 
   private void readAtomPayload(ExtractorInput input) throws IOException {
     int atomPayloadSize = (int) atomSize - atomHeaderBytesRead;
+    if (DebugUtil.isDebugCmafAtomAllowed()) {
+      DebugUtil.i("atom payload [" + Atom.getAtomTypeString(atomType)
+          + "], read " + atomPayloadSize);
+    }
     @Nullable ParsableByteArray atomData = this.atomData;
     if (atomData != null) {
       input.readFully(atomData.getData(), Atom.HEADER_SIZE, atomPayloadSize);
@@ -656,7 +672,7 @@ public class FragmentedMp4Extractor implements Extractor {
     }
 
     byte[] messageData = new byte[atom.bytesLeft()];
-    atom.readBytes(messageData, /*offset=*/ 0, atom.bytesLeft());
+    atom.readBytes(messageData, /* offset= */ 0, atom.bytesLeft());
     EventMessage eventMessage = new EventMessage(schemeIdUri, value, durationMs, id, messageData);
     ParsableByteArray encodedEventMessage =
         new ParsableByteArray(eventMessageEncoder.encode(eventMessage));
@@ -667,6 +683,8 @@ public class FragmentedMp4Extractor implements Extractor {
       encodedEventMessage.setPosition(0);
       emsgTrackOutput.sampleData(encodedEventMessage, sampleSize);
     }
+
+    String msg = DebugUtil.isDebugSampleMetaWriteAllowed() ? "timeUs " + sampleTimeUs : null;
 
     // Output the sample metadata.
     if (sampleTimeUs == C.TIME_UNSET) {
@@ -683,6 +701,19 @@ public class FragmentedMp4Extractor implements Extractor {
       pendingMetadataSampleInfos.addLast(
           new MetadataSampleInfo(sampleTimeUs, /* sampleTimeIsRelative= */ false, sampleSize));
       pendingMetadataSampleBytes += sampleSize;
+      if (msg != null) {
+        msg = ", pending emsg, " + msg;
+      }
+    } else if (timestampAdjuster != null && !timestampAdjuster.isInitialized()) {
+      // We also need to defer outputting metadata if the timestampAdjuster is not initialized,
+      // else we will set a wrong timestampOffsetUs in timestampAdjuster. See:
+      // https://github.com/androidx/media/issues/356.
+      pendingMetadataSampleInfos.addLast(
+          new MetadataSampleInfo(sampleTimeUs, /* sampleTimeIsRelative= */ false, sampleSize));
+      pendingMetadataSampleBytes += sampleSize;
+      if (msg != null) {
+        msg = ", pending emsg without initialized, " + msg;
+      }
     } else {
       // We can output the sample metadata immediately.
       if (timestampAdjuster != null) {
@@ -692,6 +723,14 @@ public class FragmentedMp4Extractor implements Extractor {
         emsgTrackOutput.sampleMetadata(
             sampleTimeUs, C.BUFFER_FLAG_KEY_FRAME, sampleSize, /* offset= */ 0, null);
       }
+      if (msg != null) {
+        msg = ", output emsg directly, " + msg + " -> " + sampleTimeUs;
+      }
+    }
+    if (msg != null) {
+      DebugUtil.i(getDebugInfo(msg) + ", pending [count " + pendingMetadataSampleInfos.size()
+          + ", length " + pendingMetadataSampleBytes + "], version " + version
+          + ", sampleSize " + sampleSize + ", dataSize " + messageData.length);
     }
   }
 
@@ -1317,7 +1356,39 @@ public class FragmentedMp4Extractor implements Extractor {
           "Offset to encryption data was negative.", /* cause= */ null);
     }
     input.skipFully(bytesToSkip);
+    if (DebugUtil.isDebugCmafAtomAllowed()) {
+      DebugUtil.i("atom encrypt data [" + Atom.getAtomTypeString(atomType)
+          + "], " + getDebugTrackInfo(nextTrackBundle));
+    }
     nextTrackBundle.fragment.fillEncryptionData(input);
+  }
+
+  @Override
+  public void debugSamples() {
+    DebugUtil.i(getDebugInfo(", print samples"));
+    int trackBundlesSize = trackBundles.size();
+    for (int i = 0; i < trackBundlesSize; i++) {
+      TrackBundle bundle = trackBundles.valueAt(i);
+      DebugUtil.i("track #" + i + ", " + getDebugTrackInfo(bundle));
+      TrackOutput.debugSamples(bundle == null ? null : bundle.output);
+    }
+    for (int i = 0; i < emsgTrackOutputs.length; i++) {
+      DebugUtil.i("emsg #" + i);
+      TrackOutput.debugSamples(emsgTrackOutputs[i]);
+    }
+  }
+
+  private String getDebugInfo(String msg) {
+    return "extractor [" + hashCode() + "]" + msg + ", "
+        + TimestampAdjuster.getDebugInfo("", timestampAdjuster);
+  }
+
+  private String getDebugTrackInfo(TrackBundle bundle) {
+    if (bundle == null) {
+      return "track [-]";
+    }
+    return "track ["+ Format.toLogString(bundle.moovSampleTable.track.format)
+        + "], fragment [" + bundle.fragment.trunCount + ", " + bundle.fragment.sampleCount + "]";
   }
 
   /**
@@ -1513,6 +1584,11 @@ public class FragmentedMp4Extractor implements Extractor {
             metadataSampleInfo.size,
             pendingMetadataSampleBytes,
             null);
+      }
+      if (DebugUtil.isDebugSampleMetaWriteAllowed()) {
+        DebugUtil.i(getDebugInfo(", output emsg pending, ")
+            + ", size " + pendingMetadataSampleInfos.size() + ", bytes " + pendingMetadataSampleBytes
+            + ", timeUs " + metadataSampleInfo.sampleTimeUs + "-> " + metadataSampleTimeUs);
       }
     }
   }
