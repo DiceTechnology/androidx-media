@@ -120,7 +120,7 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
     referenceCount = 1;
     // Add the initial check about this device support L1 or only L3.
     boolean mediaDrmL3 = "L3".equalsIgnoreCase(getPropertyString("securityLevel"));
-    if (C.WIDEVINE_UUID.equals(uuid) && (mediaDrmL3 || needsForceWidevineL3Workaround())) {
+    if (C.WIDEVINE_UUID.equals(uuid) && !mediaDrmL3 && needsForceWidevineL3Workaround()) {
       forceWidevineL3(mediaDrm);
     }
   }
