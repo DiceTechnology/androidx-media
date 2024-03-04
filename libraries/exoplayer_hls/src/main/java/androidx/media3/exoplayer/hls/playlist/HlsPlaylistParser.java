@@ -853,6 +853,8 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
         playlistDiscontinuitySequence = Integer.parseInt(line.substring(line.indexOf(':') + 1));
       } else if (line.equals(TAG_DISCONTINUITY) && !discontinuityAfterSkip) {
         relativeDiscontinuitySequence++;
+        // To fix the playback issue on the mixed-ts-cmaf stream.
+        initializationSegment = null;
       } else if (line.startsWith(TAG_PROGRAM_DATE_TIME)) {
         segmentStartTimeUtcUs = Util.msToUs(Util.parseXsDateTime(line.substring(line.indexOf(':') + 1)));
         // Calc playlist start time with latest value of #EXT-X-PROGRAM-DATE-TIME tag, instead first value.
