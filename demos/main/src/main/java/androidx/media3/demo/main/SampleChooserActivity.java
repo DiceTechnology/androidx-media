@@ -57,6 +57,8 @@ import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSourceInputStream;
 import androidx.media3.datasource.DataSourceUtil;
 import androidx.media3.datasource.DataSpec;
+import androidx.media3.demo.main.upstream.AsyncFetcher;
+import androidx.media3.demo.main.upstream.OkHttpClientFactory;
 import androidx.media3.demo.main.upstream.PlaybackProvider;
 import androidx.media3.exoplayer.RenderersFactory;
 import androidx.media3.exoplayer.offline.DownloadService;
@@ -64,7 +66,8 @@ import com.facebook.stetho.Stetho;
 import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -131,7 +134,7 @@ public class SampleChooserActivity extends AppCompatActivity
 
     useExtensionRenderers = DemoUtil.useExtensionRenderers();
     downloadTracker = DemoUtil.getDownloadTracker(/* context= */ this);
-    loadSample();
+    loadOfficeSample(); // loadSample();
     startDownloadService();
   }
 
@@ -205,6 +208,36 @@ public class SampleChooserActivity extends AppCompatActivity
     loaderTask.execute(uris);
   }
 
+  private void loadOfficeSample() {
+    String url = "http://172.16.0.108:8899/exoplayer/media.exolist.json";
+    AsyncFetcher.RequestBuilder requestBuilder = () -> AsyncFetcher.RequestData.from(url, null);
+    AsyncFetcher.ResponseParser<List<PlaylistGroup>> responseParser = reader -> {
+      List<PlaylistGroup> result = new ArrayList<>();
+      new SampleListLoader().readPlaylistGroups(new JsonReader(reader), result);
+      if (result.size() < 1) {
+        throw new IOException("Unexpected response with empty playlist group");
+      }
+      return result;
+    };
+
+    new AsyncFetcher<List<PlaylistGroup>>().newCall(requestBuilder, responseParser, OkHttpClientFactory.create())
+        .subscribeOn(Schedulers.io())
+        .observeOn(io.reactivex.rxjava3.android.schedulers.AndroidSchedulers.mainThread())
+        .subscribe(
+            groups -> {
+              String msg = "loaded " + groups.size() + " sample-groups from " + url;
+              Log.i(TAG, msg);
+              Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show();
+              onPlaylistGroups(groups, false);
+            },
+            error -> {
+              String msg = "loaded asset media.exolist.json, failed to load " + url;
+              Log.e(TAG, msg, error);
+              Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show();
+              loadSample();
+            });
+  }
+
   private void onPlaylistGroups(final List<PlaylistGroup> groups, boolean sawError) {
     if (sawError) {
       Toast.makeText(getApplicationContext(), R.string.sample_list_load_error, Toast.LENGTH_LONG)
@@ -241,7 +274,7 @@ public class SampleChooserActivity extends AppCompatActivity
         isNonNullAndChecked(preferExtensionDecodersMenuItem));
     if (playlistHolder.mediaItems.size() == 1) {
       Uri originUri = playlistHolder.mediaItems.get(0).localConfiguration.uri;
-      PlaybackProvider.getInstance().getLiveStreamInfo(originUri)
+      PlaybackProvider.getInstance().getStream(originUri)
           .observeOn(AndroidSchedulers.mainThread())
           .subscribe(result -> {
                 List<MediaItem> mediaItems = playlistHolder.mediaItems;

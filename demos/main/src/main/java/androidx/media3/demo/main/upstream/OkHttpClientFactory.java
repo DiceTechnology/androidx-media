@@ -9,11 +9,12 @@ public class OkHttpClientFactory {
   }
 
   public static OkHttpClient create() {
-    long timeoutMs = 6_000;
+    long timeoutMs = 10_000;
     return new OkHttpClient().newBuilder()
         .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
         .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
         .writeTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+        // .addInterceptor(new HttpService.ResponseBodyInterceptor())
         .build();
   }
 }
