@@ -28,10 +28,8 @@ allprojects {
         mavenCentral()
         maven {
             url 'https://jitpack.io'
-            credentials { username authToken }
             content {
                 includeGroup "com.github.philburk"
-                includeGroup "com.github.DiceTechnology.doris-android"
             }
         }
     }
