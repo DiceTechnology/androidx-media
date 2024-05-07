@@ -4,8 +4,8 @@ import android.text.TextUtils;
 import com.diceplatform.doris.sdk.playback.internal.HttpService;
 import io.reactivex.rxjava3.core.Observable;
 import java.io.IOException;
-import java.io.Reader;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import okhttp3.Call;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -15,7 +15,14 @@ import okhttp3.Response;
 import okhttp3.ResponseBody;
 import org.jetbrains.annotations.NotNull;
 
-public final class AsyncFetcher<T> {
+public final class FetchUtil {
+
+  private static final long DEFAULT_HTTP_TIMEOUT_MS = 10_000;
+  private static final OkHttpClient client = client();
+
+  private FetchUtil() {
+    // prevent instantiation.
+  }
 
   public interface RequestBuilder {
 
@@ -27,18 +34,6 @@ public final class AsyncFetcher<T> {
      */
     @NotNull
     RequestData build() throws Throwable;
-  }
-
-  public interface ResponseParser<T> {
-
-    /**
-     * Parse response to specified type instance.
-     *
-     * @param reader The reader from response body.
-     * @return The specified type instance or null/error for unexpected response.
-     * @throws Throwable The parse error.
-     */
-    T parse(@NotNull Reader reader) throws Throwable;
   }
 
   public static final class RequestData {
@@ -53,6 +48,10 @@ public final class AsyncFetcher<T> {
       this.headers = headers;
       this.body = body;
       this.bodyType = bodyType;
+    }
+
+    public static RequestData from(String url) {
+      return from(url, null, null, null);
     }
 
     public static RequestData from(String url, Map<String, String> headers) {
@@ -73,10 +72,20 @@ public final class AsyncFetcher<T> {
     }
   }
 
-  public Observable<T> newCall(
-      RequestBuilder requestBuilder,
-      ResponseParser<T> responseParser,
-      OkHttpClient client) {
+  public static OkHttpClient client() {
+    return new OkHttpClient().newBuilder()
+        .connectTimeout(DEFAULT_HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .readTimeout(DEFAULT_HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .writeTimeout(DEFAULT_HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        // .addInterceptor(new HttpService.ResponseBodyInterceptor())
+        .build();
+  }
+
+  public static Observable<String> fetch(String url) {
+    return fetch(() -> RequestData.from(url));
+  }
+
+  public static Observable<String> fetch(RequestBuilder requestBuilder) {
     return Observable.create(emitter -> {
       final RequestData requestData;
       try {
@@ -108,8 +117,7 @@ public final class AsyncFetcher<T> {
             if (!response.isSuccessful() || responseBody == null) {
               throw new IOException("Unexpected response: " + response);
             }
-            T result = responseParser.parse(responseBody.charStream());
-            emitter.onNext(result);
+            emitter.onNext(responseBody.string());
             emitter.onComplete();
           } catch (Throwable error) {
             emitter.onError(error);

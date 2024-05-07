@@ -57,8 +57,7 @@ import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSourceInputStream;
 import androidx.media3.datasource.DataSourceUtil;
 import androidx.media3.datasource.DataSpec;
-import androidx.media3.demo.main.upstream.AsyncFetcher;
-import androidx.media3.demo.main.upstream.OkHttpClientFactory;
+import androidx.media3.demo.main.upstream.FetchUtil;
 import androidx.media3.demo.main.upstream.PlaybackProvider;
 import androidx.media3.exoplayer.RenderersFactory;
 import androidx.media3.exoplayer.offline.DownloadService;
@@ -71,6 +70,7 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -210,21 +210,13 @@ public class SampleChooserActivity extends AppCompatActivity
 
   private void loadOfficeSample() {
     String url = "http://172.16.0.108:8899/exoplayer/media.exolist.json";
-    AsyncFetcher.RequestBuilder requestBuilder = () -> AsyncFetcher.RequestData.from(url, null);
-    AsyncFetcher.ResponseParser<List<PlaylistGroup>> responseParser = reader -> {
-      List<PlaylistGroup> result = new ArrayList<>();
-      new SampleListLoader().readPlaylistGroups(new JsonReader(reader), result);
-      if (result.size() < 1) {
-        throw new IOException("Unexpected response with empty playlist group");
-      }
-      return result;
-    };
-
-    new AsyncFetcher<List<PlaylistGroup>>().newCall(requestBuilder, responseParser, OkHttpClientFactory.create())
+    FetchUtil.fetch(url)
         .subscribeOn(Schedulers.io())
-        .observeOn(io.reactivex.rxjava3.android.schedulers.AndroidSchedulers.mainThread())
+        .observeOn(AndroidSchedulers.mainThread())
         .subscribe(
-            groups -> {
+            body -> {
+              List<PlaylistGroup> groups = new ArrayList<>();
+              new SampleListLoader().readPlaylistGroups(new JsonReader(new StringReader(body)), groups);
               String msg = "loaded " + groups.size() + " sample-groups from " + url;
               Log.i(TAG, msg);
               Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show();
@@ -232,7 +224,7 @@ public class SampleChooserActivity extends AppCompatActivity
             },
             error -> {
               String msg = "loaded asset media.exolist.json, failed to load " + url;
-              Log.e(TAG, msg, error);
+              Log.i(TAG, msg, error);
               Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show();
               loadSample();
             });
