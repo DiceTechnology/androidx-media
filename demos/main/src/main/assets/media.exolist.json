@@ -221,6 +221,13 @@
     "name": "Dice Test",
     "samples": [
       {
+        "name": "webvtt 3.0, sandbox",
+        "uri": "https://dummy.imggaming.com/video?id=85158&live=&dash=&realm=dce.sandbox&usr=&pwd=",
+        "subtitle_uri": "https://dve-subtitles.imggaming.com/85158/127290/vtt/subtitle-hu-HU-199613-1697467810981.vtt",
+        "subtitle_mime_type": "text/vtt",
+        "subtitle_language": "hu"
+      },
+      {
         "name": "WWE live hls clear, sandbox",
         "uri": "https://dummy.imggaming.com/video?id=111449&live=true&dash=&realm=dce.sandbox&usr=&pwd="
       },
