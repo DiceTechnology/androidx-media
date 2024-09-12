@@ -83,8 +83,33 @@ import java.util.List;
     Collections.sort(cuesWithUnsetLine, (c1, c2) -> Long.compare(c1.startTimeUs, c2.startTimeUs));
     for (int i = 0; i < cuesWithUnsetLine.size(); i++) {
       Cue cue = cuesWithUnsetLine.get(i).cue;
-      currentCues.add(cue.buildUpon().setLine((float) (-1 - i), Cue.LINE_TYPE_NUMBER).build());
+      /* [DORIS-2466] Insert cues with unset lines to the next available lines in the "currentCues"
+      starting from line number -2 to avoid cropped cues on the bottom. */
+      currentCues.add(
+          cue.buildUpon()
+              .setLine(getNextAvailableLine(currentCues), Cue.LINE_TYPE_NUMBER)
+              .build()
+      );
     }
     return currentCues;
+  }
+
+  private float getNextAvailableLine(List<Cue> currentCues) {
+    /* Starting from -2 to avoid cropped cues on the bottom. */
+    for (int i = -2; i >= -100; i--) {
+      if (isLineAvailable(currentCues, i)) {
+        return i;
+      }
+    }
+    return -2;
+  }
+
+  private boolean isLineAvailable(List<Cue> currentCues, float line) {
+    for (Cue currentCue : currentCues) {
+      if (currentCue.lineType == Cue.LINE_TYPE_NUMBER && currentCue.line == line) {
+        return false;
+      }
+    }
+    return true;
   }
 }
