@@ -917,6 +917,20 @@
         "subtitle_language": "en"
       },
       {
+        "name": "WebVTT Auto Line",
+        "uri": "https://hsec92v41d.execute-api.eu-west-1.amazonaws.com/Prod/auto-live/big-buck-bunny/master.m3u8?debug&streamUptime=1400&streamEndAfter=1400",
+        "subtitle_uri": "https://sample-videos-zyrkp2nj.s3.eu-west-1.amazonaws.com/test-20240403/line-position.vtt",
+        "subtitle_mime_type": "text/vtt",
+        "subtitle_language": "en"
+      },
+      {
+        "name": "WebVTT Arabic",
+        "uri": "https://hsec92v41d.execute-api.eu-west-1.amazonaws.com/Prod/auto-live/big-buck-bunny/master.m3u8?debug&streamUptime=1400&streamEndAfter=1400",
+        "subtitle_uri": "https://dve-subtitles.imggaming.com/680850/927716/vtt/subtitle-ar-320516-1726134946702.vtt",
+        "subtitle_mime_type": "text/vtt",
+        "subtitle_language": "en"
+      },
+      {
         "name": "WebVTT Japanese features",
         "uri": "https://html5demos.com/assets/dizzy.mp4",
         "subtitle_uri": "https://storage.googleapis.com/exoplayer-test-media-1/webvtt/japanese.vtt",
