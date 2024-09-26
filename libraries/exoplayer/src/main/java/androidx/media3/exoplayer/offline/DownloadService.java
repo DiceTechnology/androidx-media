@@ -18,12 +18,14 @@ package androidx.media3.exoplayer.offline;
 import static androidx.media3.exoplayer.offline.Download.STOP_REASON_NONE;
 
 import android.annotation.SuppressLint;
+import android.app.ForegroundServiceStartNotAllowedException;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -148,6 +150,13 @@ public abstract class DownloadService extends Service {
    */
   public static final String ACTION_SET_REQUIREMENTS =
       "androidx.media3.exoplayer.downloadService.action.SET_REQUIREMENTS";
+
+  /**
+   * Sets the service to foreground and show the downloading notification,
+   *  if the service is not foreground but has downloading item.
+   */
+  public static final String ACTION_REFRESH_FOREGROUND =
+      "androidx.media3.exoplayer.downloadService.action.REFRESH_FOREGROUND";
 
   /** Key for the {@link DownloadRequest} in {@link #ACTION_ADD_DOWNLOAD} intents. */
   public static final String KEY_DOWNLOAD_REQUEST = "download_request";
@@ -416,6 +425,19 @@ public abstract class DownloadService extends Service {
   }
 
   /**
+   * Builds an {@link Intent} for refreshing the service foreground state.
+   *
+   * @param context A {@link Context}.
+   * @param clazz The concrete download service being targeted by the intent.
+   * @return The created intent.
+   */
+  public static Intent buildRefreshForegroundIntent(
+      Context context,
+      Class<? extends DownloadService> clazz) {
+    return getIntent(context, clazz, ACTION_REFRESH_FOREGROUND);
+  }
+
+  /**
    * Starts the service if not started already and adds a new download.
    *
    * @param context A {@link Context}.
@@ -541,6 +563,19 @@ public abstract class DownloadService extends Service {
       boolean foreground) {
     Intent intent = buildSetRequirementsIntent(context, clazz, requirements, foreground);
     startService(context, intent, foreground);
+  }
+
+  /**
+   * Starts the service if not started already and refresh the foreground state.
+   *
+   * @param context A {@link Context}.
+   * @param clazz The concrete download service to be started.
+   */
+  public static void sendRefreshForeground(
+      Context context,
+      Class<? extends DownloadService> clazz) {
+    Intent intent = buildRefreshForegroundIntent(context, clazz);
+    startService(context, intent, false);
   }
 
   /**
@@ -676,6 +711,9 @@ public abstract class DownloadService extends Service {
         } else {
           downloadManager.setRequirements(requirements);
         }
+        break;
+      case ACTION_REFRESH_FOREGROUND:
+        refreshForegroundNotification(downloadManager.getCurrentDownloads());
         break;
       default:
         Log.e(TAG, "Ignored unrecognized action: " + intentAction);
@@ -823,6 +861,19 @@ public abstract class DownloadService extends Service {
     }
   }
 
+  private void refreshForegroundNotification(List<Download> downloads) {
+    if (foregroundNotificationUpdater != null
+        && !foregroundNotificationUpdater.periodicUpdatesStarted
+        && !isDestroyed) {
+      for (int i = 0; i < downloads.size(); i++) {
+        if (needsStartedService(downloads.get(i).state)) {
+          foregroundNotificationUpdater.startPeriodicUpdates();
+          break;
+        }
+      }
+    }
+  }
+
   /** Returns whether the service is stopped. */
   private boolean isStopped() {
     return isStopped;
@@ -912,7 +963,6 @@ public abstract class DownloadService extends Service {
       }
     }
 
-    @SuppressLint("InlinedApi") // Using compile time constant FOREGROUND_SERVICE_TYPE_DATA_SYNC
     private void update() {
       DownloadManager downloadManager =
           Assertions.checkNotNull(downloadManagerHelper).downloadManager;
@@ -920,13 +970,22 @@ public abstract class DownloadService extends Service {
       @RequirementFlags int notMetRequirements = downloadManager.getNotMetRequirements();
       Notification notification = getForegroundNotification(downloads, notMetRequirements);
       if (!notificationDisplayed) {
-        Util.setForegroundServiceNotification(
-            /* service= */ DownloadService.this,
-            notificationId,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
-            "dataSync");
-        notificationDisplayed = true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+          try {
+            setForegroundServiceNotification(notification);
+          } catch (IllegalStateException e) {
+            if (!(e instanceof ForegroundServiceStartNotAllowedException)) {
+              throw e;
+            } else {
+              // Ignore app not in a valid state to start foreground service
+              // (e.g. started from bg)
+              Log.e(TAG, "app not in a valid state to start foreground service");
+              stopPeriodicUpdates();
+            }
+          }
+        } else {
+          setForegroundServiceNotification(notification);
+        }
       } else {
         // Update the notification via NotificationManager rather than by repeatedly calling
         // startForeground, since the latter can cause ActivityManager log spam.
@@ -937,6 +996,17 @@ public abstract class DownloadService extends Service {
         handler.removeCallbacksAndMessages(null);
         handler.postDelayed(this::update, updateInterval);
       }
+    }
+
+    @SuppressLint("InlinedApi") // Using compile time constant FOREGROUND_SERVICE_TYPE_DATA_SYNC
+    private void setForegroundServiceNotification(Notification notification) {
+      Util.setForegroundServiceNotification(
+          /* service= */ DownloadService.this,
+          notificationId,
+          notification,
+          ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+          "dataSync");
+      notificationDisplayed = true;
     }
   }
 
