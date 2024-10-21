@@ -237,6 +237,7 @@ public class DefaultTimeBar extends View implements TimeBar {
   private int adGroupCount;
   @Nullable private long[] adGroupTimesMs;
   @Nullable private boolean[] playedAdGroups;
+  private boolean keepPlayHeadAtEnd = false;
 
   public DefaultTimeBar(Context context) {
     this(context, null);
@@ -586,6 +587,10 @@ public class DefaultTimeBar extends View implements TimeBar {
     }
   }
 
+  public void setKeepPlayHeadAtEnd(boolean playHeadAtEnd) {
+    this.keepPlayHeadAtEnd = playHeadAtEnd;
+  }
+
   @Override
   public void onDraw(Canvas canvas) {
     canvas.save();
@@ -933,7 +938,8 @@ public class DefaultTimeBar extends View implements TimeBar {
     if (duration <= 0) {
       return;
     }
-    int playheadX = Util.constrainValue(scrubberBar.right, scrubberBar.left, progressBar.right);
+    int playheadValue = keepPlayHeadAtEnd ? progressBar.right : scrubberBar.right;
+    int playheadX = Util.constrainValue(playheadValue, scrubberBar.left, progressBar.right);
     int playheadY = scrubberBar.centerY();
     if (scrubberDrawable == null) {
       int scrubberSize =
