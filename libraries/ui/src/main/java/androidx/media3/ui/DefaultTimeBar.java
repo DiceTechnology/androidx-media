@@ -587,7 +587,7 @@ public class DefaultTimeBar extends View implements TimeBar {
     }
   }
 
-  public void setPlayHeadAtEnd(boolean playHeadAtEnd) {
+  public void setKeepPlayHeadAtEnd(boolean playHeadAtEnd) {
     this.keepPlayHeadAtEnd = playHeadAtEnd;
   }
 
