@@ -938,7 +938,7 @@ public class DefaultTimeBar extends View implements TimeBar {
     if (duration <= 0) {
       return;
     }
-    int playheadValue= keepPlayHeadAtEnd ? progressBar.right : scrubberBar.right;
+    int playheadValue = keepPlayHeadAtEnd ? progressBar.right : scrubberBar.right;
     int playheadX = Util.constrainValue(playheadValue, scrubberBar.left, progressBar.right);
     int playheadY = scrubberBar.centerY();
     if (scrubberDrawable == null) {
