@@ -89,10 +89,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private int parentBottom;
 
   // Derived drawing variables.
-  private @MonotonicNonNull StaticLayout textLayout;
+  /* private */ public @MonotonicNonNull StaticLayout textLayout;
   private @MonotonicNonNull StaticLayout edgeLayout;
-  private int textLeft;
-  private int textTop;
+  /* private */ public int textLeft;
+  /* private */ public int textTop;
   private int textPaddingX;
   private @MonotonicNonNull Rect bitmapRect;
 
@@ -189,7 +189,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         && this.parentRight == cueBoxRight
         && this.parentBottom == cueBoxBottom) {
       // We can use the cached layout.
-      drawLayout(canvas, isTextCue);
+      // [SUPPORT-13547] Called from CanvasSubtitleOutput.dispatchDraw(Canvas canvas).
+      // drawLayout(canvas, isTextCue);
       return;
     }
 
@@ -225,7 +226,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       Assertions.checkNotNull(cueBitmap);
       setupBitmapLayout();
     }
-    drawLayout(canvas, isTextCue);
+    // [SUPPORT-13547] Called from CanvasSubtitleOutput.dispatchDraw(Canvas canvas).
+    // drawLayout(canvas, isTextCue);
   }
 
   @RequiresNonNull("cueText")
@@ -397,7 +399,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     bitmapRect = new Rect(x, y, x + width, y + height);
   }
 
-  private void drawLayout(Canvas canvas, boolean isTextCue) {
+  /**
+   * Exposing to {@link CanvasSubtitleOutput}, needed for [SUPPORT-13547].
+   */
+  /* private */ public void drawLayout(Canvas canvas, boolean isTextCue) {
     if (isTextCue) {
       drawTextLayout(canvas);
     } else {

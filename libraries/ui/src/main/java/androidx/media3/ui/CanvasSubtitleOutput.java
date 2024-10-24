@@ -34,6 +34,7 @@ import java.util.List;
  */
 /* package */ final class CanvasSubtitleOutput extends View implements SubtitleView.Output {
 
+  private final boolean applyOverlappingCueHandling = true;
   private final List<SubtitlePainter> painters;
 
   private List<Cue> cues;
@@ -104,6 +105,11 @@ import java.util.List;
       return;
     }
 
+    // [SUPPORT-13547] Variables introduced to handle overlapping cues.
+    int previousCueBottom = Integer.MIN_VALUE;
+    int previousCueLeft = Integer.MIN_VALUE;
+    int previousCueRight = Integer.MIN_VALUE;
+
     int cueCount = cues.size();
     for (int i = 0; i < cueCount; i++) {
       Cue cue = cues.get(i);
@@ -125,6 +131,38 @@ import java.util.List;
           top,
           right,
           bottom);
+
+      /* [SUPPORT-13547] Handling overlapping subs, e.g. when there are two cues with the same
+      timestamp, their position is defined with line fraction, but the first cue is too long
+      and wrapped in two lines resulting in an overlap with the second cue. In this scenario,
+      shift the next cue's top position to avoid the overlap. */
+      if (applyOverlappingCueHandling && cue.lineType == Cue.LINE_TYPE_FRACTION) {
+        int cueHeight = painter.textLayout.getHeight();
+        int cueTop = painter.textTop;
+        int cueLeft = painter.textLeft;
+        int cueWidth = painter.textLayout.getWidth();
+        int cueRight = cueLeft + cueWidth;
+
+        // Check for both vertical and horizontal overlap with the previous cue.
+        boolean isVerticallyOverlapping = cueTop < previousCueBottom;
+        boolean isHorizontallyOverlapping =
+            cueLeft < previousCueRight && cueRight > previousCueLeft;
+
+        if (isVerticallyOverlapping && isHorizontallyOverlapping) {
+          // Adjust current cue's top position to avoid overlap.
+          int shiftAmount = previousCueBottom - cueTop;
+          painter.textTop = cueTop + shiftAmount + 10; // Add 10px as padding between cues.
+        }
+
+        // Update the previous cue's bottom and horizontal bounds for the next cue.
+        previousCueBottom = painter.textTop + cueHeight;
+        previousCueLeft = cueLeft;
+        previousCueRight = cueRight;
+      }
+
+      // Manually call painter.drawLayout(..)
+      boolean isTextCue = cue.bitmap == null;
+      painter.drawLayout(canvas, isTextCue);
     }
   }
 
