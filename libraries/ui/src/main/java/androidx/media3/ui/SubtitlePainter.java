@@ -25,7 +25,9 @@ import android.graphics.Paint;
 import android.graphics.Paint.Join;
 import android.graphics.Paint.Style;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.text.Layout.Alignment;
+import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.StaticLayout;
@@ -34,6 +36,7 @@ import android.text.TextUtils;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.LeadingMarginSpan;
 import android.util.DisplayMetrics;
 import androidx.annotation.Nullable;
 import androidx.media3.common.text.Cue;
@@ -95,6 +98,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private int textTop;
   private int textPaddingX;
   private @MonotonicNonNull Rect bitmapRect;
+  private final RectF backgroundPaddingRect = new RectF();
+  private int horizontalPadding = 20; //TODO: test code, set default padding 0.
 
   @SuppressWarnings("ResourceType")
   public SubtitlePainter(Context context) {
@@ -122,6 +127,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     bitmapPaint = new Paint();
     bitmapPaint.setAntiAlias(true);
     bitmapPaint.setFilterBitmap(true);
+  }
+
+  public void setHorizontalPadding(int padding) {
+    horizontalPadding = padding;
   }
 
   /**
@@ -433,6 +442,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       textPaint.setStrokeWidth(outlineWidth);
       textPaint.setColor(edgeColor);
       textPaint.setStyle(Style.FILL_AND_STROKE);
+//      drawLayoutPadding(canvas, textPaint, edgeColor);
       edgeLayout.draw(canvas);
     } else if (edgeType == CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW) {
       textPaint.setShadowLayer(shadowRadius, shadowOffset, shadowOffset, edgeColor);
@@ -444,6 +454,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       float offset = shadowRadius / 2f;
       textPaint.setColor(foregroundColor);
       textPaint.setStyle(Style.FILL);
+//      drawLayoutPadding(canvas, textPaint, foregroundColor);
       textPaint.setShadowLayer(shadowRadius, -offset, -offset, colorUp);
       edgeLayout.draw(canvas);
       textPaint.setShadowLayer(shadowRadius, offset, offset, colorDown);
@@ -464,10 +475,51 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
     textPaint.setColor(foregroundColor);
     textPaint.setStyle(Style.FILL);
+    if (edgeType == CaptionStyleCompat.EDGE_TYPE_NONE) { //TODO draw padding
+      drawLayoutPadding(canvas, textPaint, backgroundColor);
+    }
     textLayout.draw(canvas);
     textPaint.setShadowLayer(0, 0, 0, 0);
 
     canvas.restoreToCount(saveCount);
+  }
+
+  private void drawLayoutPadding(Canvas canvas, Paint paint, int color) {
+    if (horizontalPadding > 0) {
+      // save original color
+      int paintColor = paint.getColor();
+      // set default background color
+      paint.setColor(color);
+      if (textLayout.getText() instanceof Spannable) { // Spannable text can set background.
+        BackgroundColorSpan[] colorSpans = ((Spannable) textLayout.getText())
+            .getSpans(0, textLayout.getText().length(), BackgroundColorSpan.class);
+        if (colorSpans != null && colorSpans.length > 0) {
+          paint.setColor(colorSpans[colorSpans.length - 1].getBackgroundColor());
+        }
+        LeadingMarginSpan[] marginSpans = ((Spannable) textLayout.getText())
+            .getSpans(0, textLayout.getText().length(), LeadingMarginSpan.class);
+        if (marginSpans != null && marginSpans.length > 0) {
+          // cal offset
+        }
+      }
+      for (int line = 0; line < textLayout.getLineCount(); line++) {
+        // draw left: content background color is alpha, can't set all content area.
+        backgroundPaddingRect.left = textLayout.getLineStart(line) - horizontalPadding;
+        backgroundPaddingRect.top = textLayout.getLineTop(line);
+        backgroundPaddingRect.right = textLayout.getLineStart(line);
+        backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
+        canvas.drawRect(backgroundPaddingRect, paint);
+
+        // draw right
+        backgroundPaddingRect.left = textLayout.getLineEnd(line);
+        backgroundPaddingRect.top = textLayout.getLineTop(line);
+        backgroundPaddingRect.right = textLayout.getLineEnd(line) + horizontalPadding;
+        backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
+        canvas.drawRect(backgroundPaddingRect, paint);
+      }
+      // restore color
+      paint.setColor(paintColor);
+    }
   }
 
   @RequiresNonNull({"cueBitmap", "bitmapRect"})
