@@ -47,12 +47,16 @@ import androidx.media3.common.util.Util;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-/** Paints subtitle {@link Cue}s. */
+/**
+ * Paints subtitle {@link Cue}s.
+ */
 /* package */ final class SubtitlePainter {
 
   private static final String TAG = "SubtitlePainter";
 
-  /** Ratio of inner padding to font size. */
+  /**
+   * Ratio of inner padding to font size.
+   */
   private static final float INNER_PADDING_RATIO = 0.125f;
 
   // Styled dimensions.
@@ -67,9 +71,12 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private final Paint bitmapPaint;
 
   // Previous input variables.
-  @Nullable private CharSequence cueText;
-  @Nullable private Alignment cueTextAlignment;
-  @Nullable private Bitmap cueBitmap;
+  @Nullable
+  private CharSequence cueText;
+  @Nullable
+  private Alignment cueTextAlignment;
+  @Nullable
+  private Bitmap cueBitmap;
   private float cueLine;
   private @Cue.LineType int cueLineType;
   private @Cue.AnchorType int cueLineAnchor;
@@ -82,7 +89,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private int windowColor;
   private int edgeColor;
   private @CaptionStyleCompat.EdgeType int edgeType;
-  @Nullable private TextShadow cueTextShadow;
+  @Nullable
+  private TextShadow cueTextShadow;
   private float defaultTextSizePx;
   private float cueTextSizePx;
   private float bottomPaddingFraction;
@@ -140,18 +148,18 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
    * call, and so an instance of this class is able to optimize repeated calls to this method in
    * which the same parameters are passed.
    *
-   * @param cue The cue to draw. sizes embedded within the cue should be applied. Otherwise, it is
-   *     ignored.
-   * @param style The style to use when drawing the cue text.
-   * @param defaultTextSizePx The default text size to use when drawing the text, in pixels.
-   * @param cueTextSizePx The embedded text size of this cue, in pixels.
+   * @param cue                   The cue to draw. sizes embedded within the cue should be applied. Otherwise, it is
+   *                              ignored.
+   * @param style                 The style to use when drawing the cue text.
+   * @param defaultTextSizePx     The default text size to use when drawing the text, in pixels.
+   * @param cueTextSizePx         The embedded text size of this cue, in pixels.
    * @param bottomPaddingFraction The bottom padding fraction to apply when {@link Cue#line} is
-   *     {@link Cue#DIMEN_UNSET}, as a fraction of the viewport height
-   * @param canvas The canvas into which to draw.
-   * @param cueBoxLeft The left position of the enclosing cue box.
-   * @param cueBoxTop The top position of the enclosing cue box.
-   * @param cueBoxRight The right position of the enclosing cue box.
-   * @param cueBoxBottom The bottom position of the enclosing cue box.
+   *                              {@link Cue#DIMEN_UNSET}, as a fraction of the viewport height
+   * @param canvas                The canvas into which to draw.
+   * @param cueBoxLeft            The left position of the enclosing cue box.
+   * @param cueBoxTop             The top position of the enclosing cue box.
+   * @param cueBoxRight           The right position of the enclosing cue box.
+   * @param cueBoxBottom          The bottom position of the enclosing cue box.
    */
   public void draw(
       Cue cue,
@@ -475,11 +483,12 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
     textPaint.setColor(foregroundColor);
     textPaint.setStyle(Style.FILL);
+    textLayout.draw(canvas);
+    textPaint.setShadowLayer(0, 0, 0, 0);
+
     if (edgeType == CaptionStyleCompat.EDGE_TYPE_NONE) { //TODO draw padding
       drawLayoutPadding(canvas, textPaint, backgroundColor);
     }
-    textLayout.draw(canvas);
-    textPaint.setShadowLayer(0, 0, 0, 0);
 
     canvas.restoreToCount(saveCount);
   }
@@ -502,18 +511,21 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
           // cal offset
         }
       }
+      android.util.Log.i("testSubTitle", "getLineCount=" + textLayout.getLineCount());
       for (int line = 0; line < textLayout.getLineCount(); line++) {
+        android.util.Log.i("testSubTitle", "getLineStart=" + textLayout.getLineStart(line));
+        android.util.Log.i("testSubTitle", "getLineEnd=" + textLayout.getLineEnd(line));
         // draw left: content background color is alpha, can't set all content area.
-        backgroundPaddingRect.left = textLayout.getLineStart(line) - horizontalPadding;
+        backgroundPaddingRect.left = textLayout.getLineLeft(line) - horizontalPadding;
         backgroundPaddingRect.top = textLayout.getLineTop(line);
-        backgroundPaddingRect.right = textLayout.getLineStart(line);
+        backgroundPaddingRect.right = textLayout.getLineLeft(line);
         backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
         canvas.drawRect(backgroundPaddingRect, paint);
 
         // draw right
-        backgroundPaddingRect.left = textLayout.getLineEnd(line);
+        backgroundPaddingRect.left = textLayout.getLineRight(line);
         backgroundPaddingRect.top = textLayout.getLineTop(line);
-        backgroundPaddingRect.right = textLayout.getLineEnd(line) + horizontalPadding;
+        backgroundPaddingRect.right = textLayout.getLineRight(line) + horizontalPadding;
         backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
         canvas.drawRect(backgroundPaddingRect, paint);
       }
