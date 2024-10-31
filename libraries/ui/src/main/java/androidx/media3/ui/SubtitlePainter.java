@@ -480,12 +480,13 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       }
     }
 
+    // draw background padding
+    drawLayoutPadding(canvas, textPaint, backgroundColor);
+
     textPaint.setColor(foregroundColor);
     textPaint.setStyle(Style.FILL);
     textLayout.draw(canvas);
     textPaint.setShadowLayer(0, 0, 0, 0);
-
-    drawLayoutPadding(canvas, textPaint, backgroundColor);
 
     canvas.restoreToCount(saveCount);
   }
@@ -494,48 +495,59 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     if (horizontalPadding > 0) {
       // save original color
       int paintColor = paint.getColor();
-      // set default background color
-      paint.setColor(color);
+      int bgColor = color;
       if (textLayout.getText() instanceof Spannable) { // Spannable text can set background.
         BackgroundColorSpan[] colorSpans = ((Spannable) textLayout.getText())
             .getSpans(0, textLayout.getText().length(), BackgroundColorSpan.class);
         if (colorSpans != null && colorSpans.length > 0) {
-          paint.setColor(colorSpans[colorSpans.length - 1].getBackgroundColor());
+          bgColor = colorSpans[colorSpans.length - 1].getBackgroundColor();
         }
       }
+      // set background color
+      paint.setColor(bgColor);
 
-      Log.i("testSubTitle", "    ");
-      Log.i("testSubTitle", textLayout.getText().toString());
       for (int line = 0; line < textLayout.getLineCount(); line++) {
-        int leftOffsetX = 0;
-        if (textLayout.getAlignment() == Alignment.ALIGN_CENTER) {
-          // when alignment is 'Alignment.ALIGN_CENTER', TextLine calculate x is little diff with TextLayout.
-          // add 1pix to x position. but it's not very accurate.
-          leftOffsetX = (int) textLayout.getLineMax(line) % 2;
+        if (Color.alpha(bgColor) == 0xFF) { // draw all the regions
+          backgroundPaddingRect.left =
+              textLayout.getLineLeft(line) - horizontalPadding;
+          backgroundPaddingRect.top = textLayout.getLineTop(line);
+          backgroundPaddingRect.right = textLayout.getLineRight(line) + horizontalPadding;
+          backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
+          canvas.drawRect(backgroundPaddingRect, paint);
+        } else {
+          Log.i("testSubTitle", "    ");
+          Log.i("testSubTitle", textLayout.getText().toString());
+          int leftOffsetX = 0;
+          if (textLayout.getAlignment() == Alignment.ALIGN_CENTER) {
+            // when alignment is 'Alignment.ALIGN_CENTER', TextLine calculate x is little diff with TextLayout.
+            // add 1pix to x position. but it's not very accurate.
+            leftOffsetX = (int) textLayout.getLineMax(line) % 2;
+          }
+          Log.i("testSubTitle",
+              String.format(Locale.US,
+                  "line[%d]: max = %d, [%d,%d], offset = %d",
+                  line,
+                  (int) textLayout.getLineMax(line),
+                  (int) textLayout.getLineLeft(line),
+                  (int) textLayout.getLineRight(line),
+                  leftOffsetX));
+
+          // draw left: content background color is alpha, can't set all content area.
+          backgroundPaddingRect.left =
+              textLayout.getLineLeft(line) + leftOffsetX - horizontalPadding;
+          backgroundPaddingRect.top = textLayout.getLineTop(line);
+          backgroundPaddingRect.right = textLayout.getLineLeft(line) + leftOffsetX;
+          backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
+          canvas.drawRect(backgroundPaddingRect, paint);
+
+          // draw right
+          backgroundPaddingRect.left = textLayout.getLineRight(line) + leftOffsetX;
+          backgroundPaddingRect.top = textLayout.getLineTop(line);
+          backgroundPaddingRect.right =
+              textLayout.getLineRight(line) + leftOffsetX + horizontalPadding;
+          backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
+          canvas.drawRect(backgroundPaddingRect, paint);
         }
-        Log.i("testSubTitle",
-            String.format(Locale.US,
-                "line[%d]: max = %d, [%d,%d], offset = %d",
-                line,
-                (int) textLayout.getLineMax(line),
-                (int) textLayout.getLineLeft(line),
-                (int) textLayout.getLineRight(line),
-                leftOffsetX));
-
-        // draw left: content background color is alpha, can't set all content area.
-        backgroundPaddingRect.left = textLayout.getLineLeft(line) + leftOffsetX - horizontalPadding;
-        backgroundPaddingRect.top = textLayout.getLineTop(line);
-        backgroundPaddingRect.right = textLayout.getLineLeft(line) + leftOffsetX;
-        backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
-        canvas.drawRect(backgroundPaddingRect, paint);
-
-        // draw right
-        backgroundPaddingRect.left = textLayout.getLineRight(line) + leftOffsetX;
-        backgroundPaddingRect.top = textLayout.getLineTop(line);
-        backgroundPaddingRect.right =
-            textLayout.getLineRight(line) + leftOffsetX + horizontalPadding;
-        backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
-        canvas.drawRect(backgroundPaddingRect, paint);
       }
       // restore color
       paint.setColor(paintColor);
