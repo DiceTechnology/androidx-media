@@ -14,8 +14,6 @@
 apply from: "$gradle.ext.androidxMediaSettingsDir/constants.gradle"
 apply plugin: 'com.android.library'
 
-group='com.github.DiceTechnology'
-
 android {
     compileSdkVersion project.ext.compileSdkVersion
 
