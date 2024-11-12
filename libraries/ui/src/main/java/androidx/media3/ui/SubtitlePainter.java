@@ -26,6 +26,7 @@ import android.graphics.Paint.Join;
 import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.os.Build;
 import android.text.Layout.Alignment;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
@@ -36,7 +37,6 @@ import android.text.TextUtils;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.ForegroundColorSpan;
-
 import android.util.DisplayMetrics;
 import androidx.annotation.Nullable;
 import androidx.media3.common.text.Cue;
@@ -44,7 +44,6 @@ import androidx.media3.common.text.TextShadow;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.Util;
-import java.util.Locale;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
@@ -108,10 +107,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private int textPaddingX;
   private @MonotonicNonNull Rect bitmapRect;
   private final RectF backgroundPaddingRect = new RectF();
-  private int horizontalPadding = 20; //TODO: test code, set default padding 0.
+  private int horizontalPadding = 0;
 
   @SuppressWarnings("ResourceType")
-  public SubtitlePainter(Context context) {
+  public SubtitlePainter(Context context, int horizontalPadding) {
     int[] viewAttr = {android.R.attr.lineSpacingExtra, android.R.attr.lineSpacingMultiplier};
     TypedArray styledAttributes = context.obtainStyledAttributes(null, viewAttr, 0, 0);
     spacingAdd = styledAttributes.getDimensionPixelSize(0, 0);
@@ -136,10 +135,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     bitmapPaint = new Paint();
     bitmapPaint.setAntiAlias(true);
     bitmapPaint.setFilterBitmap(true);
-  }
 
-  public void setHorizontalPadding(int padding) {
-    horizontalPadding = padding;
+    this.horizontalPadding = horizontalPadding;
   }
 
   /**
@@ -492,66 +489,62 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   }
 
   private void drawLayoutPadding(Canvas canvas, Paint paint, int color) {
-    if (horizontalPadding > 0) {
-      // save original color
-      int paintColor = paint.getColor();
-      int bgColor = color;
-      if (textLayout.getText() instanceof Spannable) { // Spannable text can set background.
-        BackgroundColorSpan[] colorSpans = ((Spannable) textLayout.getText())
-            .getSpans(0, textLayout.getText().length(), BackgroundColorSpan.class);
-        if (colorSpans != null && colorSpans.length > 0) {
-          bgColor = colorSpans[colorSpans.length - 1].getBackgroundColor();
-        }
-      }
-      // set background color
-      paint.setColor(bgColor);
-
-      for (int line = 0; line < textLayout.getLineCount(); line++) {
-        if (Color.alpha(bgColor) == 0xFF) { // draw all the regions
-          backgroundPaddingRect.left =
-              textLayout.getLineLeft(line) - horizontalPadding;
-          backgroundPaddingRect.top = textLayout.getLineTop(line);
-          backgroundPaddingRect.right = textLayout.getLineRight(line) + horizontalPadding;
-          backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
-          canvas.drawRect(backgroundPaddingRect, paint);
-        } else {
-          Log.i("testSubTitle", "    ");
-          Log.i("testSubTitle", textLayout.getText().toString());
-          int leftOffsetX = 0;
-          if (textLayout.getAlignment() == Alignment.ALIGN_CENTER) {
-            // when alignment is 'Alignment.ALIGN_CENTER', TextLine calculate x is little diff with TextLayout.
-            // add 1pix to x position. but it's not very accurate.
-            leftOffsetX = (int) textLayout.getLineMax(line) % 2;
-          }
-          Log.i("testSubTitle",
-              String.format(Locale.US,
-                  "line[%d]: max = %d, [%d,%d], offset = %d",
-                  line,
-                  (int) textLayout.getLineMax(line),
-                  (int) textLayout.getLineLeft(line),
-                  (int) textLayout.getLineRight(line),
-                  leftOffsetX));
-
-          // draw left: content background color is alpha, can't set all content area.
-          backgroundPaddingRect.left =
-              textLayout.getLineLeft(line) + leftOffsetX - horizontalPadding;
-          backgroundPaddingRect.top = textLayout.getLineTop(line);
-          backgroundPaddingRect.right = textLayout.getLineLeft(line) + leftOffsetX;
-          backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
-          canvas.drawRect(backgroundPaddingRect, paint);
-
-          // draw right
-          backgroundPaddingRect.left = textLayout.getLineRight(line) + leftOffsetX;
-          backgroundPaddingRect.top = textLayout.getLineTop(line);
-          backgroundPaddingRect.right =
-              textLayout.getLineRight(line) + leftOffsetX + horizontalPadding;
-          backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
-          canvas.drawRect(backgroundPaddingRect, paint);
-        }
-      }
-      // restore color
-      paint.setColor(paintColor);
+    if (horizontalPadding == 0) {
+      return;
     }
+    // save original color
+    int paintColor = paint.getColor();
+    int bgColor = color;
+    if (textLayout.getText() instanceof Spannable) { // Spannable text can set background.
+      BackgroundColorSpan[] colorSpans = ((Spannable) textLayout.getText())
+          .getSpans(0, textLayout.getText().length(), BackgroundColorSpan.class);
+      if (colorSpans != null && colorSpans.length > 0) {
+        bgColor = colorSpans[colorSpans.length - 1].getBackgroundColor();
+      }
+    }
+    // set background color
+    paint.setColor(bgColor);
+
+    for (int line = 0; line < textLayout.getLineCount(); line++) {
+      backgroundPaddingRect.top = textLayout.getLineTop(line);
+      backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
+
+      if (Color.alpha(bgColor) == 0xFF) { // draw all the regions
+        backgroundPaddingRect.left = textLayout.getLineLeft(line) - horizontalPadding;
+        backgroundPaddingRect.right = textLayout.getLineRight(line) + horizontalPadding;
+        canvas.drawRect(backgroundPaddingRect, paint);
+      } else {
+        Log.i("testSubTitle", "");
+        Log.i("testSubTitle", textLayout.getText().toString());
+        float left = textLayout.getLineLeft(line);
+        float right = textLayout.getLineRight(line);
+        if (textLayout.getAlignment() == Alignment.ALIGN_CENTER) {
+          // TextLayout cal x position logic
+          int marginLeft = 0;
+          int lineMax = (int) textLayout.getLineMax(line);
+          lineMax = lineMax & ~1;
+          left = (textLayout.getWidth() + marginLeft - lineMax) >> 1;
+          CharSequence charSequence = textLayout.getText();
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            right = left + paint.getRunAdvance(charSequence, 0, charSequence.length(), 0,
+                charSequence.length(), false, charSequence.length());
+          } else {
+            right = left + paint.measureText(textLayout.getText().toString());
+          }
+        }
+        Log.i("testSubTitle", "left: " + left + ", right: " + right);
+        // draw left padding
+        backgroundPaddingRect.left = left - horizontalPadding;
+        backgroundPaddingRect.right = left;
+        canvas.drawRect(backgroundPaddingRect, paint);
+        // draw right padding
+        backgroundPaddingRect.left = right;
+        backgroundPaddingRect.right = right + horizontalPadding;
+        canvas.drawRect(backgroundPaddingRect, paint);
+      }
+    }
+    // restore color
+    paint.setColor(paintColor);
   }
 
   @RequiresNonNull({"cueBitmap", "bitmapRect"})
