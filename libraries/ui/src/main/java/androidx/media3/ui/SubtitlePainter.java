@@ -107,7 +107,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private int textPaddingX;
   private @MonotonicNonNull Rect bitmapRect;
   private final RectF backgroundPaddingRect = new RectF();
-  private int horizontalPadding = 0;
+  private final int horizontalPadding;
 
   @SuppressWarnings("ResourceType")
   public SubtitlePainter(Context context, int horizontalPadding) {
@@ -514,8 +514,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         backgroundPaddingRect.right = textLayout.getLineRight(line) + horizontalPadding;
         canvas.drawRect(backgroundPaddingRect, paint);
       } else {
-        Log.i("testSubTitle", "");
-        Log.i("testSubTitle", textLayout.getText().toString());
         float left = textLayout.getLineLeft(line);
         float right = textLayout.getLineRight(line);
         if (textLayout.getAlignment() == Alignment.ALIGN_CENTER) {
@@ -532,7 +530,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
             right = left + paint.measureText(textLayout.getText().toString());
           }
         }
-        Log.i("testSubTitle", "left: " + left + ", right: " + right);
         // draw left padding
         backgroundPaddingRect.left = left - horizontalPadding;
         backgroundPaddingRect.right = left;
