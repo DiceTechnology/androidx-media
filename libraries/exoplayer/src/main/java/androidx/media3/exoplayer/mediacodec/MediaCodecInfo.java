@@ -43,6 +43,7 @@ import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
+import androidx.media3.common.ColorInfo;
 import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.Assertions;
@@ -429,7 +430,10 @@ public final class MediaCodecInfo {
           && (oldFormat.width != newFormat.width || oldFormat.height != newFormat.height)) {
         discardReasons |= DISCARD_REASON_VIDEO_RESOLUTION_CHANGED;
       }
-      if (!Util.areEqual(oldFormat.colorInfo, newFormat.colorInfo)) {
+      if ((!ColorInfo.isEquivalentToAssumedSdrDefault(oldFormat.colorInfo)
+              || !ColorInfo.isEquivalentToAssumedSdrDefault(newFormat.colorInfo))
+          && !Util.areEqual(oldFormat.colorInfo, newFormat.colorInfo)) {
+        // Don't perform detailed checks if both ColorInfos fall within the default SDR assumption.
         discardReasons |= DISCARD_REASON_VIDEO_COLOR_INFO_CHANGED;
       }
       if (needsAdaptationReconfigureWorkaround(name)
