@@ -41,6 +41,7 @@ import java.util.List;
   private float textSize;
   private CaptionStyleCompat style;
   private float bottomPaddingFraction;
+  private int horizontalPadding = 0;
 
   public CanvasSubtitleOutput(Context context) {
     this(context, /* attrs= */ null);
@@ -54,6 +55,10 @@ import java.util.List;
     textSize = DEFAULT_TEXT_SIZE_FRACTION;
     style = CaptionStyleCompat.DEFAULT;
     bottomPaddingFraction = DEFAULT_BOTTOM_PADDING_FRACTION;
+  }
+
+  public void setHorizontalPadding(int horizontalPadding) {
+    this.horizontalPadding = horizontalPadding;
   }
 
   @Override
@@ -70,7 +75,7 @@ import java.util.List;
     this.bottomPaddingFraction = bottomPaddingFraction;
     // Ensure we have sufficient painters.
     while (painters.size() < cues.size()) {
-      painters.add(new SubtitlePainter(getContext()));
+      painters.add(new SubtitlePainter(getContext(), horizontalPadding));
     }
     // Invalidate to trigger drawing.
     invalidate();
