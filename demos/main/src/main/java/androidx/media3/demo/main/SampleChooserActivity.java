@@ -209,7 +209,7 @@ public class SampleChooserActivity extends AppCompatActivity
   }
 
   private void loadOfficeSample() {
-    String url = "http://172.16.0.108:8899/exoplayer/media.exolist.json";
+    String url = "http://172.16.0.108:8899/exoplayer/media.exolist.fake.json";
     FetchUtil.fetch(url)
         .subscribeOn(Schedulers.io())
         .observeOn(AndroidSchedulers.mainThread())

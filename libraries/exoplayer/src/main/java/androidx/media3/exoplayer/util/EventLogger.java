@@ -351,7 +351,10 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onAudioInputFormatChanged(
       EventTime eventTime, Format format, @Nullable DecoderReuseEvaluation decoderReuseEvaluation) {
-    Log.i(WebUtil.DEBUG, "onAudioInputFormatChanged " + (format == null ? "-" : format.label + ", " + TrackCollector.getFormatGroupId(format)));
+    Log.i(WebUtil.DEBUG, "onAudioInputFormatChanged ["
+        + getTimeString(eventTime.realtimeMs - startTimeMs)
+        + (format == null ? "" : ", " + format)
+        + "]");
     logd(eventTime, "audioInputFormat", Format.toLogString(format));
   }
 
@@ -442,7 +445,10 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onVideoInputFormatChanged(
       EventTime eventTime, Format format, @Nullable DecoderReuseEvaluation decoderReuseEvaluation) {
-    Log.i(WebUtil.DEBUG, "onVideoInputFormatChanged " + (format == null ? "-" : format.bitrate + ", " + TrackCollector.getAudioGroupId(format)));
+    Log.i(WebUtil.DEBUG, "onVideoInputFormatChanged ["
+        + getTimeString(eventTime.realtimeMs - startTimeMs)
+        + (format == null ? "" : ", " + format)
+        + "]");
     logd(eventTime, "videoInputFormat", Format.toLogString(format));
   }
 
@@ -507,10 +513,10 @@ public class EventLogger implements AnalyticsListener {
   public void onLoadCompleted(
       EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData) {
 
-    String loadUri = (loadEventInfo != null && loadEventInfo.uri != null ? loadEventInfo.uri.toString() : null);
-    if (loadUri != null) {
-      Log.i(WebUtil.DEBUG, String.format("loadCompleted [%.3f, %.3f kb, %.3f s], play %.3f s, buff %.3f s\n%s",
-          System.currentTimeMillis() / 1000f,
+    if (loadEventInfo != null && loadEventInfo.uri != null) {
+      String loadUri = loadEventInfo.uri.toString();
+      Log.i(WebUtil.DEBUG, String.format("loadCompleted [%s, %.3f kb, %.3f s], play %.3f s, buff %.3f s\n%s",
+          getTimeString(eventTime.realtimeMs - startTimeMs),
           loadEventInfo.bytesLoaded / 1000f,
           loadEventInfo.loadDurationMs / 1000f,
           eventTime.currentPlaybackPositionMs / 1000f,
