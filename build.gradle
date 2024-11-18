@@ -13,6 +13,7 @@
 // limitations under the License.
 buildscript {
     repositories {
+        mavenLocal()
         google()
         mavenCentral()
     }
@@ -24,6 +25,7 @@ buildscript {
 }
 allprojects {
     repositories {
+        mavenLocal()
         google()
         mavenCentral()
         maven {
@@ -33,11 +35,12 @@ allprojects {
             }
         }
     }
+
     if (it.hasProperty('externalBuildDir')) {
         if (!new File(externalBuildDir).isAbsolute()) {
             externalBuildDir = new File(rootDir, externalBuildDir)
         }
         buildDir = "${externalBuildDir}/${project.name}"
     }
-    group = 'androidx.media3'
+    group = 'com.endeavorstreaming.androidx-media'
 }
