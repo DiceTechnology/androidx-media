@@ -684,7 +684,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
    */
   private int determineIdealSelectedIndex(long nowMs, long chunkDurationUs) {
     long effectiveBitrate = getAllocatedBandwidth(chunkDurationUs);
-    if (effectiveBitrate < 1) {
+    if (effectiveBitrate < 0) {
       return selectedIndex;
     }
     effectiveBitrateStr = String.format(", estBitrate %.2fM", effectiveBitrate / 1000000f);
