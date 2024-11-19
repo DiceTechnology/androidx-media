@@ -32,8 +32,6 @@ import androidx.media3.common.MediaItem.LiveConfiguration;
 import androidx.media3.common.MediaLibraryInfo;
 import androidx.media3.common.StreamKey;
 import androidx.media3.common.endeavor.DebugUtil;
-import androidx.media3.common.endeavor.WebUtil;
-import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
@@ -683,8 +681,8 @@ public final class HlsMediaSource extends BaseMediaSource
     liveConfiguration =
         new LiveConfiguration.Builder()
             .setTargetOffsetMs(Util.usToMs(targetLiveOffsetUs))
-            .setMinPlaybackSpeed(disableSpeedAdjustment ? 1f : WebUtil.LOW_LATENCY_MIN_PLAYBACK_SPEED)
-            .setMaxPlaybackSpeed(disableSpeedAdjustment ? 1f : WebUtil.LOW_LATENCY_MAX_PLAYBACK_SPEED)
+            .setMinPlaybackSpeed(disableSpeedAdjustment ? 1f : liveConfiguration.minPlaybackSpeed)
+            .setMaxPlaybackSpeed(disableSpeedAdjustment ? 1f : liveConfiguration.maxPlaybackSpeed)
             .build();
   }
 

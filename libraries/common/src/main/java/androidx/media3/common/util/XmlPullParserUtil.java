@@ -48,6 +48,11 @@ public final class XmlPullParserUtil {
     return xpp.getEventType() == XmlPullParser.END_TAG;
   }
 
+  public static boolean isEndTagIgnorePrefix(XmlPullParser xpp, String name)
+      throws XmlPullParserException {
+    return isEndTag(xpp) && stripPrefix(xpp.getName()).equals(name);
+  }
+
   /**
    * Returns whether the current event is a start tag with the specified name.
    *
