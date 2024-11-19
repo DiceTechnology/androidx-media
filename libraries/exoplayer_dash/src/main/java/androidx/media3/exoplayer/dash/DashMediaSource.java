@@ -1131,14 +1131,6 @@ public final class DashMediaSource extends BaseMediaSource {
     } else if (manifest.serviceDescription != null) {
       maxPlaybackSpeed = manifest.serviceDescription.maxPlaybackSpeed;
     }
-    if (manifestLiveOffsetMs != C.TIME_UNSET) {
-      if (minPlaybackSpeed == C.RATE_UNSET) {
-        minPlaybackSpeed = WebUtil.LOW_LATENCY_MIN_PLAYBACK_SPEED;
-      }
-      if (maxPlaybackSpeed == C.RATE_UNSET) {
-        maxPlaybackSpeed = WebUtil.LOW_LATENCY_MAX_PLAYBACK_SPEED;
-      }
-    }
     if (minPlaybackSpeed == C.RATE_UNSET
         && maxPlaybackSpeed == C.RATE_UNSET
         && (manifest.serviceDescription == null

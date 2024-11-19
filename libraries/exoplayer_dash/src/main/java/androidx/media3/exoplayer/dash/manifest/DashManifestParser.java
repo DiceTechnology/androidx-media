@@ -1206,7 +1206,7 @@ public class DashManifestParser extends DefaultHandler
     byte[] binary = null;
     do {
       xpp.next();
-      if (XmlPullParserUtil.isStartTag(xpp, "Signal")) {
+      if (XmlPullParserUtil.isStartTagIgnorePrefix(xpp, "Signal")) {
         binary = parseBinaryObject(xpp);
       } else {
         maybeSkipTag(xpp);
@@ -1220,13 +1220,13 @@ public class DashManifestParser extends DefaultHandler
     byte[] binary = null;
     do {
       xpp.next();
-      if (XmlPullParserUtil.isStartTag(xpp, "Binary")) {
+      if (XmlPullParserUtil.isStartTagIgnorePrefix(xpp, "Binary")) {
         String text = xpp.nextText();
         binary = Base64.decode(text, Base64.DEFAULT);
       } else {
         maybeSkipTag(xpp);
       }
-    } while (!XmlPullParserUtil.isEndTag(xpp, "Signal"));
+    } while (!XmlPullParserUtil.isEndTagIgnorePrefix(xpp, "Signal"));
     return binary;
   }
 
