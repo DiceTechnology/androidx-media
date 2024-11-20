@@ -519,8 +519,9 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         float right = textLayout.getLineRight(line);
         if (textLayout.getAlignment() == Alignment.ALIGN_CENTER) {
           final float lineWidth = textLayout.getLineMax(line);
-          final int lineWidthAdjust = (int) lineWidth & ~1; // this is TextLayout logic
-          left = (float) (textLayout.getWidth() - lineWidthAdjust) / 2; // this is TextLayout logic
+          // these is TextLayout code logic
+          final int lineWidthAdjust = (int) lineWidth & ~1;
+          left = (textLayout.getWidth() - lineWidthAdjust) >> 1; // left should be a int value!
           right = left + lineWidth;
         }
 
