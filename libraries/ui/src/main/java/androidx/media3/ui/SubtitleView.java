@@ -157,6 +157,12 @@ public final class SubtitleView extends FrameLayout {
     }
   }
 
+  public void setDrawPaddingFirst(boolean drawPaddingFirst) {
+    if (innerSubtitleView instanceof CanvasSubtitleOutput) {
+      ((CanvasSubtitleOutput) innerSubtitleView).setDrawPaddingFirst(drawPaddingFirst);
+    }
+  }
+
   /**
    * Sets the cues to be displayed by the view.
    *

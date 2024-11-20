@@ -26,7 +26,6 @@ import android.graphics.Paint.Join;
 import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.os.Build;
 import android.text.Layout.Alignment;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
@@ -100,9 +99,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private @MonotonicNonNull Rect bitmapRect;
   private final RectF backgroundPaddingRect = new RectF();
   private final int horizontalPadding;
+  private final boolean drawPaddingAreaFirst;
 
   @SuppressWarnings("ResourceType")
-  public SubtitlePainter(Context context, int horizontalPadding) {
+  public SubtitlePainter(Context context, int horizontalPadding, boolean drawPaddingAreaFirst) {
     int[] viewAttr = {android.R.attr.lineSpacingExtra, android.R.attr.lineSpacingMultiplier};
     TypedArray styledAttributes = context.obtainStyledAttributes(null, viewAttr, 0, 0);
     spacingAdd = styledAttributes.getDimensionPixelSize(0, 0);
@@ -129,6 +129,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     bitmapPaint.setFilterBitmap(true);
 
     this.horizontalPadding = horizontalPadding;
+    this.drawPaddingAreaFirst = drawPaddingAreaFirst;
   }
 
   /**
@@ -469,13 +470,18 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       }
     }
 
-    // draw background padding
-    drawPadding(canvas, textPaint, backgroundColor);
+    if (drawPaddingAreaFirst) {  // draw background padding before subtitle text
+      drawPadding(canvas, textPaint, backgroundColor);
+    }
 
     textPaint.setColor(foregroundColor);
     textPaint.setStyle(Style.FILL);
     textLayout.draw(canvas);
     textPaint.setShadowLayer(0, 0, 0, 0);
+
+    if (!drawPaddingAreaFirst) {  // draw background padding after subtitle text
+      drawPadding(canvas, textPaint, backgroundColor);
+    }
 
     canvas.restoreToCount(saveCount);
   }
@@ -486,6 +492,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     }
     // save original color
     int paintColor = paint.getColor();
+    Style paintStyle = paint.getStyle();
     int bgColor = color;
     if (textLayout.getText() instanceof Spannable) { // Spannable text can set background.
       BackgroundColorSpan[] colorSpans = ((Spannable) textLayout.getText())
@@ -496,12 +503,14 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     }
     // set background color
     paint.setColor(bgColor);
+    paint.setStyle(Style.FILL);
 
     for (int line = 0; line < textLayout.getLineCount(); line++) {
       backgroundPaddingRect.top = textLayout.getLineTop(line);
       backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
 
-      if (Color.alpha(bgColor) == 0xFF) { // draw all the regions
+      // draw all the regions.
+      if (Color.alpha(bgColor) == 0xFF && drawPaddingAreaFirst) { // draw all the regions
         backgroundPaddingRect.left = textLayout.getLineLeft(line) - horizontalPadding;
         backgroundPaddingRect.right = textLayout.getLineRight(line) + horizontalPadding;
         canvas.drawRect(backgroundPaddingRect, paint);
@@ -509,19 +518,12 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         float left = textLayout.getLineLeft(line);
         float right = textLayout.getLineRight(line);
         if (textLayout.getAlignment() == Alignment.ALIGN_CENTER) {
-          // TextLayout cal x position logic
-          int marginLeft = 0;
-          int lineMax = (int) textLayout.getLineMax(line);
-          lineMax = lineMax & ~1;
-          left = (textLayout.getWidth() + marginLeft - lineMax) >> 1;
-          CharSequence charSequence = textLayout.getText();
-          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            right = left + paint.getRunAdvance(charSequence, 0, charSequence.length(), 0,
-                charSequence.length(), false, charSequence.length());
-          } else {
-            right = left + paint.measureText(textLayout.getText().toString());
-          }
+          final float lineWidth = textLayout.getLineMax(line);
+          final int lineWidthAdjust = (int) lineWidth & ~1; // this is TextLayout logic
+          left = (float) (textLayout.getWidth() - lineWidthAdjust) / 2; // this is TextLayout logic
+          right = left + lineWidth;
         }
+
         // draw left padding
         backgroundPaddingRect.left = left - horizontalPadding;
         backgroundPaddingRect.right = left;
@@ -534,6 +536,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     }
     // restore color
     paint.setColor(paintColor);
+    paint.setStyle(paintStyle);
   }
 
   @RequiresNonNull({"cueBitmap", "bitmapRect"})
