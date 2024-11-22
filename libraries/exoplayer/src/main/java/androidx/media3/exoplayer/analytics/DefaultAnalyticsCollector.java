@@ -193,7 +193,6 @@ public class DefaultAnalyticsCollector implements AnalyticsCollector {
         });
   }
 
-  @SuppressWarnings("deprecation") // Calling deprecated listener method.
   @Override
   public final void onAudioInputFormatChanged(
       Format format, @Nullable DecoderReuseEvaluation decoderReuseEvaluation) {
@@ -201,10 +200,7 @@ public class DefaultAnalyticsCollector implements AnalyticsCollector {
     sendEvent(
         eventTime,
         AnalyticsListener.EVENT_AUDIO_INPUT_FORMAT_CHANGED,
-        listener -> {
-          listener.onAudioInputFormatChanged(eventTime, format);
-          listener.onAudioInputFormatChanged(eventTime, format, decoderReuseEvaluation);
-        });
+        listener -> listener.onAudioInputFormatChanged(eventTime, format, decoderReuseEvaluation));
   }
 
   @Override
@@ -321,17 +317,13 @@ public class DefaultAnalyticsCollector implements AnalyticsCollector {
   }
 
   @Override
-  @SuppressWarnings("deprecation") // Calling deprecated listener method.
   public final void onVideoInputFormatChanged(
       Format format, @Nullable DecoderReuseEvaluation decoderReuseEvaluation) {
     EventTime eventTime = generateReadingMediaPeriodEventTime();
     sendEvent(
         eventTime,
         AnalyticsListener.EVENT_VIDEO_INPUT_FORMAT_CHANGED,
-        listener -> {
-          listener.onVideoInputFormatChanged(eventTime, format);
-          listener.onVideoInputFormatChanged(eventTime, format, decoderReuseEvaluation);
-        });
+        listener -> listener.onVideoInputFormatChanged(eventTime, format, decoderReuseEvaluation));
   }
 
   @Override

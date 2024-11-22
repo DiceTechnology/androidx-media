@@ -26,9 +26,10 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.JsonReader;
 import android.view.Menu;
@@ -48,10 +49,12 @@ import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaItem.ClippingConfiguration;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.util.Log;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSourceInputStream;
@@ -71,6 +74,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -78,6 +82,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** An activity for selecting from a list of media samples. */
 public class SampleChooserActivity extends AppCompatActivity
@@ -124,6 +130,7 @@ public class SampleChooserActivity extends AppCompatActivity
           }
         }
       } catch (IOException e) {
+        Log.e(TAG, "One or more sample lists failed to load", e);
         Toast.makeText(getApplicationContext(), R.string.sample_list_load_error, Toast.LENGTH_LONG)
             .show();
       }
@@ -311,6 +318,7 @@ public class SampleChooserActivity extends AppCompatActivity
     }
   }
 
+  @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
   private void toggleDownload(MediaItem mediaItem) {
     RenderersFactory renderersFactory =
         DemoUtil.buildRenderersFactory(
@@ -327,6 +335,10 @@ public class SampleChooserActivity extends AppCompatActivity
     if (localConfiguration.adsConfiguration != null) {
       return R.string.download_ads_unsupported;
     }
+    @Nullable MediaItem.DrmConfiguration drmConfiguration = localConfiguration.drmConfiguration;
+    if (drmConfiguration != null && !drmConfiguration.scheme.equals(C.WIDEVINE_UUID)) {
+      return R.string.download_only_widevine_drm_supported;
+    }
     String scheme = localConfiguration.uri.getScheme();
     if (!("http".equals(scheme) || "https".equals(scheme))) {
       return R.string.download_scheme_unsupported;
@@ -339,34 +351,43 @@ public class SampleChooserActivity extends AppCompatActivity
     return menuItem != null && menuItem.isChecked();
   }
 
-  private final class SampleListLoader extends AsyncTask<String, Void, List<PlaylistGroup>> {
+  private final class SampleListLoader {
+
+    private final ExecutorService executorService;
 
     private boolean sawError;
 
-    @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
-    @Override
-    protected List<PlaylistGroup> doInBackground(String... uris) {
-      List<PlaylistGroup> result = new ArrayList<>();
-      Context context = getApplicationContext();
-      DataSource dataSource = DemoUtil.getDataSourceFactory(context).createDataSource();
-      for (String uri : uris) {
-        DataSpec dataSpec = new DataSpec(Uri.parse(uri));
-        InputStream inputStream = new DataSourceInputStream(dataSource, dataSpec);
-        try {
-          readPlaylistGroups(new JsonReader(new InputStreamReader(inputStream, "UTF-8")), result);
-        } catch (Exception e) {
-          Log.e(TAG, "Error loading sample list: " + uri, e);
-          sawError = true;
-        } finally {
-          DataSourceUtil.closeQuietly(dataSource);
-        }
-      }
-      return result;
+    public SampleListLoader() {
+      executorService = Executors.newSingleThreadExecutor();
     }
 
-    @Override
-    protected void onPostExecute(List<PlaylistGroup> result) {
-      onPlaylistGroups(result, sawError);
+    @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
+    public void execute(String... uris) {
+      executorService.execute(
+          () -> {
+            List<PlaylistGroup> result = new ArrayList<>();
+            Context context = getApplicationContext();
+            DataSource dataSource = DemoUtil.getDataSourceFactory(context).createDataSource();
+            for (String uri : uris) {
+              DataSpec dataSpec = new DataSpec(Uri.parse(uri));
+              InputStream inputStream = new DataSourceInputStream(dataSource, dataSpec);
+              try {
+                readPlaylistGroups(
+                    new JsonReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8)),
+                    result);
+              } catch (Exception e) {
+                Log.e(TAG, "Error loading sample list: " + uri, e);
+                sawError = true;
+              } finally {
+                DataSourceUtil.closeQuietly(dataSource);
+              }
+            }
+            new Handler(Looper.getMainLooper())
+                .post(
+                    () -> {
+                      onPlaylistGroups(result, sawError);
+                    });
+          });
     }
 
     private void readPlaylistGroups(JsonReader reader, List<PlaylistGroup> groups)
@@ -410,6 +431,7 @@ public class SampleChooserActivity extends AppCompatActivity
       group.playlists.addAll(playlistHolders);
     }
 
+    @OptIn(markerClass = UnstableApi.class) // Setting image duration.
     private PlaylistHolder readEntry(JsonReader reader, boolean insidePlaylist) throws IOException {
       Uri uri = null;
       String extension = null;
@@ -446,6 +468,9 @@ public class SampleChooserActivity extends AppCompatActivity
             break;
           case "clip_end_position_ms":
             clippingConfiguration.setEndPositionMs(reader.nextLong());
+            break;
+          case "image_duration_ms":
+            mediaItem.setImageDurationMs(reader.nextLong());
             break;
           case "ad_tag_uri":
             mediaItem.setAdsConfiguration(

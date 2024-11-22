@@ -25,7 +25,6 @@ import androidx.media3.common.MediaItem.LiveConfiguration;
 import androidx.media3.common.endeavor.DebugUtil;
 import androidx.media3.common.endeavor.WebUtil;
 import androidx.media3.common.util.Assertions;
-import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;

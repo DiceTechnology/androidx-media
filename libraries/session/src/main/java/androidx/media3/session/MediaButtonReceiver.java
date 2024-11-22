@@ -123,13 +123,14 @@ public class MediaButtonReceiver extends BroadcastReceiver {
       KeyEvent keyEvent = checkNotNull(intent.getExtras()).getParcelable(Intent.EXTRA_KEY_EVENT);
       if (keyEvent != null
           && keyEvent.getKeyCode() != KeyEvent.KEYCODE_MEDIA_PLAY
-          && keyEvent.getKeyCode() != KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
+          && keyEvent.getKeyCode() != KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+          && keyEvent.getKeyCode() != KeyEvent.KEYCODE_HEADSETHOOK) {
         // Starting with Android 8 (API 26), the service must be started immediately in the
         // foreground when being started. Also starting with Android 8, the system sends media
         // button intents to this receiver only when the session is released or not active, meaning
         // the service is not running. Hence we only accept a PLAY command here that ensures that
         // playback is started and the MediaSessionService/MediaLibraryService is put into the
-        // foreground (see https://developer.android.com/guide/topics/media-apps/mediabuttons and
+        // foreground (see https://developer.android.com/media/legacy/media-buttons and
         // https://developer.android.com/about/versions/oreo/android-8.0-changes#back-all).
         android.util.Log.w(
             TAG,

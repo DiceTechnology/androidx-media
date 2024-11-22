@@ -21,13 +21,14 @@ import androidx.annotation.GuardedBy;
 import androidx.annotation.Nullable;
 import androidx.media3.common.VideoFrameProcessingException;
 import androidx.media3.common.util.GlUtil;
-import androidx.media3.common.util.UnstableApi;
 import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Wrapper around a single thread {@link ExecutorService} for executing {@link Task} instances.
@@ -41,7 +42,6 @@ import java.util.concurrent.RejectedExecutionException;
  * {@linkplain #submit(Task) default priority tasks}. Tasks with equal priority are executed in FIFO
  * order.
  */
-@UnstableApi
 /* package */ final class VideoFrameProcessingTaskExecutor {
   /**
    * Interface for tasks that may throw a {@link GlUtil.GlException} or {@link
@@ -63,10 +63,11 @@ import java.util.concurrent.RejectedExecutionException;
     void onError(VideoFrameProcessingException exception);
   }
 
-  private static final long RELEASE_WAIT_TIME_MS = 500;
+  private static final long EXECUTOR_SERVICE_TIMEOUT_MS = 500;
 
   private final boolean shouldShutdownExecutorService;
   private final ExecutorService singleThreadExecutorService;
+  private final Future<Thread> threadFuture; // Used to identify the GL thread.
   private final ErrorListener errorListener;
   private final Object lock;
 
@@ -82,6 +83,7 @@ import java.util.concurrent.RejectedExecutionException;
       boolean shouldShutdownExecutorService,
       ErrorListener errorListener) {
     this.singleThreadExecutorService = singleThreadExecutorService;
+    threadFuture = singleThreadExecutorService.submit(Thread::currentThread);
     this.shouldShutdownExecutorService = shouldShutdownExecutorService;
     this.errorListener = errorListener;
     lock = new Object();
@@ -105,6 +107,45 @@ import java.util.concurrent.RejectedExecutionException;
 
     if (executionException != null) {
       handleException(executionException);
+    }
+  }
+
+  /** Blocks the caller until the given {@link Task} has completed. */
+  public void invoke(Task task) throws InterruptedException {
+    // If running on the executor service thread, run synchronously.
+    // Calling future.get() on the single executor thread would deadlock.
+    Thread videoFrameProcessingThread;
+    try {
+      videoFrameProcessingThread = threadFuture.get(EXECUTOR_SERVICE_TIMEOUT_MS, MILLISECONDS);
+    } catch (InterruptedException e) {
+      throw e;
+    } catch (Exception e) {
+      handleException(e);
+      return;
+    }
+    if (Thread.currentThread() == videoFrameProcessingThread) {
+      try {
+        task.run();
+      } catch (Exception e) {
+        handleException(e);
+      }
+      return;
+    }
+
+    // Not running on the executor service thread. Block until task.run() returns.
+    try {
+      Future<?> taskFuture =
+          singleThreadExecutorService.submit(
+              () -> {
+                try {
+                  task.run();
+                } catch (Exception e) {
+                  handleException(e);
+                }
+              });
+      taskFuture.get(EXECUTOR_SERVICE_TIMEOUT_MS, MILLISECONDS);
+    } catch (RuntimeException | ExecutionException | TimeoutException e) {
+      handleException(e);
     }
   }
 
@@ -175,7 +216,8 @@ import java.util.concurrent.RejectedExecutionException;
         wrapTaskAndSubmitToExecutorService(releaseTask, /* isFlushOrReleaseTask= */ true);
     if (shouldShutdownExecutorService) {
       singleThreadExecutorService.shutdown();
-      if (!singleThreadExecutorService.awaitTermination(RELEASE_WAIT_TIME_MS, MILLISECONDS)) {
+      if (!singleThreadExecutorService.awaitTermination(
+          EXECUTOR_SERVICE_TIMEOUT_MS, MILLISECONDS)) {
         errorListener.onError(
             new VideoFrameProcessingException(
                 "Release timed out. OpenGL resources may not be cleaned up properly."));

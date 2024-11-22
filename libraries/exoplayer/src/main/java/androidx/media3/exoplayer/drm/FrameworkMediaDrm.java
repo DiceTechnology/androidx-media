@@ -50,10 +50,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /** An {@link ExoMediaDrm} implementation that wraps the framework {@link MediaDrm}. */
-@RequiresApi(18)
 public final class FrameworkMediaDrm implements ExoMediaDrm {
 
   private static final String TAG = "FrameworkMediaDrm";
@@ -252,15 +252,18 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
     return new KeyRequest(requestData, licenseServerUrl, requestType).setXDrmInfo(xDrmInfo);
   }
 
-  private static String adjustLicenseServerUrl(String licenseServerUrl) {
+  private String adjustLicenseServerUrl(String licenseServerUrl) {
     if (MOCK_LA_URL.equals(licenseServerUrl)) {
       return "";
-    } else if (Util.SDK_INT >= 33 && "https://default.url".equals(licenseServerUrl)) {
-      // Work around b/247808112
-      return "";
-    } else {
-      return licenseServerUrl;
     }
+    if (Util.SDK_INT >= 33 && "https://default.url".equals(licenseServerUrl)) {
+      // Work around b/247808112
+      String pluginVersion = getPropertyString("version");
+      if (Objects.equals(pluginVersion, "1.2") || Objects.equals(pluginVersion, "aidl-1")) {
+        return "";
+      }
+    }
+    return licenseServerUrl;
   }
 
   @UnstableApi
@@ -297,22 +300,24 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
   @UnstableApi
   @Override
   public boolean requiresSecureDecoder(byte[] sessionId, String mimeType) {
-    if (Util.SDK_INT >= 31) {
-      return Api31.requiresSecureDecoder(mediaDrm, mimeType);
+    boolean result;
+    if (Util.SDK_INT >= 31 && isMediaDrmRequiresSecureDecoderImplemented()) {
+      result = Api31.requiresSecureDecoder(mediaDrm, mimeType);
+    } else {
+      MediaCrypto mediaCrypto = null;
+      try {
+        mediaCrypto = new MediaCrypto(uuid, sessionId);
+        result = mediaCrypto.requiresSecureDecoderComponent(mimeType);
+      } catch (MediaCryptoException e) {
+        // This shouldn't happen, but if it does then assume that a secure decoder may be required.
+        result = true;
+      } finally {
+        if (mediaCrypto != null) {
+          mediaCrypto.release();
+        }
+      }
     }
-
-    MediaCrypto mediaCrypto;
-    try {
-      mediaCrypto = new MediaCrypto(uuid, sessionId);
-    } catch (MediaCryptoException e) {
-      // This shouldn't happen, but if it does then assume that a secure decoder may be required.
-      return true;
-    }
-    try {
-      return mediaCrypto.requiresSecureDecoderComponent(mimeType);
-    } finally {
-      mediaCrypto.release();
-    }
+    return result && !shouldForceAllowInsecureDecoderComponents();
   }
 
   @UnstableApi
@@ -393,20 +398,43 @@ public final class FrameworkMediaDrm implements ExoMediaDrm {
   @UnstableApi
   @Override
   public FrameworkCryptoConfig createCryptoConfig(byte[] sessionId) throws MediaCryptoException {
-    // Work around a bug prior to Lollipop where L1 Widevine forced into L3 mode would still
-    // indicate that it required secure video decoders [Internal ref: b/11428937].
-    boolean forceAllowInsecureDecoderComponents =
-        Util.SDK_INT < 21
-            && C.WIDEVINE_UUID.equals(uuid)
-            && "L3".equals(getPropertyString("securityLevel"));
+    boolean forceAllowInsecureDecoderComponents = shouldForceAllowInsecureDecoderComponents();
     return new FrameworkCryptoConfig(
         adjustUuid(uuid), sessionId, forceAllowInsecureDecoderComponents);
+  }
+
+  // Work around a bug prior to Lollipop where L1 Widevine forced into L3 mode would still
+  // indicate that it required secure video decoders [Internal ref: b/11428937].
+  private boolean shouldForceAllowInsecureDecoderComponents() {
+    return Util.SDK_INT < 21
+        && C.WIDEVINE_UUID.equals(uuid)
+        && "L3".equals(getPropertyString("securityLevel"));
   }
 
   @UnstableApi
   @Override
   public @C.CryptoType int getCryptoType() {
     return C.CRYPTO_TYPE_FRAMEWORK;
+  }
+
+  /**
+   * {@link MediaDrm#requiresSecureDecoder} is nominally available from API 31, but it's only
+   * functional for Widevine if the plugin version is greater than 16.0. See b/352419654#comment63.
+   */
+  @RequiresApi(31)
+  private boolean isMediaDrmRequiresSecureDecoderImplemented() {
+    // TODO: b/359768062 - Add an SDK_INT guard clause once WV 16.0 is not permitted on any device.
+    if (uuid.equals(C.WIDEVINE_UUID)) {
+      String pluginVersion = getPropertyString(MediaDrm.PROPERTY_VERSION);
+      return !pluginVersion.startsWith("v5.")
+          && !pluginVersion.startsWith("14.")
+          && !pluginVersion.startsWith("15.")
+          && !pluginVersion.startsWith("16.0");
+    } else {
+      // Assume that ClearKey plugin always supports this method, and no non-Google plugin does. See
+      // b/352419654#comment71.
+      return uuid.equals(C.CLEARKEY_UUID);
+    }
   }
 
   private static SchemeData getSchemeData(UUID uuid, List<SchemeData> schemeDatas) {

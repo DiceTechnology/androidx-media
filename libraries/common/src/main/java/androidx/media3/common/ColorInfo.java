@@ -31,7 +31,7 @@ import org.checkerframework.dataflow.qual.Pure;
  * #SDR_BT709_LIMITED} instance.
  */
 @UnstableApi
-public final class ColorInfo implements Bundleable {
+public final class ColorInfo {
 
   /**
    * Builds {@link ColorInfo} instances.
@@ -285,37 +285,7 @@ public final class ColorInfo implements Bundleable {
   // Lazily initialized hashcode.
   private int hashCode;
 
-  /**
-   * Constructs the ColorInfo.
-   *
-   * @param colorSpace The color space of the video.
-   * @param colorRange The color range of the video.
-   * @param colorTransfer The color transfer characteristics of the video.
-   * @param hdrStaticInfo HdrStaticInfo as defined in CTA-861.3, or null if none specified.
-   * @deprecated Use {@link Builder}.
-   */
-  @Deprecated
-  public ColorInfo(
-      @C.ColorSpace int colorSpace,
-      @C.ColorRange int colorRange,
-      @C.ColorTransfer int colorTransfer,
-      @Nullable byte[] hdrStaticInfo) {
-    this(colorSpace, colorRange, colorTransfer, hdrStaticInfo, Format.NO_VALUE, Format.NO_VALUE);
-  }
-
-  /**
-   * Constructs the ColorInfo.
-   *
-   * @param colorSpace The color space of the video.
-   * @param colorRange The color range of the video.
-   * @param colorTransfer The color transfer characteristics of the video.
-   * @param hdrStaticInfo HdrStaticInfo as defined in CTA-861.3, or null if none specified.
-   * @param lumaBitdepth The bit depth of the luma samples of the video.
-   * @param chromaBitdepth The bit depth of the chroma samples of the video.
-   * @deprecated Use {@link Builder}.
-   */
-  @Deprecated
-  public ColorInfo(
+  private ColorInfo(
       @C.ColorSpace int colorSpace,
       @C.ColorRange int colorRange,
       @C.ColorTransfer int colorTransfer,
@@ -451,7 +421,7 @@ public final class ColorInfo implements Bundleable {
       case C.COLOR_SPACE_BT2020:
         return "BT2020";
       default:
-        return "Undefined color space";
+        return "Undefined color space " + colorSpace;
     }
   }
 
@@ -473,7 +443,7 @@ public final class ColorInfo implements Bundleable {
       case C.COLOR_TRANSFER_HLG:
         return "HLG";
       default:
-        return "Undefined color transfer";
+        return "Undefined color transfer " + colorTransfer;
     }
   }
 
@@ -487,11 +457,9 @@ public final class ColorInfo implements Bundleable {
       case C.COLOR_RANGE_FULL:
         return "Full range";
       default:
-        return "Undefined color range";
+        return "Undefined color range " + colorRange;
     }
   }
-
-  // Bundleable implementation
 
   private static final String FIELD_COLOR_SPACE = Util.intToStringMaxRadix(0);
   private static final String FIELD_COLOR_RANGE = Util.intToStringMaxRadix(1);
@@ -500,7 +468,6 @@ public final class ColorInfo implements Bundleable {
   private static final String FIELD_LUMA_BITDEPTH = Util.intToStringMaxRadix(4);
   private static final String FIELD_CHROMA_BITDEPTH = Util.intToStringMaxRadix(5);
 
-  @Override
   public Bundle toBundle() {
     Bundle bundle = new Bundle();
     bundle.putInt(FIELD_COLOR_SPACE, colorSpace);
@@ -512,13 +479,14 @@ public final class ColorInfo implements Bundleable {
     return bundle;
   }
 
-  public static final Creator<ColorInfo> CREATOR =
-      bundle ->
-          new ColorInfo(
-              bundle.getInt(FIELD_COLOR_SPACE, Format.NO_VALUE),
-              bundle.getInt(FIELD_COLOR_RANGE, Format.NO_VALUE),
-              bundle.getInt(FIELD_COLOR_TRANSFER, Format.NO_VALUE),
-              bundle.getByteArray(FIELD_HDR_STATIC_INFO),
-              bundle.getInt(FIELD_LUMA_BITDEPTH, Format.NO_VALUE),
-              bundle.getInt(FIELD_CHROMA_BITDEPTH, Format.NO_VALUE));
+  /** Restores a {@code ColorInfo} from a {@link Bundle}. */
+  public static ColorInfo fromBundle(Bundle bundle) {
+    return new ColorInfo(
+        bundle.getInt(FIELD_COLOR_SPACE, Format.NO_VALUE),
+        bundle.getInt(FIELD_COLOR_RANGE, Format.NO_VALUE),
+        bundle.getInt(FIELD_COLOR_TRANSFER, Format.NO_VALUE),
+        bundle.getByteArray(FIELD_HDR_STATIC_INFO),
+        bundle.getInt(FIELD_LUMA_BITDEPTH, Format.NO_VALUE),
+        bundle.getInt(FIELD_CHROMA_BITDEPTH, Format.NO_VALUE));
+  }
 }
