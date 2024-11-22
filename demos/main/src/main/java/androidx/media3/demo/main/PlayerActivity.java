@@ -119,7 +119,6 @@ public class PlayerActivity extends AppCompatActivity
     playerView.setErrorMessageProvider(new PlayerErrorMessageProvider());
     playerView.requestFocus();
     playerView.getSubtitleView().setSubtitleHorizontalPadding(20);
-    playerView.getSubtitleView().setDrawPaddingFirst(false);
 
     if (savedInstanceState != null) {
       trackSelectionParameters =

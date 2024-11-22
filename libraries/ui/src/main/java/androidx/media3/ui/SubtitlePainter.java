@@ -25,7 +25,6 @@ import android.graphics.Paint;
 import android.graphics.Paint.Join;
 import android.graphics.Paint.Style;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.text.Layout.Alignment;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
@@ -43,6 +42,9 @@ import androidx.media3.common.text.TextShadow;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.Util;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
@@ -97,12 +99,11 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private int textTop;
   private int textPaddingX;
   private @MonotonicNonNull Rect bitmapRect;
-  private final RectF backgroundPaddingRect = new RectF();
   private final int horizontalPadding;
-  private final boolean drawPaddingAreaFirst;
+  private final List<PaddingLineBackgroundSpan.PaddingSpanInfo> paddingSpanInfos = new ArrayList<>();
 
   @SuppressWarnings("ResourceType")
-  public SubtitlePainter(Context context, int horizontalPadding, boolean drawPaddingAreaFirst) {
+  public SubtitlePainter(Context context, int horizontalPadding) {
     int[] viewAttr = {android.R.attr.lineSpacingExtra, android.R.attr.lineSpacingMultiplier};
     TypedArray styledAttributes = context.obtainStyledAttributes(null, viewAttr, 0, 0);
     spacingAdd = styledAttributes.getDimensionPixelSize(0, 0);
@@ -129,7 +130,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     bitmapPaint.setFilterBitmap(true);
 
     this.horizontalPadding = horizontalPadding;
-    this.drawPaddingAreaFirst = drawPaddingAreaFirst;
   }
 
   /**
@@ -378,6 +378,9 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     this.textLeft = textLeft;
     this.textTop = textTop;
     this.textPaddingX = textPaddingX;
+
+    // reset spannable text background span and draw padding area
+    setupPaddingSpan(backgroundColor, horizontalPadding);
   }
 
   @RequiresNonNull("cueBitmap")
@@ -470,74 +473,63 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       }
     }
 
-    if (drawPaddingAreaFirst) {  // draw background padding before subtitle text
-      drawPadding(canvas, textPaint, backgroundColor);
-    }
-
     textPaint.setColor(foregroundColor);
     textPaint.setStyle(Style.FILL);
     textLayout.draw(canvas);
     textPaint.setShadowLayer(0, 0, 0, 0);
 
-    if (!drawPaddingAreaFirst) {  // draw background padding after subtitle text
-      drawPadding(canvas, textPaint, backgroundColor);
-    }
-
     canvas.restoreToCount(saveCount);
   }
 
-  private void drawPadding(Canvas canvas, Paint paint, int color) {
-    if (horizontalPadding == 0) {
+  private void setupPaddingSpan(int color, int horizontalPadding) {
+    if (horizontalPadding <= 0) {
       return;
     }
-    // save original color
-    int paintColor = paint.getColor();
-    Style paintStyle = paint.getStyle();
     int bgColor = color;
     if (textLayout.getText() instanceof Spannable) { // Spannable text can set background.
-      BackgroundColorSpan[] colorSpans = ((Spannable) textLayout.getText())
-          .getSpans(0, textLayout.getText().length(), BackgroundColorSpan.class);
-      if (colorSpans != null && colorSpans.length > 0) {
-        bgColor = colorSpans[colorSpans.length - 1].getBackgroundColor();
+      Spannable spannableText = (Spannable) textLayout.getText();
+      BackgroundColorSpan[] colorSpans = spannableText.getSpans(0, spannableText.length(),
+          BackgroundColorSpan.class);
+      if (colorSpans != null) {
+        paddingSpanInfos.clear();
+        if (colorSpans.length == 1) {
+          bgColor = colorSpans[0].getBackgroundColor();
+          spannableText.removeSpan(colorSpans[0]);
+        } else if (colorSpans.length > 1) {
+          for (BackgroundColorSpan span : colorSpans) {
+            int spanStart = spannableText.getSpanStart(span);
+            int spanEnd = spannableText.getSpanEnd(span);
+            if (spanStart == 0 && spanEnd == spannableText.length()) {
+              spannableText.removeSpan(span);
+              bgColor = span.getBackgroundColor();
+            } else {
+              paddingSpanInfos.add(
+                  new PaddingLineBackgroundSpan.PaddingSpanInfo(spanStart, spanEnd,
+                      span.getBackgroundColor()));
+            }
+          }
+          Collections.sort(paddingSpanInfos); // sort by start position.
+        }
       }
-    }
-    // set background color
-    paint.setColor(bgColor);
-    paint.setStyle(Style.FILL);
 
-    for (int line = 0; line < textLayout.getLineCount(); line++) {
-      backgroundPaddingRect.top = textLayout.getLineTop(line);
-      backgroundPaddingRect.bottom = textLayout.getLineBottom(line);
-
-      // draw all the regions.
-      if (Color.alpha(bgColor) == 0xFF && drawPaddingAreaFirst) { // draw all the regions
-        backgroundPaddingRect.left = textLayout.getLineLeft(line) - horizontalPadding;
-        backgroundPaddingRect.right = textLayout.getLineRight(line) + horizontalPadding;
-        canvas.drawRect(backgroundPaddingRect, paint);
-      } else {
+      for (int line = 0; line < textLayout.getLineCount(); line++) {
+        float top = textLayout.getLineTop(line);
+        float bottom = textLayout.getLineBottom(line);
         float left = textLayout.getLineLeft(line);
         float right = textLayout.getLineRight(line);
-        if (textLayout.getAlignment() == Alignment.ALIGN_CENTER) {
-          final float lineWidth = textLayout.getLineMax(line);
-          // these is TextLayout code logic
-          final int lineWidthAdjust = (int) lineWidth & ~1;
-          left = (textLayout.getWidth() - lineWidthAdjust) >> 1; // left should be a int value!
-          right = left + lineWidth;
-        }
-
-        // draw left padding
-        backgroundPaddingRect.left = left - horizontalPadding;
-        backgroundPaddingRect.right = left;
-        canvas.drawRect(backgroundPaddingRect, paint);
-        // draw right padding
-        backgroundPaddingRect.left = right;
-        backgroundPaddingRect.right = right + horizontalPadding;
-        canvas.drawRect(backgroundPaddingRect, paint);
+        final float lineWidth = textLayout.getLineMax(line);
+        int start = textLayout.getLineStart(line);
+        int end = textLayout.getLineVisibleEnd(line);
+        float measureScale = lineWidth / textPaint.measureText(spannableText, start, end);
+        spannableText.setSpan(
+            new PaddingLineBackgroundSpan(bgColor, horizontalPadding, left, top, right, bottom,
+                measureScale,
+                paddingSpanInfos.toArray(new PaddingLineBackgroundSpan.PaddingSpanInfo[0])),
+            start,
+            end,
+            Spanned.SPAN_PRIORITY);
       }
     }
-    // restore color
-    paint.setColor(paintColor);
-    paint.setStyle(paintStyle);
   }
 
   @RequiresNonNull({"cueBitmap", "bitmapRect"})
