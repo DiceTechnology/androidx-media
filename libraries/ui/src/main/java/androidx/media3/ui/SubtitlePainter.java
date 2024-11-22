@@ -492,39 +492,37 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
           BackgroundColorSpan.class);
       if (colorSpans != null) {
         paddingSpanInfos.clear();
-        if (colorSpans.length == 1) {
-          bgColor = colorSpans[0].getBackgroundColor();
-          spannableText.removeSpan(colorSpans[0]);
-        } else if (colorSpans.length > 1) {
-          for (BackgroundColorSpan span : colorSpans) {
-            int spanStart = spannableText.getSpanStart(span);
-            int spanEnd = spannableText.getSpanEnd(span);
-            if (spanStart == 0 && spanEnd == spannableText.length()) {
-              spannableText.removeSpan(span);
-              bgColor = span.getBackgroundColor();
-            } else {
-              paddingSpanInfos.add(
-                  new PaddingLineBackgroundSpan.PaddingSpanInfo(spanStart, spanEnd,
-                      span.getBackgroundColor()));
-            }
+        for (BackgroundColorSpan span : colorSpans) {
+          int spanStart = spannableText.getSpanStart(span);
+          int spanEnd = spannableText.getSpanEnd(span);
+          if (spanStart == 0 && spanEnd == spannableText.length()) {
+            bgColor = span.getBackgroundColor();
+          } else {
+            paddingSpanInfos.add(
+                new PaddingLineBackgroundSpan.PaddingSpanInfo(spanStart, spanEnd,
+                    span.getBackgroundColor()));
           }
-          Collections.sort(paddingSpanInfos); // sort by start position.
+          // remove original background span, background will drawn by PaddingLineBackgroundSpan.
+          spannableText.removeSpan(span);
         }
+        Collections.sort(paddingSpanInfos); // sort by start position.
       }
 
       for (int line = 0; line < textLayout.getLineCount(); line++) {
-        float top = textLayout.getLineTop(line);
-        float bottom = textLayout.getLineBottom(line);
-        float left = textLayout.getLineLeft(line);
-        float right = textLayout.getLineRight(line);
         final float lineWidth = textLayout.getLineMax(line);
         int start = textLayout.getLineStart(line);
         int end = textLayout.getLineVisibleEnd(line);
         float measureScale = lineWidth / textPaint.measureText(spannableText, start, end);
         spannableText.setSpan(
-            new PaddingLineBackgroundSpan(bgColor, horizontalPadding, left, top, right, bottom,
+            new PaddingLineBackgroundSpan(bgColor,
+                horizontalPadding,
+                textLayout.getLineLeft(line),
+                textLayout.getLineTop(line),
+                textLayout.getLineRight(line),
+                textLayout.getLineBottom(line),
                 measureScale,
-                paddingSpanInfos.toArray(new PaddingLineBackgroundSpan.PaddingSpanInfo[0])),
+                paddingSpanInfos.toArray(new PaddingLineBackgroundSpan.PaddingSpanInfo[0])
+            ),
             start,
             end,
             Spanned.SPAN_PRIORITY);

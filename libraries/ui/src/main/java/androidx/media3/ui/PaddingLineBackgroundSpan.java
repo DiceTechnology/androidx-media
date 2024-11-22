@@ -51,33 +51,49 @@ public class PaddingLineBackgroundSpan implements LineBackgroundSpan {
     final int originColor = paint.getColor();
     if (spanInfos.length > 0) {
       float left = this.left;
+      float right = left;
       int textPos = start;
       for (int index = 0; index < spanInfos.length; index++) {
         PaddingSpanInfo info = spanInfos[index];
-        PaddingSpanInfo nextInfo = index < spanInfos.length - 1 ? spanInfos[index + 1] : null;
-        if (info.start > text.length()) {
+        if (info.start > end) {
           continue;
         }
-        // draw background
-        paint.setColor(color);
-        float textWidth = measureText(paint, text, textPos, info.start);
-        canvas.drawRect(left - horizontalPadding, top, left + textWidth, bottom, paint);
-
-        left = left + textWidth;
-        textPos = info.start;
-        // draw span
-        paint.setColor(info.color);
-        textWidth = measureText(paint, text, textPos, info.end);
-        canvas.drawRect(left, top, left + textWidth, bottom, paint);
-
-        left = left + textWidth;
-        textPos = info.end;
-
-        if (nextInfo == null) {
-          // draw background
+        // draw line background
+        if (info.start > textPos && info.start < end) {
           paint.setColor(color);
-          textWidth = measureText(paint, text, textPos, end);
-          canvas.drawRect(left, top, left + textWidth + horizontalPadding, bottom, paint);
+          // draw left padding
+          if (index == 0) {
+            canvas.drawRect(this.left - horizontalPadding, top, this.left, bottom, paint);
+          }
+
+          float textWidth = measureText(paint, text, textPos, info.start);
+          textPos = info.start;
+          right = left + textWidth;
+          canvas.drawRect(left, top, right, bottom, paint);
+          left = right;
+        }
+        // draw span background
+        if (info.end <= end) {
+          paint.setColor(info.color);
+          // draw left padding
+          if (info.start == start) {
+            canvas.drawRect(this.left - horizontalPadding, top, this.left, bottom, paint);
+          }
+
+          float textWidth = measureText(paint, text, textPos, info.end);
+          textPos = info.end;
+          right = left + textWidth;
+          canvas.drawRect(left, top, right, bottom, paint);
+          left = right;
+        }
+
+        PaddingSpanInfo nextInfo = index < spanInfos.length - 1 ? spanInfos[index + 1] : null;
+        if (nextInfo == null) {
+          // draw line background and right padding
+          paint.setColor(info.end == end ? info.color : color);
+          right = this.right;
+          canvas.drawRect(left, top, right + horizontalPadding, bottom, paint);
+          left = right;
         }
       }
     } else {
@@ -88,7 +104,7 @@ public class PaddingLineBackgroundSpan implements LineBackgroundSpan {
   }
 
   private float measureText(Paint paint, CharSequence text, int start, int end) {
-    if (end < start) {
+    if (start < 0 || end < start || end > text.length()) {
       return 0f;
     }
     return paint.measureText(text, start, end) * measureScale;
