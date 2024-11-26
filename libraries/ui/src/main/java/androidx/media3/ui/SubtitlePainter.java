@@ -100,7 +100,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private int textPaddingX;
   private @MonotonicNonNull Rect bitmapRect;
   private final int horizontalPadding;
-  private final List<PaddingLineBackgroundSpan.PaddingSpanInfo> paddingSpanInfos = new ArrayList<>();
 
   @SuppressWarnings("ResourceType")
   public SubtitlePainter(Context context, int horizontalPadding) {
@@ -481,52 +480,55 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     canvas.restoreToCount(saveCount);
   }
 
-  private void setupPaddingSpan(int color, int horizontalPadding) {
-    if (horizontalPadding <= 0) {
+  private void setupPaddingSpan(int backgroundColor, int horizontalPadding) {
+    if (horizontalPadding <= 0 || !(textLayout.getText() instanceof Spannable)) {
       return;
     }
-    int bgColor = color;
-    if (textLayout.getText() instanceof Spannable) { // Spannable text can set background.
-      Spannable spannableText = (Spannable) textLayout.getText();
-      BackgroundColorSpan[] colorSpans = spannableText.getSpans(0, spannableText.length(),
-          BackgroundColorSpan.class);
-      if (colorSpans != null) {
-        paddingSpanInfos.clear();
-        for (BackgroundColorSpan span : colorSpans) {
-          int spanStart = spannableText.getSpanStart(span);
-          int spanEnd = spannableText.getSpanEnd(span);
-          if (spanStart == 0 && spanEnd == spannableText.length()) {
-            bgColor = span.getBackgroundColor();
-          } else {
-            paddingSpanInfos.add(
-                new PaddingLineBackgroundSpan.PaddingSpanInfo(spanStart, spanEnd,
-                    span.getBackgroundColor()));
-          }
-          // remove original background span, background will drawn by PaddingLineBackgroundSpan.
-          spannableText.removeSpan(span);
+    List<PaddingLineBackgroundSpan.BackgroundSpanInfo> backgroundSpanInfos = new ArrayList<>();
+    int lineBackgroundColor = backgroundColor;
+    Spannable spannableText = (Spannable) textLayout.getText();
+    BackgroundColorSpan[] colorSpans = spannableText.getSpans(
+        0,
+        spannableText.length(),
+        BackgroundColorSpan.class);
+    if (colorSpans != null) {
+      for (BackgroundColorSpan span : colorSpans) {
+        int spanStart = spannableText.getSpanStart(span);
+        int spanEnd = spannableText.getSpanEnd(span);
+        if (spanStart == 0 && spanEnd == spannableText.length()) {
+          lineBackgroundColor = span.getBackgroundColor();
+        } else {
+          backgroundSpanInfos.add(
+              new PaddingLineBackgroundSpan.BackgroundSpanInfo(
+                  spanStart,
+                  spanEnd,
+                  span.getBackgroundColor()));
         }
-        Collections.sort(paddingSpanInfos); // sort by start position.
+        // remove original background span, background will drawn by PaddingLineBackgroundSpan.
+        spannableText.removeSpan(span);
       }
+      Collections.sort(backgroundSpanInfos); // sort by start position.
+    }
 
-      for (int line = 0; line < textLayout.getLineCount(); line++) {
-        final float lineWidth = textLayout.getLineMax(line);
-        int start = textLayout.getLineStart(line);
-        int end = textLayout.getLineVisibleEnd(line);
-        float measureScale = lineWidth / textPaint.measureText(spannableText, start, end);
-        spannableText.setSpan(
-            new PaddingLineBackgroundSpan(bgColor,
-                horizontalPadding,
-                textLayout.getLineLeft(line),
-                textLayout.getLineTop(line),
-                textLayout.getLineRight(line),
-                textLayout.getLineBottom(line),
-                measureScale,
-                paddingSpanInfos.toArray(new PaddingLineBackgroundSpan.PaddingSpanInfo[0])
-            ),
-            start,
-            end,
-            Spanned.SPAN_PRIORITY);
-      }
+    for (int line = 0; line < textLayout.getLineCount(); line++) {
+      final float lineWidth = textLayout.getLineMax(line);
+      int start = textLayout.getLineStart(line);
+      int end = textLayout.getLineVisibleEnd(line);
+      float measureScale = lineWidth / textPaint.measureText(spannableText, start, end);
+      spannableText.setSpan(
+          new PaddingLineBackgroundSpan(
+              lineBackgroundColor,
+              horizontalPadding,
+              textLayout.getLineLeft(line),
+              textLayout.getLineTop(line),
+              textLayout.getLineRight(line),
+              textLayout.getLineBottom(line),
+              measureScale,
+              backgroundSpanInfos.toArray(new PaddingLineBackgroundSpan.BackgroundSpanInfo[0])
+          ),
+          start,
+          end,
+          Spanned.SPAN_PRIORITY);
     }
   }
 
