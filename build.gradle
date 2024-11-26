@@ -13,7 +13,6 @@
 // limitations under the License.
 buildscript {
     repositories {
-        mavenLocal()
         google()
         mavenCentral()
     }
@@ -25,7 +24,6 @@ buildscript {
 }
 allprojects {
     repositories {
-        mavenLocal()
         google()
         mavenCentral()
         maven {
@@ -34,6 +32,7 @@ allprojects {
                 includeGroup "com.github.philburk"
             }
         }
+        mavenLocal()
     }
 
     if (it.hasProperty('externalBuildDir')) {
