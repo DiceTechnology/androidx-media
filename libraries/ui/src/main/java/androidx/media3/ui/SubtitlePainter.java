@@ -493,42 +493,47 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         BackgroundColorSpan.class);
     if (colorSpans != null) {
       for (BackgroundColorSpan span : colorSpans) {
+        int color = span.getBackgroundColor();
         int spanStart = spannableText.getSpanStart(span);
         int spanEnd = spannableText.getSpanEnd(span);
         if (spanStart == 0 && spanEnd == spannableText.length()) {
-          lineBackgroundColor = span.getBackgroundColor();
+          lineBackgroundColor = color;
         } else {
           backgroundSpanInfos.add(
               new PaddingLineBackgroundSpan.BackgroundSpanInfo(
                   spanStart,
                   spanEnd,
-                  span.getBackgroundColor()));
+                  color));
         }
         // remove original background span, background will drawn by PaddingLineBackgroundSpan.
-        spannableText.removeSpan(span);
+        if (color != Color.TRANSPARENT) {
+          spannableText.removeSpan(span);
+        }
       }
       Collections.sort(backgroundSpanInfos); // sort by start position.
     }
 
-    for (int line = 0; line < textLayout.getLineCount(); line++) {
-      final float lineWidth = textLayout.getLineMax(line);
-      int start = textLayout.getLineStart(line);
-      int end = textLayout.getLineVisibleEnd(line);
-      float measureScale = lineWidth / textPaint.measureText(spannableText, start, end);
-      spannableText.setSpan(
-          new PaddingLineBackgroundSpan(
-              lineBackgroundColor,
-              horizontalPadding,
-              textLayout.getLineLeft(line),
-              textLayout.getLineTop(line),
-              textLayout.getLineRight(line),
-              textLayout.getLineBottom(line),
-              measureScale,
-              backgroundSpanInfos.toArray(new PaddingLineBackgroundSpan.BackgroundSpanInfo[0])
-          ),
-          start,
-          end,
-          Spanned.SPAN_PRIORITY);
+    if (lineBackgroundColor != Color.TRANSPARENT) {
+      for (int line = 0; line < textLayout.getLineCount(); line++) {
+        final float lineWidth = textLayout.getLineMax(line);
+        int start = textLayout.getLineStart(line);
+        int end = textLayout.getLineVisibleEnd(line);
+        float measureScale = lineWidth / textPaint.measureText(spannableText, start, end);
+        spannableText.setSpan(
+            new PaddingLineBackgroundSpan(
+                lineBackgroundColor,
+                horizontalPadding,
+                textLayout.getLineLeft(line),
+                textLayout.getLineTop(line),
+                textLayout.getLineRight(line),
+                textLayout.getLineBottom(line),
+                measureScale,
+                backgroundSpanInfos.toArray(new PaddingLineBackgroundSpan.BackgroundSpanInfo[0])
+            ),
+            start,
+            end,
+            Spanned.SPAN_PRIORITY);
+      }
     }
   }
 
