@@ -952,6 +952,13 @@
         "subtitle_language": "en"
       },
       {
+        "name": "WebVTT from hidive",
+        "uri": "https://html5demos.com/assets/dizzy.mp4",
+        "subtitle_uri": "https://dve-subtitles.imggaming.com/560967/776847/vtt/subtitle-en-US-245273-1712171888041.vtt",
+        "subtitle_mime_type": "text/vtt",
+        "subtitle_language": "en"
+      },
+      {
         "name": "WebVTT Japanese features",
         "uri": "https://html5demos.com/assets/dizzy.mp4",
         "subtitle_uri": "https://storage.googleapis.com/exoplayer-test-media-1/webvtt/japanese.vtt",
