@@ -151,6 +151,12 @@ public final class SubtitleView extends FrameLayout {
     viewType = VIEW_TYPE_CANVAS;
   }
 
+  public void setSubtitleHorizontalPadding(int horizontalPadding) {
+    if (innerSubtitleView instanceof CanvasSubtitleOutput) {
+      ((CanvasSubtitleOutput) innerSubtitleView).setHorizontalPadding(horizontalPadding);
+    }
+  }
+
   /**
    * Sets the cues to be displayed by the view.
    *

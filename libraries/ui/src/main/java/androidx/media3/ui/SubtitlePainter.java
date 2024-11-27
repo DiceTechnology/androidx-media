@@ -26,6 +26,7 @@ import android.graphics.Paint.Join;
 import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.text.Layout.Alignment;
+import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.StaticLayout;
@@ -41,6 +42,9 @@ import androidx.media3.common.text.TextShadow;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.Util;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
@@ -95,9 +99,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private int textTop;
   private int textPaddingX;
   private @MonotonicNonNull Rect bitmapRect;
+  private final int horizontalPadding;
 
   @SuppressWarnings("ResourceType")
-  public SubtitlePainter(Context context) {
+  public SubtitlePainter(Context context, int horizontalPadding) {
     int[] viewAttr = {android.R.attr.lineSpacingExtra, android.R.attr.lineSpacingMultiplier};
     TypedArray styledAttributes = context.obtainStyledAttributes(null, viewAttr, 0, 0);
     spacingAdd = styledAttributes.getDimensionPixelSize(0, 0);
@@ -122,6 +127,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     bitmapPaint = new Paint();
     bitmapPaint.setAntiAlias(true);
     bitmapPaint.setFilterBitmap(true);
+
+    this.horizontalPadding = horizontalPadding;
   }
 
   /**
@@ -370,6 +377,9 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     this.textLeft = textLeft;
     this.textTop = textTop;
     this.textPaddingX = textPaddingX;
+
+    // reset spannable text background span and draw padding area
+    setupPaddingSpan(backgroundColor, horizontalPadding);
   }
 
   @RequiresNonNull("cueBitmap")
@@ -468,6 +478,63 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     textPaint.setShadowLayer(0, 0, 0, 0);
 
     canvas.restoreToCount(saveCount);
+  }
+
+  private void setupPaddingSpan(int backgroundColor, int horizontalPadding) {
+    if (horizontalPadding <= 0 || !(textLayout.getText() instanceof Spannable)) {
+      return;
+    }
+    List<PaddingLineBackgroundSpan.BackgroundSpanInfo> backgroundSpanInfos = new ArrayList<>();
+    int lineBackgroundColor = backgroundColor;
+    Spannable spannableText = (Spannable) textLayout.getText();
+    BackgroundColorSpan[] colorSpans = spannableText.getSpans(
+        0,
+        spannableText.length(),
+        BackgroundColorSpan.class);
+    if (colorSpans != null) {
+      for (BackgroundColorSpan span : colorSpans) {
+        int color = span.getBackgroundColor();
+        int spanStart = spannableText.getSpanStart(span);
+        int spanEnd = spannableText.getSpanEnd(span);
+        if (spanStart == 0 && spanEnd == spannableText.length()) {
+          lineBackgroundColor = color;
+        } else {
+          backgroundSpanInfos.add(
+              new PaddingLineBackgroundSpan.BackgroundSpanInfo(
+                  spanStart,
+                  spanEnd,
+                  color));
+        }
+        // remove original background span, background will drawn by PaddingLineBackgroundSpan.
+        if (color != Color.TRANSPARENT) {
+          spannableText.removeSpan(span);
+        }
+      }
+      Collections.sort(backgroundSpanInfos); // sort by start position.
+    }
+
+    if (lineBackgroundColor != Color.TRANSPARENT) {
+      for (int line = 0; line < textLayout.getLineCount(); line++) {
+        final float lineWidth = textLayout.getLineMax(line);
+        int start = textLayout.getLineStart(line);
+        int end = textLayout.getLineVisibleEnd(line);
+        float measureScale = lineWidth / textPaint.measureText(spannableText, start, end);
+        spannableText.setSpan(
+            new PaddingLineBackgroundSpan(
+                lineBackgroundColor,
+                horizontalPadding,
+                textLayout.getLineLeft(line),
+                textLayout.getLineTop(line),
+                textLayout.getLineRight(line),
+                textLayout.getLineBottom(line),
+                measureScale,
+                backgroundSpanInfos.toArray(new PaddingLineBackgroundSpan.BackgroundSpanInfo[0])
+            ),
+            start,
+            end,
+            Spanned.SPAN_PRIORITY);
+      }
+    }
   }
 
   @RequiresNonNull({"cueBitmap", "bitmapRect"})
