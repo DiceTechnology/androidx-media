@@ -7,7 +7,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class TextShadow implements Serializable {
+public class TextShadow {
 
   private static final String FIELD_COMPONENTS = Util.intToStringMaxRadix(0);
 
@@ -41,7 +41,7 @@ public class TextShadow implements Serializable {
     return new TextShadow(components);
   }
 
-  public static class Component implements Serializable {
+  public static class Component {
 
     private static final String FIELD_DX = Util.intToStringMaxRadix(0);
     private static final String FIELD_DY = Util.intToStringMaxRadix(1);

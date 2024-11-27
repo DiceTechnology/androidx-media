@@ -955,7 +955,9 @@ public final class Cue {
     bundle.putInt(FIELD_WINDOW_COLOR, windowColor);
     bundle.putInt(FIELD_VERTICAL_TYPE, verticalType);
     bundle.putFloat(FIELD_SHEAR_DEGREES, shearDegrees);
-    bundle.putSerializable(FIELD_SHADOW, textShadow);
+    if (textShadow != null) {
+      bundle.putBundle(FIELD_SHADOW, textShadow.toBundle());
+    }
     return bundle;
   }
 
@@ -1028,10 +1030,9 @@ public final class Cue {
     if (bundle.containsKey(FIELD_SHEAR_DEGREES)) {
       builder.setShearDegrees(bundle.getFloat(FIELD_SHEAR_DEGREES));
     }
-    @Nullable
-    TextShadow textShadow = (TextShadow) bundle.getSerializable(FIELD_SHADOW);
-    if (textShadow != null) {
-      builder.setTextShadow(textShadow);
+    Bundle textShadowBundle = bundle.containsKey(FIELD_SHADOW) ? bundle.getBundle(FIELD_SHADOW) : null;
+    if (textShadowBundle != null) {
+      builder.setTextShadow(TextShadow.fromBundle(bundle.getBundle(FIELD_SHADOW)));
     }
     return builder.build();
   }
