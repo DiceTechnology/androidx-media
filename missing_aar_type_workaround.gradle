@@ -30,6 +30,8 @@ def addMissingAarTypeToXml(xml) {
         "org.mockito:mockito-core",
         "org.robolectric:robolectric",
         "com.github.philburk:jsyn",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk7",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
     ]
     // Dependencies that have AAR files.
     def aar_dependencies = [
