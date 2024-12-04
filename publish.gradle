@@ -20,13 +20,18 @@ afterEvaluate {
         publishing {
             repositories {
                 maven {
-                    url = findProperty('mavenRepo') ?: "${buildDir}/repo"
+                    url = System.getenv('AWS_S3_BUCKET_URL')
+                    credentials(AwsCredentials) {
+                        accessKey = System.getenv('AWS_ACCESS_KEY_ID')
+                        secretKey = System.getenv('AWS_SECRET_ACCESS_KEY')
+                        sessionToken = System.getenv('AWS_SESSION_TOKEN')
+                    }
                 }
             }
             publications {
                 release(MavenPublication) {
                     from components.release
-                    groupId = 'androidx.media3'
+                    groupId = 'com.endeavorstreaming.androidx-media'
                     artifactId = findProperty('releaseArtifactId') ?: ''
                     version = findProperty('releaseVersion') ?: ''
                     pom {

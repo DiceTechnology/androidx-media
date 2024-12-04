@@ -32,12 +32,14 @@ allprojects {
                 includeGroup "com.github.philburk"
             }
         }
+        mavenLocal()
     }
+
     if (it.hasProperty('externalBuildDir')) {
         if (!new File(externalBuildDir).isAbsolute()) {
             externalBuildDir = new File(rootDir, externalBuildDir)
         }
         buildDir = "${externalBuildDir}/${project.name}"
     }
-    group = 'androidx.media3'
+    group = 'com.endeavorstreaming.androidx-media'
 }
