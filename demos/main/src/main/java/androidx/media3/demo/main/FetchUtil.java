@@ -1,7 +1,7 @@
-package androidx.media3.demo.main.upstream;
+package androidx.media3.demo.main;
 
-import android.text.TextUtils;
-import com.diceplatform.doris.sdk.playback.internal.HttpService;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParser;
 import io.reactivex.rxjava3.core.Observable;
 import java.io.IOException;
 import java.util.Map;
@@ -17,7 +17,10 @@ import org.jetbrains.annotations.NotNull;
 
 public final class FetchUtil {
 
-  private static final long DEFAULT_HTTP_TIMEOUT_MS = 10_000;
+  public static final String CONTENT_TYPE_JSON = "application/json";
+  public static final MediaType MEDIA_TYPE_JSON = MediaType.get(CONTENT_TYPE_JSON);
+  public static final long DEFAULT_HTTP_TIMEOUT_MS = 10_000;
+
   private static final OkHttpClient client = client();
 
   private FetchUtil() {
@@ -62,13 +65,8 @@ public final class FetchUtil {
       return from(url, headers, body, null);
     }
 
-    public static RequestData from(String url, Map<String, String> headers, String body,
-        MediaType bodyType) {
-      if (TextUtils.isEmpty(body)) {
-        return new RequestData(url, headers, null, null);
-      }
-      return new RequestData(url, headers, body,
-          bodyType == null ? HttpService.MEDIA_TYPE_JSON : bodyType);
+    public static RequestData from(String url, Map<String, String> headers, String body, MediaType bodyType) {
+      return new RequestData(url, headers, body, bodyType == null ? MEDIA_TYPE_JSON : bodyType);
     }
   }
 
@@ -77,7 +75,6 @@ public final class FetchUtil {
         .connectTimeout(DEFAULT_HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         .readTimeout(DEFAULT_HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         .writeTimeout(DEFAULT_HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        // .addInterceptor(new HttpService.ResponseBodyInterceptor())
         .build();
   }
 
@@ -125,5 +122,13 @@ public final class FetchUtil {
         }
       });
     });
+  }
+
+  public static String generateJson(Object obj) {
+    return new GsonBuilder().setPrettyPrinting().create().toJson(obj);
+  }
+
+  public static String prettyJson(String json) {
+    return generateJson(JsonParser.parseString(json));
   }
 }
