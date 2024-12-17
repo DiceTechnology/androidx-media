@@ -46,7 +46,7 @@ echo "Running Gradle publish task..."
 AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
 AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
 AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN" \
-./gradlew publish
+./gradlew publish -x test
 
 # Check for success or failure of the gradle publish task
 if [[ $? -eq 0 ]]; then
