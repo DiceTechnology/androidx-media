@@ -73,7 +73,7 @@ def addMissingAarTypeToXml(xml) {
                             .children()[0]
                     String dependencyName = groupId + ":" + artifactId
                     boolean isProjectLibrary =
-                        groupId == 'androidx.media3'
+                        groupId == 'com.endeavorstreaming.androidx-media'
                     boolean hasJar =
                         jar_only_dependencies.contains(dependencyName)
                     boolean hasAar =
