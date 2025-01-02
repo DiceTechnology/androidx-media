@@ -585,7 +585,6 @@ public class ChunkSampleStream<T extends ChunkSource>
     if (endOfStream) {
       pendingResetPositionUs = C.TIME_UNSET;
       loadingFinished = true;
-
       return true;
     }
 

@@ -446,7 +446,7 @@ public final class DashMediaSourceTest {
     assertThat(window.getDefaultPositionMs()).isEqualTo(12_000);
     // Expect the target live offset reaching from now time to the end of the window.
     // Ignore this check because of our low latency logic (smooth the target offset)
-    // assertThat(window.liveConfiguration.targetOffsetMs).isEqualTo(60_000 - 16_000);
+//    assertThat(window.liveConfiguration.targetOffsetMs).isEqualTo(60_000 - 16_000);
   }
 
   @Test

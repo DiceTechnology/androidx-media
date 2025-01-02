@@ -67,4 +67,16 @@ afterEvaluate {
         }
     }
 }
-tasks.withType(PublishToMavenRepository) { it.dependsOn lint, test }
+tasks.withType(PublishToMavenRepository) {
+    if (project.name == 'lib-session' || project.name == 'lib-ui') {
+        // Fix the RestrictedApi lint error. 
+        // e.g. androidx-media/libraries/session/src/main/java/androidx/media3/session/legacy/MediaBrowserCompat.java:1260
+        // Error: ResultReceiver can only be accessed from within the same library group prefix (referenced 
+        // groupId=androidx.core with prefix androidx from groupId=com.endeavorstreaming.androidx-media) [RestrictedApi]
+        // e.g. androidx-media/libraries/ui/src/main/java/androidx/media3/ui/PlayerNotificationManager.java:1643: 
+        // Error: NotificationBuilderWithBuilderAccessor can only be accessed from within the same library group prefix ...
+        it.dependsOn test
+    } else {
+        it.dependsOn lint, test
+    }
+}

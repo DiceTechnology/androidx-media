@@ -101,7 +101,9 @@ public class MediaSessionKeyEventTest {
       handler.postAndSync(
           () -> {
             player.notifyPlayWhenReadyChanged(
-                /* playWhenReady= */ true, Player.PLAYBACK_SUPPRESSION_REASON_NONE);
+                /* playWhenReady= */ true,
+                Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST,
+                Player.PLAYBACK_SUPPRESSION_REASON_NONE);
             player.notifyPlaybackStateChanged(Player.STATE_READY);
           });
     } else {
@@ -192,7 +194,7 @@ public class MediaSessionKeyEventTest {
                 .get(0)
                 .getConnectionHints()
                 .getBoolean(
-                    MediaNotificationManager.KEY_MEDIA_NOTIFICATION_MANAGER,
+                    MediaController.KEY_MEDIA_NOTIFICATION_CONTROLLER_FLAG,
                     /* defaultValue= */ false))
         .isTrue();
     threadTestRule.getHandler().postAndSync(controller::release);
@@ -234,7 +236,7 @@ public class MediaSessionKeyEventTest {
                 .get(0)
                 .getConnectionHints()
                 .getBoolean(
-                    MediaNotificationManager.KEY_MEDIA_NOTIFICATION_MANAGER,
+                    MediaController.KEY_MEDIA_NOTIFICATION_CONTROLLER_FLAG,
                     /* defaultValue= */ false))
         .isTrue();
     threadTestRule.getHandler().postAndSync(controller::release);
@@ -344,6 +346,20 @@ public class MediaSessionKeyEventTest {
     player.awaitMethodCalled(MockPlayer.METHOD_SEEK_TO_NEXT, TIMEOUT_MS);
   }
 
+  @Test
+  public void playPauseKeyEvent_doubleTapOnHeadsetHook_seekNext() throws Exception {
+    Assume.assumeTrue(Util.SDK_INT >= 21); // TODO: b/199064299 - Lower minSdk to 19.
+    handler.postAndSync(
+        () -> {
+          player.playWhenReady = true;
+          player.playbackState = Player.STATE_READY;
+        });
+
+    dispatchMediaKeyEvent(KeyEvent.KEYCODE_HEADSETHOOK, /* doubleTap= */ true);
+
+    player.awaitMethodCalled(MockPlayer.METHOD_SEEK_TO_NEXT, TIMEOUT_MS);
+  }
+
   private MediaController connectMediaNotificationController() throws Exception {
     return threadTestRule
         .getHandler()
@@ -351,7 +367,7 @@ public class MediaSessionKeyEventTest {
             () -> {
               Bundle connectionHints = new Bundle();
               connectionHints.putBoolean(
-                  MediaNotificationManager.KEY_MEDIA_NOTIFICATION_MANAGER, /* value= */ true);
+                  MediaController.KEY_MEDIA_NOTIFICATION_CONTROLLER_FLAG, /* value= */ true);
               return new MediaController.Builder(
                       ApplicationProvider.getApplicationContext(), session.getToken())
                   .setConnectionHints(connectionHints)

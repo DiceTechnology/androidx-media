@@ -48,6 +48,7 @@ public final class SpliceInfoDecoderTest {
     inputBuffer = new MetadataInputBuffer();
   }
 
+  // Add this check because of our scte35 signal handle logic (read the Binary data on CSAI live stream)
   @Test
   public void testSpliceInsertCueOut() {
     String scte35OutHex = "0xFC302500000000000000FFF0140576AD89827FEFFF392DC5E97E00D512AE0001000000004B2D168C";

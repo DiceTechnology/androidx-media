@@ -41,7 +41,6 @@ import androidx.media3.exoplayer.DecoderReuseEvaluation;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.audio.AudioSink;
 import androidx.media3.exoplayer.drm.DrmSession;
-import androidx.media3.exoplayer.endeavor.TrackCollector;
 import androidx.media3.exoplayer.source.LoadEventInfo;
 import androidx.media3.exoplayer.source.MediaLoadData;
 import androidx.media3.exoplayer.trackselection.MappingTrackSelector;
@@ -93,10 +92,11 @@ public class EventLogger implements AnalyticsListener {
    * Creates an instance.
    *
    * @param trackSelector This parameter is ignored.
-   * @deprecated Use {@link EventLogger()}
+   * @deprecated Use {@link #EventLogger()}
    */
   @UnstableApi
   @Deprecated
+  @SuppressWarnings("unused") // Maintain backwards compatibility for callers.
   public EventLogger(@Nullable MappingTrackSelector trackSelector) {
     this(DEFAULT_TAG);
   }
@@ -106,10 +106,11 @@ public class EventLogger implements AnalyticsListener {
    *
    * @param trackSelector This parameter is ignored.
    * @param tag The tag used for logging.
-   * @deprecated Use {@link EventLogger(String)}
+   * @deprecated Use {@link #EventLogger(String)}
    */
   @UnstableApi
   @Deprecated
+  @SuppressWarnings("unused") // Maintain backwards compatibility for callers.
   public EventLogger(@Nullable MappingTrackSelector trackSelector, String tag) {
     this(tag);
   }
@@ -343,7 +344,10 @@ public class EventLogger implements AnalyticsListener {
   @UnstableApi
   @Override
   public void onAudioDecoderInitialized(
-      EventTime eventTime, String decoderName, long initializationDurationMs) {
+      EventTime eventTime,
+      String decoderName,
+      long initializedTimestampMs,
+      long initializationDurationMs) {
     logd(eventTime, "audioDecoderInitialized", decoderName);
   }
 
@@ -351,7 +355,10 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onAudioInputFormatChanged(
       EventTime eventTime, Format format, @Nullable DecoderReuseEvaluation decoderReuseEvaluation) {
-    Log.i(WebUtil.DEBUG, "onAudioInputFormatChanged " + (format == null ? "-" : format.label + ", " + TrackCollector.getFormatGroupId(format)));
+    Log.i(WebUtil.DEBUG, "onAudioInputFormatChanged ["
+        + getTimeString(eventTime.realtimeMs - startTimeMs)
+        + (format == null ? "" : ", " + format)
+        + "]");
     logd(eventTime, "audioInputFormat", Format.toLogString(format));
   }
 
@@ -434,7 +441,10 @@ public class EventLogger implements AnalyticsListener {
   @UnstableApi
   @Override
   public void onVideoDecoderInitialized(
-      EventTime eventTime, String decoderName, long initializationDurationMs) {
+      EventTime eventTime,
+      String decoderName,
+      long initializedTimestampMs,
+      long initializationDurationMs) {
     logd(eventTime, "videoDecoderInitialized", decoderName);
   }
 
@@ -442,7 +452,10 @@ public class EventLogger implements AnalyticsListener {
   @Override
   public void onVideoInputFormatChanged(
       EventTime eventTime, Format format, @Nullable DecoderReuseEvaluation decoderReuseEvaluation) {
-    Log.i(WebUtil.DEBUG, "onVideoInputFormatChanged " + (format == null ? "-" : format.bitrate + ", " + TrackCollector.getAudioGroupId(format)));
+    Log.i(WebUtil.DEBUG, "onVideoInputFormatChanged ["
+        + getTimeString(eventTime.realtimeMs - startTimeMs)
+        + (format == null ? "" : ", " + format)
+        + "]");
     logd(eventTime, "videoInputFormat", Format.toLogString(format));
   }
 
@@ -507,10 +520,10 @@ public class EventLogger implements AnalyticsListener {
   public void onLoadCompleted(
       EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData) {
 
-    String loadUri = (loadEventInfo != null && loadEventInfo.uri != null ? loadEventInfo.uri.toString() : null);
-    if (loadUri != null) {
-      Log.i(WebUtil.DEBUG, String.format("loadCompleted [%.3f, %.3f kb, %.3f s], play %.3f s, buff %.3f s\n%s",
-          System.currentTimeMillis() / 1000f,
+    if (loadEventInfo != null && loadEventInfo.uri != null) {
+      String loadUri = loadEventInfo.uri.toString();
+      Log.i(WebUtil.DEBUG, String.format("loadCompleted [%s, %.3f kb, %.3f s], play %.3f s, buff %.3f s\n%s",
+          getTimeString(eventTime.realtimeMs - startTimeMs),
           loadEventInfo.bytesLoaded / 1000f,
           loadEventInfo.loadDurationMs / 1000f,
           eventTime.currentPlaybackPositionMs / 1000f,
@@ -734,6 +747,8 @@ public class EventLogger implements AnalyticsListener {
         return "SKIP";
       case Player.DISCONTINUITY_REASON_INTERNAL:
         return "INTERNAL";
+      case Player.DISCONTINUITY_REASON_SILENCE_SKIP:
+        return "SILENCE_SKIP";
       default:
         return "?";
     }
