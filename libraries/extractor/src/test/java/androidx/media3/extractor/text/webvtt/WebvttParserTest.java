@@ -36,6 +36,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.truth.Expect;
 import java.io.IOException;
 import java.util.List;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -247,8 +248,8 @@ public class WebvttParserTest {
     assertThat(fourthCue.text.toString()).isEqualTo("This is the <fourth> &subtitle.");
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void parseWithPositioning() throws Exception {
     List<CuesWithTiming> allCues = getCuesForTestAsset(WITH_POSITIONING_FILE);
 
@@ -357,8 +358,8 @@ public class WebvttParserTest {
     assertThat(secondCue.text.toString()).isEqualTo("This is the second subtitle.");
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void parseWithOverlappingTimestamps() throws Exception {
     List<CuesWithTiming> allCues = getCuesForTestAsset(WITH_OVERLAPPING_TIMESTAMPS_FILE);
 
@@ -454,8 +455,8 @@ public class WebvttParserTest {
     assertThat(thirdCue.verticalType).isEqualTo(Cue.TYPE_UNSET);
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void parseWithRubies() throws Exception {
     List<CuesWithTiming> allCues = getCuesForTestAsset(WITH_RUBIES_FILE);
 
@@ -519,8 +520,8 @@ public class WebvttParserTest {
     assertThat(secondCue.text.toString()).isEqualTo("This is the third subtitle.");
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void parseWithCssFontSizeStyle() throws Exception {
     List<CuesWithTiming> allCues = getCuesForTestAsset(WITH_FONT_SIZE);
 

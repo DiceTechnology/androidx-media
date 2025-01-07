@@ -34,6 +34,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.truth.Expect;
 import java.io.IOException;
 import java.util.List;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -166,8 +167,8 @@ public final class DelegatingSubtitleDecoderWithWebvttParserTest {
     assertThat(fourthCue.text.toString()).isEqualTo("This is the <fourth> &subtitle.");
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void decodeWithPositioning() throws Exception {
     Subtitle subtitle = getSubtitleForTestAsset(WITH_POSITIONING_FILE);
     assertThat(subtitle.getEventTimeCount()).isEqualTo(16);
@@ -238,8 +239,8 @@ public final class DelegatingSubtitleDecoderWithWebvttParserTest {
     assertThat(eighthCue.positionAnchor).isEqualTo(Cue.ANCHOR_TYPE_END);
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void decodeWithOverlappingTimestamps() throws Exception {
     Subtitle subtitle = getSubtitleForTestAsset(WITH_OVERLAPPING_TIMESTAMPS_FILE);
     assertThat(subtitle.getEventTimeCount()).isEqualTo(8);
@@ -299,8 +300,8 @@ public final class DelegatingSubtitleDecoderWithWebvttParserTest {
     assertThat(thirdCue.verticalType).isEqualTo(Cue.TYPE_UNSET);
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void decodeWithRubies() throws Exception {
     Subtitle subtitle = getSubtitleForTestAsset(WITH_RUBIES_FILE);
     assertThat(subtitle.getEventTimeCount()).isEqualTo(8);
@@ -354,8 +355,8 @@ public final class DelegatingSubtitleDecoderWithWebvttParserTest {
     assertThat(secondCue.text.toString()).isEqualTo("This is the third subtitle.");
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void decodeWithCssFontSizeStyle() throws Exception {
     Subtitle subtitle = getSubtitleForTestAsset(WITH_FONT_SIZE);
     assertThat(subtitle.getEventTimeCount()).isEqualTo(12);

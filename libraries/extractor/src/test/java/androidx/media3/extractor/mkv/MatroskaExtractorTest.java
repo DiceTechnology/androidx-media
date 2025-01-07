@@ -23,6 +23,7 @@ import androidx.media3.test.utils.ExtractorAsserts;
 import com.google.common.base.Joiner;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.ParameterizedRobolectricTestRunner;
@@ -57,8 +58,8 @@ public final class MatroskaExtractorTest {
         simulationConfig);
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void mkvSample_withSubripSubtitles() throws Exception {
     ExtractorAsserts.assertBehavior(
         getExtractorFactory(subtitlesParsedDuringExtraction),
@@ -68,8 +69,8 @@ public final class MatroskaExtractorTest {
         simulationConfig);
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void mkvSample_withNullTerminatedSubripSubtitles() throws Exception {
     ExtractorAsserts.assertBehavior(
         getExtractorFactory(subtitlesParsedDuringExtraction),
@@ -79,8 +80,8 @@ public final class MatroskaExtractorTest {
         simulationConfig);
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void mkvSample_withOverlappingSubripSubtitles() throws Exception {
     ExtractorAsserts.assertBehavior(
         getExtractorFactory(subtitlesParsedDuringExtraction),
@@ -90,8 +91,8 @@ public final class MatroskaExtractorTest {
         simulationConfig);
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void mkvSample_withSsaSubtitles() throws Exception {
     ExtractorAsserts.assertBehavior(
         getExtractorFactory(subtitlesParsedDuringExtraction),
@@ -102,8 +103,8 @@ public final class MatroskaExtractorTest {
   }
 
   // https://github.com/google/ExoPlayer/pull/8265
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void mkvSample_withNullTerminatedSsaSubtitles() throws Exception {
     ExtractorAsserts.assertBehavior(
         getExtractorFactory(subtitlesParsedDuringExtraction),
@@ -114,8 +115,8 @@ public final class MatroskaExtractorTest {
         simulationConfig);
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void mkvSample_withOverlappingSsaSubtitles() throws Exception {
     ExtractorAsserts.assertBehavior(
         getExtractorFactory(subtitlesParsedDuringExtraction),
@@ -125,8 +126,8 @@ public final class MatroskaExtractorTest {
         simulationConfig);
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void mkvSample_withVttSubtitles() throws Exception {
     ExtractorAsserts.assertBehavior(
         getExtractorFactory(subtitlesParsedDuringExtraction),
@@ -136,8 +137,8 @@ public final class MatroskaExtractorTest {
         simulationConfig);
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void mkvSample_withNullTerminatedVttSubtitles() throws Exception {
     ExtractorAsserts.assertBehavior(
         getExtractorFactory(subtitlesParsedDuringExtraction),
@@ -172,8 +173,8 @@ public final class MatroskaExtractorTest {
         simulationConfig);
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void mkvFullBlocksSample() throws Exception {
     ExtractorAsserts.assertBehavior(
         getExtractorFactory(subtitlesParsedDuringExtraction),

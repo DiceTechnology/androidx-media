@@ -29,6 +29,7 @@ import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import java.io.EOFException;
 import java.io.IOException;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -97,8 +98,8 @@ public class WebvttExtractorTest {
         "extractordumps/webvtt/with_x-timestamp-map_header.dump");
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void read_handlesLargeCueTimestamps_withSubtitleParsingDuringExtraction()
       throws Exception {
     TimestampAdjuster timestampAdjuster = new TimestampAdjuster(/* firstSampleTimestampUs= */ 0);

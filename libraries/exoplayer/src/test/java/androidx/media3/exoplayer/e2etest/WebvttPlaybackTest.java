@@ -49,6 +49,7 @@ import androidx.test.core.app.ApplicationProvider;
 import com.google.common.collect.ImmutableList;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -68,8 +69,8 @@ public class WebvttPlaybackTest {
   public ShadowMediaCodecConfig mediaCodecConfig =
       ShadowMediaCodecConfig.forAllSupportedMimeTypes();
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void test() throws Exception {
     Context applicationContext = ApplicationProvider.getApplicationContext();
     CapturingRenderersFactory capturingRenderersFactory =
@@ -107,8 +108,8 @@ public class WebvttPlaybackTest {
         applicationContext, playbackOutput, "playbackdumps/webvtt/" + inputFile + ".dump");
   }
 
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void test_withSeek() throws Exception {
     Context applicationContext = ApplicationProvider.getApplicationContext();
     CapturingRenderersFactory capturingRenderersFactory =
@@ -160,8 +161,8 @@ public class WebvttPlaybackTest {
   // MediaSource.Factory.experimentalParseSubtitlesDuringExtraction() methods to ensure legacy
   // subtitle handling keeps working.
   @SuppressWarnings("deprecation")
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void test_legacyParseInRenderer() throws Exception {
     Context applicationContext = ApplicationProvider.getApplicationContext();
     CapturingRenderersFactory capturingRenderersFactory =
@@ -219,8 +220,8 @@ public class WebvttPlaybackTest {
   // MediaSource.Factory.experimentalParseSubtitlesDuringExtraction() methods to ensure legacy
   // subtitle handling keeps working.
   @SuppressWarnings("deprecation")
-  // Ignore this check because of our webvtt enhancement
-//  @Test
+  @Test
+  @Ignore("Disabled due to our webvtt enhancement")
   public void test_legacyParseInRendererWithSeek() throws Exception {
     Context applicationContext = ApplicationProvider.getApplicationContext();
     CapturingRenderersFactory capturingRenderersFactory =
