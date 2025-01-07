@@ -218,37 +218,6 @@
     ]
   },
   {
-    "name": "Dice Test",
-    "samples": [
-      {
-        "name": "webvtt 3.0, sandbox",
-        "uri": "https://dummy.imggaming.com/video?id=85158&live=&dash=&realm=dce.sandbox&usr=&pwd=",
-        "subtitle_uri": "https://dve-subtitles.imggaming.com/85158/127290/vtt/subtitle-hu-HU-199613-1697467810981.vtt",
-        "subtitle_mime_type": "text/vtt",
-        "subtitle_language": "hu"
-      },
-      {
-        "name": "WWE live hls clear, sandbox",
-        "uri": "https://dummy.imggaming.com/video?id=111449&live=true&dash=&realm=dce.sandbox&usr=&pwd="
-      },
-      {
-        "name": "WWE live hls clear, wwe",
-        "uri": "https://dummy.imggaming.com/video?id=111449&live=true&dash=&realm=dce.wwe&usr=&pwd="
-      },
-      {
-        "name": "WWE vod hls clear, wwe",
-        "uri": "https://dummy.imggaming.com/video?id=530182&live=&dash=&realm=dce.wwe&usr=&pwd=",
-        "subtitle_uri": "https://dve-subtitles.imggaming.com/530182/741299/vtt/subtitle-en-US-199647-1697490152197.vtt",
-        "subtitle_mime_type": "text/vtt",
-        "subtitle_language": "en"
-      },
-      {
-        "name": "450830 vod dash DRM, adjara",
-        "uri": "https://dummy.imggaming.com/video?id=450830&live=&dash=true&realm=dce.adjara&usr=&pwd="
-      }
-    ]
-  },
-  {
     "name": "Clear DASH",
     "samples": [
       {
@@ -861,6 +830,27 @@
             "clip_start_position_ms": 10000
           }
         ]
+      },
+      {
+        "name": "Image -> Video -> Image -> Image",
+        "playlist": [
+          {
+            "uri": "https://storage.googleapis.com/exoplayer-test-media-1/jpg/tokyo.jpg",
+            "image_duration_ms": 2000
+          },
+          {
+            "uri": "https://html5demos.com/assets/dizzy.mp4",
+            "clip_end_position_ms": 2000
+          },
+          {
+            "uri": "https://storage.googleapis.com/exoplayer-test-media-1/jpg/london.jpg",
+            "image_duration_ms": 2000
+          },
+          {
+            "uri": "https://storage.googleapis.com/exoplayer-test-media-1/jpg/tokyo.jpg",
+            "image_duration_ms": 2000
+          }
+        ]
       }
     ]
   },
@@ -931,6 +921,13 @@
         "subtitle_language": "en"
       },
       {
+        "name": "WebVTT from hidive",
+        "uri": "https://html5demos.com/assets/dizzy.mp4",
+        "subtitle_uri": "https://dve-subtitles.imggaming.com/560967/776847/vtt/subtitle-en-US-245273-1712171888041.vtt",
+        "subtitle_mime_type": "text/vtt",
+        "subtitle_language": "en"
+      },
+      {
         "name": "WebVTT Japanese features",
         "uri": "https://html5demos.com/assets/dizzy.mp4",
         "subtitle_uri": "https://storage.googleapis.com/exoplayer-test-media-1/webvtt/japanese.vtt",
@@ -966,7 +963,7 @@
     ]
   },
   {
-    "name": "Misc",
+    "name": "Progressive",
     "samples": [
       {
         "name": "Dizzy (MP4)",
@@ -1019,6 +1016,40 @@
       {
         "name": "One hour frame counter (MP4)",
         "uri": "https://storage.googleapis.com/exoplayer-test-media-1/mp4/frame-counter-one-hour.mp4"
+      }
+    ]
+  },
+  {
+    "name": "Images",
+    "samples": [
+      {
+        "name": "JPEG (wide)",
+        "uri": "https://storage.googleapis.com/exoplayer-test-media-1/jpg/london.jpg",
+        "image_duration_ms": 2000
+      },
+      {
+        "name": "JPEG (tall)",
+        "uri": "https://storage.googleapis.com/exoplayer-test-media-1/jpg/tokyo.jpg",
+        "image_duration_ms": 2000
+      },
+      {
+        "name": "PNG",
+        "uri": "https://storage.googleapis.com/exoplayer-test-media-1/png/media3test.png",
+        "image_duration_ms": 2000
+      },
+      {
+        "name": "JPEG motion photo (still)",
+        "uri": "https://storage.googleapis.com/exoplayer-test-media-1/jpg/london_motion_photo.jpg",
+        "image_duration_ms": 2000
+      },
+      {
+        "name": "JPEG motion photo (motion)",
+        "uri": "https://storage.googleapis.com/exoplayer-test-media-1/jpg/london_motion_photo.jpg"
+      },
+      {
+        "name": "JPEG (Ultra HDR)",
+        "uri": "https://storage.googleapis.com/exoplayer-test-media-1/jpg/ultra_hdr.jpg",
+        "image_duration_ms": 2000
       }
     ]
   }
