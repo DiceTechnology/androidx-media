@@ -25,6 +25,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/rename_package.gradle"
+
 dependencies {
     implementation project(modulePrefix + 'lib-exoplayer')
     implementation project(modulePrefix + 'lib-decoder')

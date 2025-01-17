@@ -31,6 +31,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/rename_package.gradle"
+
 dependencies {
     implementation project(modulePrefix + 'lib-exoplayer')
     compileOnly 'com.google.errorprone:error_prone_annotations:' + errorProneVersion

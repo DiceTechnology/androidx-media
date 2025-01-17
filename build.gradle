@@ -22,6 +22,11 @@ buildscript {
         classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0'
     }
 }
+
+plugins {
+    id "endeavorstreaming.renaming.package" apply false
+}
+
 allprojects {
     repositories {
         google()

@@ -23,6 +23,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/rename_package.gradle"
+
 dependencies {
     api 'com.google.android.gms:play-services-cast-framework:21.3.0'
     implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
