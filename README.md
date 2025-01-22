@@ -1,3 +1,7 @@
+# We support renaming the libraries‘ package, see: [rename the package][]
+
+[rename the package]: RENAME_THE_PACKAGE.md
+
 # AndroidX Media
 
 AndroidX Media is a collection of libraries for implementing media use cases on

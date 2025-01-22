@@ -15,16 +15,19 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url("https://d1yvb7bfbv0w4t.cloudfront.net/")
+            credentials {
+                username = System.getenv("ES_MAVEN_SECRET")
+            }
+        }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.3.2'
         classpath 'com.google.android.gms:strict-version-matcher-plugin:1.2.4'
         classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0'
+        classpath "com.endeavorstreaming.plugin:rename-package:1.0.1"
     }
-}
-
-plugins {
-    id "endeavorstreaming.renaming.package" apply false
 }
 
 allprojects {
