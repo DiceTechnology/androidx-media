@@ -42,6 +42,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/rename_package.gradle"
+
 dependencies {
     constraints {
         // List all released targets as constraints. This ensures they are all

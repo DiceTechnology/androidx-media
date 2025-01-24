@@ -41,6 +41,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/rename_package.gradle"
+
 dependencies {
     implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
     implementation project(modulePrefix + 'lib-datasource')

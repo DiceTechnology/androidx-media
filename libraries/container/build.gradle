@@ -41,6 +41,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/rename_package.gradle"
+
 dependencies {
     api project(modulePrefix + 'lib-common')
     implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
