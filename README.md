@@ -7,7 +7,7 @@ Android, including local playback (via ExoPlayer), video editing (via Transforme
 
 Modified AndroidX Media libraries include a `-mod` suffix in their version name:
 ```kotlin
-implementation("com.endeavorstreaming.androidx-media:exoplayer:1.4.1-dr1-mod")
+implementation("com.endeavorstreaming.androidx-media:exoplayer:1.4.1-dr2-mod")
 ```
 
 To publish the modified version of AndroidX Media libraries, run:
