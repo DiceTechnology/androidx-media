@@ -34,7 +34,7 @@ android {
         aidl true
     }
 }
-apply from: "$gradle.ext.androidxMediaSettingsDir/rename_package.gradle"
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
 
 dependencies {
     api project(modulePrefix + 'lib-common')

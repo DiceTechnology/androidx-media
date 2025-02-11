@@ -24,7 +24,7 @@ android {
     }
 }
 
-apply from: "$gradle.ext.androidxMediaSettingsDir/rename_package.gradle"
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
 
 dependencies {
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion

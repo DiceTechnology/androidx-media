@@ -49,7 +49,7 @@ AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN" \
 ./gradlew publish
 
 # Publish package renamed version
-./gradlew publish -PrenamePackage=true -x test -x lintDebug
+./gradlew publish -Prepackage=true -x test -x lintDebug
 
 # Check for success or failure of the gradle publish task
 if [[ $? -eq 0 ]]; then

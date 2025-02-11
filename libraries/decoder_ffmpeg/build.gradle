@@ -23,7 +23,7 @@ if (project.file('src/main/jni/ffmpeg').exists()) {
     android.externalNativeBuild.cmake.version = '3.21.0+'
 }
 
-apply from: "$gradle.ext.androidxMediaSettingsDir/rename_package.gradle"
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
 
 dependencies {
     implementation project(modulePrefix + 'lib-decoder')

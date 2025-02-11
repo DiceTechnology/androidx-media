@@ -1,0 +1,9 @@
+project.ext {
+    repackage = project.hasProperty('repackage') ? project.repackage : false
+}
+if (repackage) {
+    apply plugin: "endeavorstreaming.plugin.repackage"
+    project.ext {
+        releaseVersion = project.ext.releaseVersion + pluginRepackage.renamedVersionSuffix
+    }
+}

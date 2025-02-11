@@ -26,7 +26,7 @@ buildscript {
         classpath 'com.android.tools.build:gradle:8.3.2'
         classpath 'com.google.android.gms:strict-version-matcher-plugin:1.2.4'
         classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0'
-        classpath "com.endeavorstreaming.plugin:rename-package:1.0.1"
+        classpath("com.endeavorstreaming.gradle.plugin:plugin-repackage:1.0.0")
     }
 }
 

@@ -15,5 +15,5 @@ apply from: "$gradle.ext.androidxMediaSettingsDir/common_library_config.gradle"
 
 android.namespace 'androidx.media3.test.data'
 
-apply from: "$gradle.ext.androidxMediaSettingsDir/rename_package.gradle"
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
 

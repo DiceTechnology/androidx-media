@@ -1,9 +1,0 @@
-project.ext {
-    renamePackage = project.hasProperty('renamePackage') ? project.renamePackage : false
-}
-if (renamePackage) {
-    apply plugin: "endeavorstreaming.renaming.package"
-    project.ext {
-        releaseVersion = project.ext.releaseVersion + packageRenaming.renamedVersionSuffix
-    }
-}
