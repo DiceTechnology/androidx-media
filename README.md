@@ -1,11 +1,19 @@
-# We support renaming the libraries‘ package, see: [rename the package][]
-
-[rename the package]: RENAME_THE_PACKAGE.md
-
 # AndroidX Media
 
 AndroidX Media is a collection of libraries for implementing media use cases on
 Android, including local playback (via ExoPlayer), video editing (via Transformer) and media sessions.
+
+## Modified (repackaged) version
+
+Modified AndroidX Media libraries include a `-mod` suffix in their version name:
+```kotlin
+implementation("com.endeavorstreaming.androidx-media:exoplayer:1.4.1-dr1-mod")
+```
+
+To publish the modified version of AndroidX Media libraries, run:
+```groovy
+./gradlew publish -Prepackage=true -x test -x lintDebug
+```
 
 ## Documentation
 
