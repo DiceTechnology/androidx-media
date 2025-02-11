@@ -41,6 +41,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
+
 dependencies {
     api project(modulePrefix + 'lib-common')
     api project(modulePrefix + 'lib-container')

@@ -40,6 +40,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
+
 dependencies {
     implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
     api project(modulePrefix + 'lib-common')

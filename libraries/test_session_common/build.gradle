@@ -21,6 +21,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
+
 dependencies {
     api 'com.google.truth:truth:' + truthVersion
     implementation project(modulePrefix + 'lib-common')

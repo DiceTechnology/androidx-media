@@ -34,6 +34,8 @@ android {
         aidl true
     }
 }
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
+
 dependencies {
     api project(modulePrefix + 'lib-common')
     compileOnly 'com.google.errorprone:error_prone_annotations:' + errorProneVersion

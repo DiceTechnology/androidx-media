@@ -15,6 +15,8 @@ apply from: "$gradle.ext.androidxMediaSettingsDir/common_library_config.gradle"
 
 android.namespace 'androidx.media3.test.exoplayer.playback'
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
+
 dependencies {
     androidTestImplementation 'androidx.test:rules:' + androidxTestRulesVersion
     androidTestImplementation 'androidx.test:runner:' + androidxTestRunnerVersion

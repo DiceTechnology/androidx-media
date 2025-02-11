@@ -51,6 +51,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
+
 dependencies {
     implementation 'androidx.core:core-ktx:' + androidxCoreVersion
     implementation 'androidx.appcompat:appcompat:' + androidxAppCompatVersion

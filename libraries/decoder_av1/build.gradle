@@ -29,6 +29,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
+
 // Configure the native build only if libgav1 is present to avoid gradle sync
 // failures if libgav1 hasn't been built according to the README instructions.
 if (project.file('src/main/jni/libgav1').exists()) {

@@ -25,6 +25,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
+
 dependencies {
     implementation project(modulePrefix + 'lib-decoder')
     // TODO(b/203752526): Remove this dependency.

@@ -31,6 +31,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
+
 dependencies {
     implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
     compileOnly 'com.google.errorprone:error_prone_annotations:' + errorProneVersion

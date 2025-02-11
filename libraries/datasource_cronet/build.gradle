@@ -23,6 +23,8 @@ android {
     }
 }
 
+apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
+
 dependencies {
     api "com.google.android.gms:play-services-cronet:18.0.1"
     implementation project(modulePrefix + 'lib-common')

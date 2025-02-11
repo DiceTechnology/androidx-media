@@ -10,3 +10,7 @@
     *;
 }
 
+# repackaged
+-keep class es.androidx.media3.decoder.VideoDecoderOutputBuffer {
+    *;
+}
