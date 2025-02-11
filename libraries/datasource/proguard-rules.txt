@@ -10,3 +10,12 @@
 -keepclassmembers class androidx.media3.datasource.rtmp.RtmpDataSource {
   <init>();
 }
+
+# repackaged
+-keepclassmembers class es.androidx.media3.datasource.RawResourceDataSource {
+  public static android.net.Uri buildRawResourceUri(int);
+}
+-dontnote es.androidx.media3.datasource.rtmp.RtmpDataSource
+-keepclassmembers class es.androidx.media3.datasource.rtmp.RtmpDataSource {
+  <init>();
+}

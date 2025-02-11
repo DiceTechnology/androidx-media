@@ -44,3 +44,20 @@
 -dontwarn org.checkerframework.**
 -dontwarn kotlin.annotations.jvm.**
 -dontwarn javax.annotation.**
+
+# repackaged
+-dontnote es.androidx.media3.exoplayer.video.spherical.SphericalGLSurfaceView
+-keepclassmembers class es.androidx.media3.exoplayer.video.spherical.SphericalGLSurfaceView {
+  <init>(android.content.Context);
+}
+-dontnote es.androidx.media3.exoplayer.video.VideoDecoderGLSurfaceView
+-keepclassmembers class es.androidx.media3.exoplayer.video.VideoDecoderGLSurfaceView {
+  <init>(android.content.Context);
+}
+-keepnames class es.androidx.media3.exoplayer.ExoPlayer {}
+-keepclassmembers class es.androidx.media3.exoplayer.ExoPlayer {
+  void setImageOutput(es.androidx.media3.exoplayer.image.ImageOutput);
+}
+-keepclasseswithmembers class es.androidx.media3.exoplayer.image.ImageOutput {
+  void onImageAvailable(long, android.graphics.Bitmap);
+}
