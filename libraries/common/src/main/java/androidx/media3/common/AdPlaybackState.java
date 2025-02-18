@@ -32,6 +32,8 @@ import androidx.annotation.IntDef;
 import androidx.annotation.IntRange;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
+import androidx.media3.common.endeavor.WebUtil;
+import androidx.media3.common.util.Log;
 import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -970,9 +972,46 @@ public final class AdPlaybackState {
     if (this.contentDurationUs == contentDurationUs) {
       return this;
     } else {
+      AdPlaybackState adPlaybackState = skipAdsExceedTimeline(contentDurationUs);
+      if (adPlaybackState != null) {
+        return adPlaybackState;
+      }
       return new AdPlaybackState(
           adsId, adGroups, adResumePositionUs, contentDurationUs, removedAdGroupCount);
     }
+  }
+
+  // Skip all ads which exceeds the timeline duration.
+  private AdPlaybackState skipAdsExceedTimeline(long contentDurationUs) {
+    if (contentDurationUs == C.TIME_UNSET) {
+      return null;
+    }
+
+    // Check ads exceeds the timeline duration or not.
+    int adGroupIndex = getAdGroupIndexAfterPositionUs(contentDurationUs, C.TIME_UNSET);
+    if (adGroupIndex == C.INDEX_UNSET || getAdGroup(adGroupIndex).isServerSideInserted) {
+      return null;
+    }
+    int endIndex = adGroupIndex;
+    while (endIndex < adGroupCount && getAdGroup(endIndex).timeUs != C.TIME_END_OF_SOURCE) {
+      endIndex++;
+    }
+    if (endIndex == adGroupIndex) {
+      return null;
+    }
+
+    // Skip all ads which exceeds the timeline duration.
+    AdGroup[] adGroups = Util.nullSafeArrayCopy(this.adGroups, this.adGroups.length);
+    StringBuilder info = new StringBuilder("skip ads which exceeds timeline");
+    while (adGroupIndex < endIndex) {
+      int adjustedIndex = adGroupIndex - removedAdGroupCount;
+      info.append(", ").append(Util.usToMs(adGroups[adjustedIndex].timeUs));
+      adGroups[adjustedIndex] = adGroups[adjustedIndex].withAllAdsSkipped();
+      adGroupIndex++;
+    }
+    Log.d(WebUtil.DEBUG, info.toString());
+    return new AdPlaybackState(
+        adsId, adGroups, adResumePositionUs, contentDurationUs, removedAdGroupCount);
   }
 
   /**
