@@ -522,6 +522,31 @@
         "ad_tag_uri": "https://pubads.g.doubleclick.net/gampad/ads?sz=640x480&iu=/124319096/external/single_ad_samples&ciu_szs=300x250&impl=s&gdfp_req=1&env=vp&output=vast&unviewed_position_start=1&cust_params=deployment%3Ddevsite%26sample_ct%3Dlinear&correlator="
       },
       {
+        "name": "Sample vmap-pre-15s",
+        "uri": "https://sample-videos-zyrkp2nj.s3-eu-west-1.amazonaws.com/big-buck-bunny/hls/master.m3u8",
+        "ad_tag_uri": "https://sample-videos-zyrkp2nj.s3.eu-west-1.amazonaws.com/ads/vmap-pre-15s.xml"
+      },
+      {
+        "name": "Sample vmap-pre-15s-post",
+        "uri": "https://sample-videos-zyrkp2nj.s3-eu-west-1.amazonaws.com/big-buck-bunny/hls/master.m3u8",
+        "ad_tag_uri": "https://sample-videos-zyrkp2nj.s3.eu-west-1.amazonaws.com/ads/vmap-pre-15s-post.xml"
+      },
+      {
+        "name": "Sample vmap-pre-15s-5m-15m-30m, exceed timeline",
+        "uri": "https://sample-videos-zyrkp2nj.s3-eu-west-1.amazonaws.com/big-buck-bunny/hls/master.m3u8",
+        "ad_tag_uri": "https://sample-videos-zyrkp2nj.s3.eu-west-1.amazonaws.com/ads/vmap-pre-15s-5m-15m-30m.xml"
+      },
+      {
+        "name": "Sample vmap-pre-15s-5m-15m-30m-post, exceed timeline",
+        "uri": "https://sample-videos-zyrkp2nj.s3-eu-west-1.amazonaws.com/big-buck-bunny/hls/master.m3u8",
+        "ad_tag_uri": "https://sample-videos-zyrkp2nj.s3.eu-west-1.amazonaws.com/ads/vmap-pre-15s-5m-15m-30m-post.xml"
+      },
+      {
+        "name": "Sample MavsTV Vamp, exceed timeline",
+        "uri": "https://sample-videos-zyrkp2nj.s3-eu-west-1.amazonaws.com/big-buck-bunny/hls/master.m3u8",
+        "ad_tag_uri": "https://tv.springserve.com/vmap/358?&device_width=1920&device_height=1080&ip=45.251.105.74&ua=Mozilla%2F5.0+%28Macintosh%3B+Intel+Mac+OS+X+10_15_7%29+AppleWebKit%2F537.36+%28KHTML%2C+like+Gecko%29+Chrome%2F133.0.0.0+Safari%2F537.36&dnt=0&app_bundle=&app_store_id=&app_name=Website&app_store_url=mavtvgo.com&did=a068e65c-65e0-3576-ae92-08bae852312e&device_make=&device_model=&cuepoints_ms=&content_id=602059&video_title=&content_series=&content_livestream=0&language=en&content_len=1351&ifa_type=2&us_privacy=&lmt=&gdpr_consent=&gdpr=0&video_tags=original%2CMAVTV+Originals%2Cmavtv%2CGuest%2CDocumentary&user_purchased_entitlement=NOT_PURCHASED&device_identifier_for_advertisements="
+      },
+      {
         "name": "Single skippable inline",
         "uri": "https://storage.googleapis.com/exoplayer-test-media-1/mkv/android-screens-lavf-56.36.100-aac-avc-main-1280x720.mkv",
         "ad_tag_uri": "https://pubads.g.doubleclick.net/gampad/ads?sz=640x480&iu=/124319096/external/single_ad_samples&ciu_szs=300x250&impl=s&gdfp_req=1&env=vp&output=vast&unviewed_position_start=1&cust_params=deployment%3Ddevsite%26sample_ct%3Dskippablelinear&correlator="
