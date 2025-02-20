@@ -1009,7 +1009,7 @@ public final class AdPlaybackState {
       adGroups[adjustedIndex] = adGroups[adjustedIndex].withAllAdsSkipped();
       adGroupIndex++;
     }
-    Log.d(WebUtil.DEBUG, info.toString());
+    Log.i(WebUtil.DEBUG, info.toString());
     return new AdPlaybackState(
         adsId, adGroups, adResumePositionUs, contentDurationUs, removedAdGroupCount);
   }
