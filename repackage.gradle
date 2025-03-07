@@ -3,7 +3,10 @@ project.ext {
 }
 if (repackage) {
     apply plugin: "endeavorstreaming.plugin.repackage"
+    pluginRepackage {
+        renameAllLayoutRes true
+    }
     project.ext {
-        releaseVersion = project.ext.releaseVersion + pluginRepackage.renamedVersionSuffix
+        releaseVersion = project.ext.releaseVersion + pluginRepackage.repackagedVersionSuffix
     }
 }
