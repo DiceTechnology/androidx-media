@@ -35,8 +35,20 @@ public class LimitedSeekRange {
     return factStartTimeMs;
   }
 
+  public long getOriginalStartTimeMs() {
+    return startTimeMs;
+  }
+
+  public long getOriginalEndTimeMs() {
+    return endTimeMs;
+  }
+
   public boolean isSeekToStart() {
     return seekToStart;
+  }
+
+  public boolean isUseAsLive() {
+    return useAsLive;
   }
 
   public void onTimelineChanged(Timeline timeline) {
