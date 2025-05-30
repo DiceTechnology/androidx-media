@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.text.TextUtils;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
+import androidx.media3.common.ParserException;
 import androidx.media3.common.Player;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.util.Util;
@@ -15,6 +16,7 @@ public class LimitedSeekRange {
 
   private final long startTimeMs; // UTC timestamp, millisecond
   private final long endTimeMs; // UTC timestamp, millisecond
+  @Deprecated
   private final boolean seekToStart;
   private final boolean useAsLive;
 
@@ -35,8 +37,21 @@ public class LimitedSeekRange {
     return factStartTimeMs;
   }
 
+  public long getOriginalStartTimeMs() {
+    return startTimeMs;
+  }
+
+  public long getOriginalEndTimeMs() {
+    return endTimeMs;
+  }
+
+  @Deprecated
   public boolean isSeekToStart() {
     return seekToStart;
+  }
+
+  public boolean isUseAsLive() {
+    return useAsLive;
   }
 
   public void onTimelineChanged(Timeline timeline) {
@@ -124,37 +139,36 @@ public class LimitedSeekRange {
     return state;
   }
 
-  // Generate limited seek range.
-  public static LimitedSeekRange from(String startDate, String endDate, boolean seekToStart) {
+  @Nullable
+  public static LimitedSeekRange create(String startDate, String endDate) {
     try {
-      long startTimeMs = TextUtils.isEmpty(startDate) ? C.TIME_UNSET : Util.parseXsDateTime(startDate);
-      long endTimeMs = TextUtils.isEmpty(endDate) ? C.TIME_UNSET : Util.parseXsDateTime(endDate);
-      return from(startTimeMs, endTimeMs, seekToStart);
+      return create(toTimeMs(startDate), toTimeMs(endDate));
     } catch (Exception e) {
       return null;
     }
   }
 
-  // Generate limited seek range.
-  public static LimitedSeekRange from(String startDate, String endDate, boolean seekToStart, boolean useAsLive) {
+  @Nullable
+  public static LimitedSeekRange create(String startDate, String endDate, boolean useAsLive) {
     try {
-      long startTimeMs = TextUtils.isEmpty(startDate) ? C.TIME_UNSET : Util.parseXsDateTime(startDate);
-      long endTimeMs = TextUtils.isEmpty(endDate) ? C.TIME_UNSET : Util.parseXsDateTime(endDate);
-      return from(startTimeMs, endTimeMs, seekToStart, useAsLive);
+      return create(toTimeMs(startDate), toTimeMs(endDate), useAsLive);
     } catch (Exception e) {
       return null;
     }
   }
 
-  // Generate limited seek range.
-  public static LimitedSeekRange from(long startTimeMs, long endTimeMs, boolean seekToStart) {
-    long nowMs = System.currentTimeMillis();
-    boolean useAsLive = !isValidTimeStamp(endTimeMs) || endTimeMs > nowMs;
-    return from(startTimeMs, endTimeMs, seekToStart, useAsLive);
+  @Nullable
+  public static LimitedSeekRange create(long startTimeMs, long endTimeMs) {
+    return create(startTimeMs, endTimeMs, isUseAsLive(endTimeMs));
   }
 
-  // Generate limited seek range.
-  public static LimitedSeekRange from(long startTimeMs, long endTimeMs, boolean seekToStart, boolean useAsLive) {
+  @Nullable
+  public static LimitedSeekRange create(long startTimeMs, long endTimeMs, boolean useAsLive) {
+    return create(startTimeMs, endTimeMs, false, useAsLive);
+  }
+
+  @Nullable
+  private static LimitedSeekRange create(long startTimeMs, long endTimeMs, boolean seekToStart, boolean useAsLive) {
     // Normalize the timestamp.
     boolean noStartTime = false;
     boolean noEndTime = false;
@@ -179,6 +193,60 @@ public class LimitedSeekRange {
     }
 
     return new LimitedSeekRange(startTimeMs, endTimeMs, seekToStart, useAsLive);
+  }
+
+  private static long toTimeMs(String date) throws ParserException {
+    return TextUtils.isEmpty(date) ? C.TIME_UNSET : Util.parseXsDateTime(date);
+  }
+
+  private static boolean isUseAsLive(long endTimeMs) {
+    long nowMs = System.currentTimeMillis();
+    return !isValidTimeStamp(endTimeMs) || endTimeMs > nowMs;
+  }
+
+  /**
+   * @deprecated Use {@link #create(String, String)} instead.
+   */
+  @Deprecated
+  // Generate limited seek range.
+  public static LimitedSeekRange from(String startDate, String endDate, boolean seekToStart) {
+    try {
+      return from(toTimeMs(startDate), toTimeMs(endDate), seekToStart);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
+   * @deprecated Use {@link #create(String, String, boolean)} instead.
+   */
+  @Deprecated
+  // Generate limited seek range.
+  public static LimitedSeekRange from(String startDate, String endDate, boolean seekToStart, boolean useAsLive) {
+    try {
+      return from(toTimeMs(startDate), toTimeMs(endDate), seekToStart, useAsLive);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
+   * @deprecated Use {@link #create(long, long)} instead.
+   */
+  @Deprecated
+  // Generate limited seek range.
+  public static LimitedSeekRange from(long startTimeMs, long endTimeMs, boolean seekToStart) {
+    return from(startTimeMs, endTimeMs, seekToStart, isUseAsLive(endTimeMs));
+  }
+
+
+  /**
+   * @deprecated Use {@link #create(long, long, boolean)} instead.
+   */
+  @Deprecated
+  // Generate limited seek range.
+  public static LimitedSeekRange from(long startTimeMs, long endTimeMs, boolean seekToStart, boolean useAsLive) {
+    return create(startTimeMs, endTimeMs, seekToStart, useAsLive);
   }
 
   // Generate limited seek range based on current time, just for testing
