@@ -339,6 +339,9 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
   private boolean controllerHideOnTouch;
   private int textureViewRotation;
 
+  /** Indicates if the playback media is currently prepared. */
+  private boolean isPlaybackPrepared = true;
+
   public PlayerView(Context context) {
     this(context, /* attrs= */ null);
   }
@@ -1309,6 +1312,22 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
   }
 
   /**
+   * Sets whether the the playback media is currently prepared.
+   * Emmit PREPARING state if first timeline is ready.
+   * Emmit PREPARED state if first frame is rendered or the initial resume has completed if have.
+   *
+   * @param prepared Indicates if the playback media is currently prepared.
+   */
+  public void setPlaybackPrepared(boolean prepared) {
+    if (prepared && !isPlaybackPrepared) {
+      mainLooperHandler.postDelayed(() -> isPlaybackPrepared = true, 200L);
+      componentListener.hideShutterView();
+    } else if (!prepared && isPlaybackPrepared) {
+      isPlaybackPrepared = false;
+    }
+  }
+
+  /**
    * Sets the {@link AspectRatioFrameLayout.AspectRatioListener}.
    *
    * @param listener The listener to be notified about aspect ratios changes of the video content or
@@ -1904,6 +1923,12 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
 
     @Override
     public void onRenderedFirstFrame() {
+      if (isPlaybackPrepared) {
+        hideShutterView();
+      }
+    }
+
+    private void hideShutterView() {
       if (shutterView != null) {
         shutterView.setVisibility(INVISIBLE);
         if (hasSelectedImageTrack()) {
