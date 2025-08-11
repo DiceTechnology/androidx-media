@@ -1313,8 +1313,6 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
 
   /**
    * Sets whether the the playback media is currently prepared.
-   * Emmit PREPARING state if first timeline is ready.
-   * Emmit PREPARED state if first frame is rendered or the initial resume has completed if have.
    *
    * @param prepared Indicates if the playback media is currently prepared.
    */
