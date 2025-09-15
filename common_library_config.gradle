@@ -27,7 +27,10 @@ android {
         aarMetadata {
             minCompileSdk = project.ext.compileSdkVersion
         }
-        multiDexEnabled true
+    }
+
+    lintOptions {
+        checkTestSources true
     }
 
     compileOptions {
@@ -41,8 +44,4 @@ android {
         }
         unitTests.includeAndroidResources true
     }
-}
-
-dependencies {
-    androidTestImplementation 'androidx.multidex:multidex:' + androidxMultidexVersion
 }

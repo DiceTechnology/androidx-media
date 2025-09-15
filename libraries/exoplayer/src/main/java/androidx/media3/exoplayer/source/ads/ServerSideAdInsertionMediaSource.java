@@ -68,6 +68,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
@@ -161,7 +162,7 @@ public final class ServerSideAdInsertionMediaSource extends BaseMediaSource
     for (Map.Entry<Object, AdPlaybackState> entry : adPlaybackStates.entrySet()) {
       Object periodUid = entry.getKey();
       AdPlaybackState adPlaybackState = entry.getValue();
-      checkArgument(Util.areEqual(adsId, adPlaybackState.adsId));
+      checkArgument(Objects.equals(adsId, adPlaybackState.adsId));
       @Nullable AdPlaybackState oldAdPlaybackState = this.adPlaybackStates.get(periodUid);
       if (oldAdPlaybackState != null) {
         for (int adGroupIndex = adPlaybackState.removedAdGroupCount;
@@ -447,20 +448,26 @@ public final class ServerSideAdInsertionMediaSource extends BaseMediaSource
       int windowIndex,
       @Nullable MediaPeriodId mediaPeriodId,
       LoadEventInfo loadEventInfo,
-      MediaLoadData mediaLoadData) {
-    @Nullable
-    MediaPeriodImpl mediaPeriod =
-        getMediaPeriodForEvent(mediaPeriodId, mediaLoadData, /* useLoadingPeriod= */ true);
-    if (mediaPeriod == null) {
-      mediaSourceEventDispatcherWithoutId.loadStarted(loadEventInfo, mediaLoadData);
-    } else {
-      mediaPeriod.sharedPeriod.onLoadStarted(loadEventInfo, mediaLoadData);
-      mediaPeriod.mediaSourceEventDispatcher.loadStarted(
-          loadEventInfo,
-          correctMediaLoadData(
-              mediaPeriod,
-              mediaLoadData,
-              checkNotNull(adPlaybackStates.get(mediaPeriod.mediaPeriodId.periodUid))));
+      MediaLoadData mediaLoadData,
+      int retryCount) {
+    // TODO: b/375408535 - Update this to support non-zero retry counts.
+    if (retryCount == 0) {
+      @Nullable
+      MediaPeriodImpl mediaPeriod =
+          getMediaPeriodForEvent(mediaPeriodId, mediaLoadData, /* useLoadingPeriod= */ true);
+      if (mediaPeriod == null) {
+        mediaSourceEventDispatcherWithoutId.loadStarted(
+            loadEventInfo, mediaLoadData, /* retryCount= */ 0);
+      } else {
+        mediaPeriod.sharedPeriod.onLoadStarted(loadEventInfo, mediaLoadData);
+        mediaPeriod.mediaSourceEventDispatcher.loadStarted(
+            loadEventInfo,
+            correctMediaLoadData(
+                mediaPeriod,
+                mediaLoadData,
+                checkNotNull(adPlaybackStates.get(mediaPeriod.mediaPeriodId.periodUid))),
+            /* retryCount= */ 0);
+      }
     }
   }
 
@@ -770,7 +777,9 @@ public final class ServerSideAdInsertionMediaSource extends BaseMediaSource
               loadData.first,
               correctMediaLoadData(loadingPeriod, loadData.second, adPlaybackState));
           mediaPeriod.mediaSourceEventDispatcher.loadStarted(
-              loadData.first, correctMediaLoadData(mediaPeriod, loadData.second, adPlaybackState));
+              loadData.first,
+              correctMediaLoadData(mediaPeriod, loadData.second, adPlaybackState),
+              /* retryCount= */ 0);
         }
       }
       this.loadingPeriod = mediaPeriod;
@@ -881,7 +890,7 @@ public final class ServerSideAdInsertionMediaSource extends BaseMediaSource
           streamResetFlags[i] = !mayRetainStreamFlags[i] || streams[i] == null;
           if (streamResetFlags[i]) {
             streams[i] =
-                Util.areEqual(trackSelections[i], selections[i])
+                Objects.equals(trackSelections[i], selections[i])
                     ? new SampleStreamImpl(mediaPeriod, /* streamIndex= */ i)
                     : new EmptySampleStream();
           }

@@ -63,13 +63,13 @@ import androidx.media3.exoplayer.source.MediaLoadData;
 import androidx.media3.exoplayer.source.MediaSource.MediaPeriodId;
 import androidx.media3.exoplayer.trackselection.TrackSelection;
 import androidx.media3.exoplayer.video.VideoDecoderOutputBufferRenderer;
-import com.google.common.base.Objects;
 import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -233,10 +233,12 @@ public interface AnalyticsListener {
     EVENT_DRM_SESSION_RELEASED,
     EVENT_PLAYER_RELEASED,
     EVENT_STREAM_LOW_LATENCY,
+    EVENT_DRM_KEY_STATUS_CHANGE,
     EVENT_AUDIO_CODEC_ERROR,
     EVENT_VIDEO_CODEC_ERROR,
     EVENT_AUDIO_TRACK_INITIALIZED,
-    EVENT_AUDIO_TRACK_RELEASED
+    EVENT_AUDIO_TRACK_RELEASED,
+    EVENT_RENDERER_READY_CHANGED
   })
   @interface EventFlags {}
 
@@ -446,6 +448,9 @@ public interface AnalyticsListener {
   /** An audio track has been released. */
   @UnstableApi int EVENT_AUDIO_TRACK_RELEASED = 1032;
 
+  /** A renderer changed its readiness for playback. */
+  @UnstableApi int EVENT_RENDERER_READY_CHANGED = 1033;
+
   int EVENT_STREAM_LOW_LATENCY = 10001;
   int EVENT_DRM_KEY_STATUS_CHANGE = 10002;
 
@@ -573,15 +578,15 @@ public interface AnalyticsListener {
           && currentWindowIndex == eventTime.currentWindowIndex
           && currentPlaybackPositionMs == eventTime.currentPlaybackPositionMs
           && totalBufferedDurationMs == eventTime.totalBufferedDurationMs
-          && Objects.equal(timeline, eventTime.timeline)
-          && Objects.equal(mediaPeriodId, eventTime.mediaPeriodId)
-          && Objects.equal(currentTimeline, eventTime.currentTimeline)
-          && Objects.equal(currentMediaPeriodId, eventTime.currentMediaPeriodId);
+          && Objects.equals(timeline, eventTime.timeline)
+          && Objects.equals(mediaPeriodId, eventTime.mediaPeriodId)
+          && Objects.equals(currentTimeline, eventTime.currentTimeline)
+          && Objects.equals(currentMediaPeriodId, eventTime.currentMediaPeriodId);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(
+      return Objects.hash(
           realtimeMs,
           timeline,
           windowIndex,
@@ -845,15 +850,29 @@ public interface AnalyticsListener {
   default void onPlaylistMetadataChanged(EventTime eventTime, MediaMetadata playlistMetadata) {}
 
   /**
+   * @deprecated Implement {@link #onLoadStarted(EventTime, LoadEventInfo, MediaLoadData, int)}
+   *     instead, and check for {@code retryCount == 0} for equivalent behavior.
+   */
+  @UnstableApi
+  @Deprecated
+  default void onLoadStarted(
+      EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData) {}
+
+  /**
    * Called when a media source started loading data.
    *
    * @param eventTime The event time.
    * @param loadEventInfo The {@link LoadEventInfo} defining the load event.
    * @param mediaLoadData The {@link MediaLoadData} defining the data being loaded.
+   * @param retryCount The number of failed attempts since {@link #onLoadStarted} was called (this
+   *     is zero for the first load attempt).
    */
   @UnstableApi
   default void onLoadStarted(
-      EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData) {}
+      EventTime eventTime,
+      LoadEventInfo loadEventInfo,
+      MediaLoadData mediaLoadData,
+      int retryCount) {}
 
   /**
    * Called when a media source completed loading data.
@@ -1420,6 +1439,22 @@ public interface AnalyticsListener {
    */
   @UnstableApi
   default void onDrmSessionReleased(EventTime eventTime) {}
+
+  /**
+   * Called each time a renderer starts or stops allowing playback to be ready.
+   *
+   * @param eventTime The event time.
+   * @param rendererIndex The index of the renderer in the {@link
+   *     androidx.media3.exoplayer.ExoPlayer} instance.
+   * @param rendererTrackType The {@link C.TrackType} of the renderer.
+   * @param isRendererReady Whether the renderer allows playback to be ready.
+   */
+  @UnstableApi
+  default void onRendererReadyChanged(
+      EventTime eventTime,
+      int rendererIndex,
+      @C.TrackType int rendererTrackType,
+      boolean isRendererReady) {}
 
   /**
    * Called when the {@link Player} is released.

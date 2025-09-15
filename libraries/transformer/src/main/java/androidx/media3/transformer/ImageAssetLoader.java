@@ -16,6 +16,7 @@
 
 package androidx.media3.transformer;
 
+import static android.os.Build.VERSION.SDK_INT;
 import static androidx.media3.common.util.Assertions.checkNotNull;
 import static androidx.media3.common.util.Assertions.checkState;
 import static androidx.media3.transformer.ExportException.ERROR_CODE_IO_UNSPECIFIED;
@@ -25,20 +26,21 @@ import static androidx.media3.transformer.SampleConsumer.INPUT_RESULT_SUCCESS;
 import static androidx.media3.transformer.SampleConsumer.INPUT_RESULT_TRY_AGAIN_LATER;
 import static androidx.media3.transformer.Transformer.PROGRESS_STATE_AVAILABLE;
 import static androidx.media3.transformer.Transformer.PROGRESS_STATE_NOT_STARTED;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Looper;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.ColorInfo;
 import androidx.media3.common.Format;
-import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
+import androidx.media3.common.ParserException;
 import androidx.media3.common.util.BitmapLoader;
 import androidx.media3.common.util.ConstantRateTimestampIterator;
 import androidx.media3.common.util.UnstableApi;
-import androidx.media3.common.util.Util;
 import androidx.media3.transformer.SampleConsumer.InputResult;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.FutureCallback;
@@ -57,19 +59,20 @@ import java.util.concurrent.ScheduledExecutorService;
 @UnstableApi
 public final class ImageAssetLoader implements AssetLoader {
 
-  private final boolean retainHdrFromUltraHdrImage;
-
   /** An {@link AssetLoader.Factory} for {@link ImageAssetLoader} instances. */
   public static final class Factory implements AssetLoader.Factory {
 
+    private final Context context;
     private final BitmapLoader bitmapLoader;
 
     /**
      * Creates an instance.
      *
+     * @param context The {@link Context}.
      * @param bitmapLoader The {@link BitmapLoader} to use to load and decode images.
      */
-    public Factory(BitmapLoader bitmapLoader) {
+    public Factory(Context context, BitmapLoader bitmapLoader) {
+      this.context = context;
       this.bitmapLoader = bitmapLoader;
     }
 
@@ -80,15 +83,21 @@ public final class ImageAssetLoader implements AssetLoader {
         Listener listener,
         CompositionSettings compositionSettings) {
       return new ImageAssetLoader(
-          editedMediaItem, listener, bitmapLoader, compositionSettings.retainHdrFromUltraHdrImage);
+          context,
+          editedMediaItem,
+          listener,
+          bitmapLoader,
+          compositionSettings.retainHdrFromUltraHdrImage);
     }
   }
 
   private static final int QUEUE_BITMAP_INTERVAL_MS = 10;
 
+  private final Context context;
   private final EditedMediaItem editedMediaItem;
   private final BitmapLoader bitmapLoader;
   private final Listener listener;
+  private final boolean retainHdrFromUltraHdrImage;
   private final ScheduledExecutorService scheduledExecutorService;
 
   @Nullable private SampleConsumer sampleConsumer;
@@ -97,16 +106,18 @@ public final class ImageAssetLoader implements AssetLoader {
   private volatile int progress;
 
   private ImageAssetLoader(
+      Context context,
       EditedMediaItem editedMediaItem,
       Listener listener,
       BitmapLoader bitmapLoader,
       boolean retainHdrFromUltraHdrImage) {
-    this.retainHdrFromUltraHdrImage = retainHdrFromUltraHdrImage;
     checkState(editedMediaItem.durationUs != C.TIME_UNSET);
     checkState(editedMediaItem.frameRate != C.RATE_UNSET_INT);
+    this.context = context;
     this.editedMediaItem = editedMediaItem;
     this.listener = listener;
     this.bitmapLoader = bitmapLoader;
+    this.retainHdrFromUltraHdrImage = retainHdrFromUltraHdrImage;
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     progressState = PROGRESS_STATE_NOT_STARTED;
   }
@@ -119,10 +130,19 @@ public final class ImageAssetLoader implements AssetLoader {
     progressState = PROGRESS_STATE_AVAILABLE;
     listener.onDurationUs(editedMediaItem.durationUs);
     listener.onTrackCount(1);
-    MediaItem.LocalConfiguration localConfiguration =
-        checkNotNull(editedMediaItem.mediaItem.localConfiguration);
+    ListenableFuture<Bitmap> future;
 
-    ListenableFuture<Bitmap> future = bitmapLoader.loadBitmap(localConfiguration.uri);
+    @Nullable
+    String mimeType = TransformerUtil.getImageMimeType(context, editedMediaItem.mediaItem);
+    if (mimeType == null || !bitmapLoader.supportsMimeType(mimeType)) {
+      future =
+          immediateFailedFuture(
+              ParserException.createForUnsupportedContainerFeature(
+                  "Attempted to load a Bitmap from unsupported MIME type: " + mimeType));
+    } else {
+      future =
+          bitmapLoader.loadBitmap(checkNotNull(editedMediaItem.mediaItem.localConfiguration).uri);
+    }
 
     Futures.addCallback(
         future,
@@ -138,7 +158,7 @@ public final class ImageAssetLoader implements AssetLoader {
                     .setColorInfo(ColorInfo.SRGB_BT709_FULL)
                     .build();
             Format outputFormat =
-                retainHdrFromUltraHdrImage && Util.SDK_INT >= 34 && bitmap.hasGainmap()
+                retainHdrFromUltraHdrImage && SDK_INT >= 34 && bitmap.hasGainmap()
                     ? inputFormat.buildUpon().setSampleMimeType(MimeTypes.IMAGE_JPEG_R).build()
                     : inputFormat;
             try {
@@ -187,8 +207,8 @@ public final class ImageAssetLoader implements AssetLoader {
             () -> queueBitmapInternal(bitmap, format), QUEUE_BITMAP_INTERVAL_MS, MILLISECONDS);
         return;
       }
-      // TODO(b/262693274): consider using listener.onDurationUs() or the MediaItem change
-      //    callback rather than setting duration here.
+      // TODO: b/262693274 - Consider using listener.onDurationUs() or the MediaItem change callback
+      //  rather than setting duration here.
       @InputResult
       int result =
           sampleConsumer.queueInputBitmap(

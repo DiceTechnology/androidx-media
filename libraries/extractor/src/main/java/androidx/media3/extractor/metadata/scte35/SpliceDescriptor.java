@@ -1,6 +1,5 @@
 package androidx.media3.extractor.metadata.scte35;
 
-import android.os.Parcel;
 import androidx.media3.common.util.ParsableByteArray;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -102,49 +101,6 @@ public abstract class SpliceDescriptor {
     }
   }
 
-  static List<SpliceDescriptor> createFromParcel(Parcel in) {
-    int descriptorListSize = in.readInt();
-    List<SpliceDescriptor> descriptorList = new ArrayList<>(descriptorListSize);
-    for (int i = 0; i < descriptorListSize; i++) {
-      DescriptorType descriptorType = DescriptorType.from(in.readInt());
-      switch (descriptorType) {
-        case AVAIL_DESCRIPTOR:
-          descriptorList.add(AvailDescriptor.fromParcel(in));
-          break;
-        case DTMF_DESCRIPTOR:
-          descriptorList.add(DTMFDescriptor.fromParcel(in));
-          break;
-        case SEGMENTATION_DESCRIPTOR:
-          descriptorList.add(SegmentationDescriptor.fromParcel(in));
-          break;
-        case TIME_DESCRIPTOR:
-          descriptorList.add(TimeDescriptor.fromParcel(in));
-          break;
-        case AUDIO_DESCRIPTOR:
-          descriptorList.add(AudioDescriptor.fromParcel(in));
-          break;
-        default:
-          // Do nothing.
-          break;
-      }
-    }
-    return Collections.unmodifiableList(descriptorList);
-  }
-
-  static void writeToParcel(List<SpliceDescriptor> descriptors, Parcel dest) {
-    int descriptorListSize = descriptors.size();
-    dest.writeInt(descriptorListSize);
-    for (int i = 0; i < descriptorListSize; i++) {
-      descriptors.get(i).writeToParcel(dest);
-    }
-  }
-
-  public void writeToParcel(Parcel dest) {
-    dest.writeInt(descriptorType.getTag());
-    dest.writeInt(descriptorLength);
-    dest.writeString(identifier);
-  }
-
   @Override
   public String toString() {
     return "SCTE-35 splice descriptor: type=" + getClass().getSimpleName();
@@ -164,17 +120,6 @@ public abstract class SpliceDescriptor {
       skipBytes(sectionEndPosition, sectionData);
       return new AvailDescriptor(descriptorLength, identifier);
     }
-
-    static AvailDescriptor fromParcel(Parcel in) {
-      // We had read the first int of spliceDescriptorTag.
-      return new AvailDescriptor(in.readInt(), in.readString());
-    }
-
-    @Override
-    public void writeToParcel(Parcel dest) {
-      super.writeToParcel(dest);
-      // More fields.
-    }
   }
 
   /** A {@link SpliceDescriptor} that defines a DTMF descriptor. */
@@ -192,17 +137,6 @@ public abstract class SpliceDescriptor {
       skipBytes(sectionEndPosition, sectionData);
       return new DTMFDescriptor(descriptorLength, identifier);
     }
-
-    static DTMFDescriptor fromParcel(Parcel in) {
-      // We had read the first int of spliceDescriptorTag.
-      return new DTMFDescriptor(in.readInt(), in.readString());
-    }
-
-    @Override
-    public void writeToParcel(Parcel dest) {
-      super.writeToParcel(dest);
-      // More fields.
-    }
   }
 
   /** A {@link SpliceDescriptor} that defines a time descriptor. */
@@ -218,17 +152,6 @@ public abstract class SpliceDescriptor {
       // TAI_seconds(48), TAI_ns(32), UTC_offset(16)
       skipBytes(sectionEndPosition, sectionData);
       return new TimeDescriptor(descriptorLength, identifier);
-    }
-
-    static TimeDescriptor fromParcel(Parcel in) {
-      // We had read the first int of spliceDescriptorTag.
-      return new TimeDescriptor(in.readInt(), in.readString());
-    }
-
-    @Override
-    public void writeToParcel(Parcel dest) {
-      super.writeToParcel(dest);
-      // More fields.
     }
   }
 
@@ -246,17 +169,6 @@ public abstract class SpliceDescriptor {
       // component_tag(8), ISO_code(24), Bit_Stream_Mode(3), Num_Channels(4), Full_Srvc_Audio(1)
       skipBytes(sectionEndPosition, sectionData);
       return new AudioDescriptor(descriptorLength, identifier);
-    }
-
-    static AudioDescriptor fromParcel(Parcel in) {
-      // We had read the first int of spliceDescriptorTag.
-      return new AudioDescriptor(in.readInt(), in.readString());
-    }
-
-    @Override
-    public void writeToParcel(Parcel dest) {
-      super.writeToParcel(dest);
-      // More fields.
     }
   }
 }

@@ -1,14 +1,14 @@
 package androidx.media3.demo.main;
 
 import android.app.Activity;
+import android.app.Application;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.media3.common.util.UnstableApi;
-import androidx.multidex.MultiDexApplication;
 
-public final class DemoApplication extends MultiDexApplication {
+public final class DemoApplication extends Application {
 
   @Override
   public void onCreate() {

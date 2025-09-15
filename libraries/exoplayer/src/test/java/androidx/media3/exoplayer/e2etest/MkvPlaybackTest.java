@@ -15,6 +15,8 @@
  */
 package androidx.media3.exoplayer.e2etest;
 
+import static org.robolectric.annotation.GraphicsMode.Mode.NATIVE;
+
 import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.view.Surface;
@@ -35,9 +37,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.ParameterizedRobolectricTestRunner;
 import org.robolectric.ParameterizedRobolectricTestRunner.Parameters;
+import org.robolectric.annotation.GraphicsMode;
 
 /** End-to-end tests using MKV samples. */
 @RunWith(ParameterizedRobolectricTestRunner.class)
+@GraphicsMode(NATIVE)
 public final class MkvPlaybackTest {
   @Parameters(name = "{0}")
   public static ImmutableList<String> mediaSamples() {
@@ -45,6 +49,7 @@ public final class MkvPlaybackTest {
     return ImmutableList.of(
         "sample.mkv",
         "sample_with_htc_rotation_track_name.mkv",
+        "sample_with_pgs_subtitles.mkv",
         "sample_with_ssa_subtitles.mkv",
         "sample_with_null_terminated_ssa_subtitles.mkv",
         "sample_with_overlapping_ssa_subtitles.mkv",
@@ -52,14 +57,15 @@ public final class MkvPlaybackTest {
         "sample_with_null_terminated_srt.mkv",
         "sample_with_overlapping_srt.mkv"/*,
         "sample_with_vtt_subtitles.mkv",
-        "sample_with_null_terminated_vtt_subtitles.mkv"*/);
+        "sample_with_null_terminated_vtt_subtitles.mkv"*/,
+        "sample_with_vobsub.mkv");
   }
 
   @ParameterizedRobolectricTestRunner.Parameter public String inputFile;
 
   @Rule
   public ShadowMediaCodecConfig mediaCodecConfig =
-      ShadowMediaCodecConfig.forAllSupportedMimeTypes();
+      ShadowMediaCodecConfig.withAllDefaultSupportedCodecs();
 
   @Test
   public void test() throws Exception {

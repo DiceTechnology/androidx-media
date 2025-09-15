@@ -15,6 +15,8 @@
  */
 package androidx.media3.exoplayer.mediacodec;
 
+import static android.os.Build.VERSION.SDK_INT;
+
 import android.media.MediaCodec;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -38,20 +40,14 @@ public class MediaCodecDecoderException extends DecoderException {
   public MediaCodecDecoderException(Throwable cause, @Nullable MediaCodecInfo codecInfo) {
     super("Decoder failed: " + (codecInfo == null ? null : codecInfo.name), cause);
     this.codecInfo = codecInfo;
-    diagnosticInfo = Util.SDK_INT >= 21 ? getDiagnosticInfoV21(cause) : null;
+    diagnosticInfo =
+        cause instanceof MediaCodec.CodecException
+            ? ((MediaCodec.CodecException) cause).getDiagnosticInfo()
+            : null;
     errorCode =
-        Util.SDK_INT >= 23
+        SDK_INT >= 23
             ? getErrorCodeV23(cause)
             : Util.getErrorCodeFromPlatformDiagnosticsInfo(diagnosticInfo);
-  }
-
-  @RequiresApi(21)
-  @Nullable
-  private static String getDiagnosticInfoV21(Throwable cause) {
-    if (cause instanceof MediaCodec.CodecException) {
-      return ((MediaCodec.CodecException) cause).getDiagnosticInfo();
-    }
-    return null;
   }
 
   @RequiresApi(23)

@@ -23,6 +23,8 @@ import static androidx.media3.test.utils.BitmapPixelTestUtil.readBitmap;
 import static androidx.media3.test.utils.TestUtil.PSNR_THRESHOLD;
 import static androidx.media3.test.utils.TestUtil.assertBitmapsAreSimilar;
 import static androidx.test.core.app.ApplicationProvider.getApplicationContext;
+import static com.google.common.truth.Truth.assertThat;
+import static java.lang.Math.round;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -92,9 +94,32 @@ public class LanczosResampleTest {
     GlTextureInfo inputTextureInfo = setupInputTexture(ORIGINAL_JPG_ASSET_PATH);
     float scale = 1f / 6;
     Size outputSize =
-        new Size((int) (inputTextureInfo.width * scale), (int) (inputTextureInfo.height * scale));
+        new Size(round(inputTextureInfo.width * scale), round(inputTextureInfo.height * scale));
     lanczosShaderProgram =
         LanczosResample.scaleToFit(outputSize.getWidth(), outputSize.getHeight())
+            .toGlShaderProgram(context, /* useHdr= */ false);
+    setupOutputTexture(outputSize.getWidth(), outputSize.getHeight());
+    Bitmap expectedBitmap = readBitmap(DOWNSCALED_6X_PNG_ASSET_PATH);
+
+    lanczosShaderProgram.queueInputFrame(
+        new DefaultGlObjectsProvider(eglContext), inputTextureInfo, /* presentationTimeUs= */ 0);
+    Bitmap actualBitmap =
+        createArgb8888BitmapFromFocusedGlFramebuffer(outputSize.getWidth(), outputSize.getHeight());
+
+    maybeSaveTestBitmap(testId, /* bitmapLabel= */ "actual", actualBitmap, /* path= */ null);
+    assertBitmapsAreSimilar(expectedBitmap, actualBitmap, PSNR_THRESHOLD);
+  }
+
+  @Test
+  public void queueInputFrame_with6xDownscaleFlexibleOrientation_matchesGoldenFile()
+      throws Exception {
+    GlTextureInfo inputTextureInfo = setupInputTexture(ORIGINAL_JPG_ASSET_PATH);
+    float scale = 1f / 6;
+    Size outputSize =
+        new Size(round(inputTextureInfo.width * scale), round(inputTextureInfo.height * scale));
+    lanczosShaderProgram =
+        LanczosResample.scaleToFitWithFlexibleOrientation(
+                outputSize.getHeight(), outputSize.getWidth())
             .toGlShaderProgram(context, /* useHdr= */ false);
     setupOutputTexture(outputSize.getWidth(), outputSize.getHeight());
     Bitmap expectedBitmap = readBitmap(DOWNSCALED_6X_PNG_ASSET_PATH);
@@ -113,7 +138,7 @@ public class LanczosResampleTest {
     GlTextureInfo inputTextureInfo = setupInputTexture(SMALLER_JPG_ASSET_PATH);
     float scale = 3;
     Size outputSize =
-        new Size((int) (inputTextureInfo.width * scale), (int) (inputTextureInfo.height * scale));
+        new Size(round(inputTextureInfo.width * scale), round(inputTextureInfo.height * scale));
     lanczosShaderProgram =
         LanczosResample.scaleToFit(outputSize.getWidth(), outputSize.getHeight())
             .toGlShaderProgram(context, /* useHdr= */ false);
@@ -127,6 +152,74 @@ public class LanczosResampleTest {
 
     maybeSaveTestBitmap(testId, /* bitmapLabel= */ "actual", actualBitmap, /* path= */ null);
     assertBitmapsAreSimilar(expectedBitmap, actualBitmap, PSNR_THRESHOLD);
+  }
+
+  @Test
+  public void queueInputFrame_with3xUpscaleFlexibleOrientation_matchesGoldenFile()
+      throws Exception {
+    GlTextureInfo inputTextureInfo = setupInputTexture(SMALLER_JPG_ASSET_PATH);
+    float scale = 3;
+    Size outputSize =
+        new Size((int) (inputTextureInfo.width * scale), (int) (inputTextureInfo.height * scale));
+    lanczosShaderProgram =
+        LanczosResample.scaleToFitWithFlexibleOrientation(
+                outputSize.getWidth(), outputSize.getHeight())
+            .toGlShaderProgram(context, /* useHdr= */ false);
+    setupOutputTexture(outputSize.getWidth(), outputSize.getHeight());
+    Bitmap expectedBitmap = readBitmap(UPSCALED_3X_PNG_ASSET_PATH);
+
+    lanczosShaderProgram.queueInputFrame(
+        new DefaultGlObjectsProvider(eglContext), inputTextureInfo, /* presentationTimeUs= */ 0);
+    Bitmap actualBitmap =
+        createArgb8888BitmapFromFocusedGlFramebuffer(outputSize.getWidth(), outputSize.getHeight());
+
+    maybeSaveTestBitmap(testId, /* bitmapLabel= */ "actual", actualBitmap, /* path= */ null);
+    assertBitmapsAreSimilar(expectedBitmap, actualBitmap, PSNR_THRESHOLD);
+  }
+
+  @Test
+  public void isNoOp_whenSizeDoesntChange_returnsTrue() {
+    LanczosResample lanczosResample = LanczosResample.scaleToFit(720, 1280);
+
+    assertThat(lanczosResample.isNoOp(720, 1280)).isTrue();
+  }
+
+  @Test
+  public void isNoOp_whenSizeDoesntChangeFlexibleOrientation_returnsTrue() {
+    LanczosResample lanczosResample = LanczosResample.scaleToFitWithFlexibleOrientation(720, 1280);
+
+    assertThat(lanczosResample.isNoOp(720, 1280)).isTrue();
+    assertThat(lanczosResample.isNoOp(1280, 720)).isTrue();
+  }
+
+  @Test
+  public void isNoOp_forSmallScalingFactors_returnsTrue() {
+    LanczosResample lanczosResample = LanczosResample.scaleToFit(1920, 1072);
+
+    assertThat(lanczosResample.isNoOp(1920, 1080)).isTrue();
+  }
+
+  @Test
+  public void isNoOp_forSmallScalingFactorsFlexibleOrientation_returnsTrue() {
+    LanczosResample lanczosResample = LanczosResample.scaleToFitWithFlexibleOrientation(1920, 1072);
+
+    assertThat(lanczosResample.isNoOp(1920, 1080)).isTrue();
+    assertThat(lanczosResample.isNoOp(1080, 1920)).isTrue();
+  }
+
+  @Test
+  public void isNoOp_forLargeScalingFactors_returnsFalse() {
+    LanczosResample lanczosResample = LanczosResample.scaleToFit(1920, 1068);
+
+    assertThat(lanczosResample.isNoOp(1920, 1080)).isFalse();
+  }
+
+  @Test
+  public void isNoOp_forLargeScalingFactorsFlexibleOrientation_returnsFalse() {
+    LanczosResample lanczosResample = LanczosResample.scaleToFitWithFlexibleOrientation(1920, 1068);
+
+    assertThat(lanczosResample.isNoOp(1920, 1080)).isFalse();
+    assertThat(lanczosResample.isNoOp(1080, 1920)).isFalse();
   }
 
   private static GlTextureInfo setupInputTexture(String path) throws Exception {

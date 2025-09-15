@@ -16,6 +16,7 @@
 
 package androidx.media3.exoplayer.mediacodec;
 
+import static android.os.Build.VERSION.SDK_INT;
 import static java.lang.annotation.ElementType.TYPE_USE;
 
 import android.media.MediaCodec;
@@ -35,7 +36,6 @@ import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.TraceUtil;
-import androidx.media3.common.util.Util;
 import androidx.media3.decoder.CryptoInfo;
 import com.google.common.base.Supplier;
 import java.io.IOException;
@@ -74,13 +74,20 @@ import java.nio.ByteBuffer;
               new HandlerThread(createQueueingThreadLabel(trackType)));
     }
 
-    @VisibleForTesting
-    /* package */ Factory(
+    /**
+     * Creates an factory for {@link AsynchronousMediaCodecAdapter} instances.
+     *
+     * @param callbackThreadSupplier A supplier of {@link HandlerThread} used for {@link MediaCodec}
+     *     callbacks invoked when buffers are available.
+     * @param queueingThreadSupplier A supplier of {@link HandlerThread} to use for queueing
+     *     buffers.
+     */
+    public Factory(
         Supplier<HandlerThread> callbackThreadSupplier,
         Supplier<HandlerThread> queueingThreadSupplier) {
       this.callbackThreadSupplier = callbackThreadSupplier;
       this.queueingThreadSupplier = queueingThreadSupplier;
-      enableSynchronousBufferQueueingWithAsyncCryptoFlag = true;
+      enableSynchronousBufferQueueingWithAsyncCryptoFlag = false;
     }
 
     /**
@@ -103,7 +110,7 @@ import java.nio.ByteBuffer;
       try {
         TraceUtil.beginSection("createCodec:" + codecName);
         codec = MediaCodec.createByCodecName(codecName);
-        int flags = configuration.flags;
+        int flags = 0;
         MediaCodecBufferEnqueuer bufferEnqueuer;
         if (enableSynchronousBufferQueueingWithAsyncCryptoFlag
             && useSynchronousBufferQueueingWithAsyncCryptoFlag(configuration.format)) {
@@ -114,8 +121,17 @@ import java.nio.ByteBuffer;
               new AsynchronousMediaCodecBufferEnqueuer(codec, queueingThreadSupplier.get());
         }
         codecAdapter =
-            new AsynchronousMediaCodecAdapter(codec, callbackThreadSupplier.get(), bufferEnqueuer);
+            new AsynchronousMediaCodecAdapter(
+                codec,
+                callbackThreadSupplier.get(),
+                bufferEnqueuer,
+                configuration.loudnessCodecController);
         TraceUtil.endSection();
+        if (configuration.surface == null
+            && configuration.codecInfo.detachedSurfaceSupported
+            && SDK_INT >= 35) {
+          flags |= MediaCodec.CONFIGURE_FLAG_DETACHED_SURFACE;
+        }
         codecAdapter.initialize(
             configuration.mediaFormat, configuration.surface, configuration.crypto, flags);
         return codecAdapter;
@@ -131,11 +147,11 @@ import java.nio.ByteBuffer;
 
     @ChecksSdkIntAtLeast(api = 34)
     private static boolean useSynchronousBufferQueueingWithAsyncCryptoFlag(Format format) {
-      if (Util.SDK_INT < 34) {
+      if (SDK_INT < 34) {
         return false;
       }
       // CONFIGURE_FLAG_USE_CRYPTO_ASYNC only works for audio on API 35+ (see b/316565675).
-      return Util.SDK_INT >= 35 || MimeTypes.isVideo(format.sampleMimeType);
+      return SDK_INT >= 35 || MimeTypes.isVideo(format.sampleMimeType);
     }
   }
 
@@ -152,14 +168,20 @@ import java.nio.ByteBuffer;
   private final MediaCodec codec;
   private final AsynchronousMediaCodecCallback asynchronousMediaCodecCallback;
   private final MediaCodecBufferEnqueuer bufferEnqueuer;
+  @Nullable private final LoudnessCodecController loudnessCodecController;
+
   private boolean codecReleased;
   private @State int state;
 
   private AsynchronousMediaCodecAdapter(
-      MediaCodec codec, HandlerThread callbackThread, MediaCodecBufferEnqueuer bufferEnqueuer) {
+      MediaCodec codec,
+      HandlerThread callbackThread,
+      MediaCodecBufferEnqueuer bufferEnqueuer,
+      @Nullable LoudnessCodecController loudnessCodecController) {
     this.codec = codec;
     this.asynchronousMediaCodecCallback = new AsynchronousMediaCodecCallback(callbackThread);
     this.bufferEnqueuer = bufferEnqueuer;
+    this.loudnessCodecController = loudnessCodecController;
     this.state = STATE_CREATED;
   }
 
@@ -176,6 +198,9 @@ import java.nio.ByteBuffer;
     TraceUtil.beginSection("startCodec");
     codec.start();
     TraceUtil.endSection();
+    if (SDK_INT >= 35 && loudnessCodecController != null) {
+      loudnessCodecController.addMediaCodec(codec);
+    }
     state = STATE_INITIALIZED;
   }
 
@@ -264,10 +289,13 @@ import java.nio.ByteBuffer;
           // MediaCodec.release() returns too early before fully detaching a Surface, and a
           // subsequent MediaCodec.configure() call using the same Surface then fails. See
           // https://github.com/google/ExoPlayer/issues/8696 and b/191966399.
-          if (Util.SDK_INT >= 30 && Util.SDK_INT < 33) {
+          if (SDK_INT >= 30 && SDK_INT < 33) {
             codec.stop();
           }
         } finally {
+          if (SDK_INT >= 35 && loudnessCodecController != null) {
+            loudnessCodecController.removeMediaCodec(codec);
+          }
           codec.release();
           codecReleased = true;
         }
@@ -293,6 +321,12 @@ import java.nio.ByteBuffer;
   @Override
   public void setOutputSurface(Surface surface) {
     codec.setOutputSurface(surface);
+  }
+
+  @RequiresApi(35)
+  @Override
+  public void detachOutputSurface() {
+    codec.detachOutputSurface();
   }
 
   @Override

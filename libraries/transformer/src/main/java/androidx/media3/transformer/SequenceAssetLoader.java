@@ -19,6 +19,7 @@ import static androidx.media3.common.util.Assertions.checkArgument;
 import static androidx.media3.common.util.Assertions.checkNotNull;
 import static androidx.media3.common.util.Assertions.checkState;
 import static androidx.media3.common.util.Assertions.checkStateNotNull;
+import static androidx.media3.common.util.Util.percentInt;
 import static androidx.media3.effect.DebugTraceUtil.COMPONENT_ASSET_LOADER;
 import static androidx.media3.effect.DebugTraceUtil.EVENT_INPUT_FORMAT;
 import static androidx.media3.effect.DebugTraceUtil.EVENT_OUTPUT_FORMAT;
@@ -27,15 +28,18 @@ import static androidx.media3.transformer.Transformer.PROGRESS_STATE_NOT_STARTED
 import static androidx.media3.transformer.TransformerUtil.getProcessedTrackType;
 
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.os.Looper;
 import android.view.Surface;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
+import androidx.media3.common.ColorInfo;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.OnInputFrameProcessedListener;
 import androidx.media3.common.util.Clock;
+import androidx.media3.common.util.ConstantRateTimestampIterator;
 import androidx.media3.common.util.HandlerWrapper;
 import androidx.media3.common.util.TimestampIterator;
 import androidx.media3.common.util.Util;
@@ -47,6 +51,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
  * An {@link AssetLoader} that is composed of a {@linkplain EditedMediaItemSequence sequence} of
@@ -61,10 +66,25 @@ import java.util.concurrent.atomic.AtomicInteger;
           .setChannelCount(2)
           .build();
 
+  private static final int BLANK_IMAGE_BITMAP_WIDTH = 1;
+  private static final int BLANK_IMAGE_BITMAP_HEIGHT = 1;
+  private static final Format BLANK_IMAGE_BITMAP_FORMAT =
+      new Format.Builder()
+          .setWidth(BLANK_IMAGE_BITMAP_WIDTH)
+          .setHeight(BLANK_IMAGE_BITMAP_HEIGHT)
+          .setSampleMimeType(MimeTypes.IMAGE_RAW)
+          .setColorInfo(ColorInfo.SRGB_BT709_FULL)
+          .build();
+
+  private static final float BLANK_IMAGE_FRAME_RATE = 30.0f;
+
+  private static final int RETRY_DELAY_MS = 10;
+
   private final List<EditedMediaItem> editedMediaItems;
   private final boolean isLooping;
   private final boolean forceAudioTrack;
-  private final AssetLoader.Factory assetLoaderFactory;
+  private final boolean forceVideoTrack;
+  private final Factory assetLoaderFactory;
   private final CompositionSettings compositionSettings;
   private final Listener sequenceAssetLoaderListener;
   private final HandlerWrapper handler;
@@ -97,6 +117,8 @@ import java.util.concurrent.atomic.AtomicInteger;
   private boolean decodeVideo;
   private int sequenceLoopCount;
   private int processedInputsSize;
+  private @MonotonicNonNull Format currentAudioInputFormat;
+  private @MonotonicNonNull Format currentVideoInputFormat;
 
   // Accessed when switching asset loader.
   private volatile boolean released;
@@ -105,19 +127,21 @@ import java.util.concurrent.atomic.AtomicInteger;
   private volatile long currentAssetDurationAfterEffectsAppliedUs;
   private volatile long maxSequenceDurationUs;
   private volatile boolean isMaxSequenceDurationUsFinal;
+  private volatile boolean sequenceHasAudio;
+  private volatile boolean sequenceHasVideo;
 
   public SequenceAssetLoader(
       EditedMediaItemSequence sequence,
-      boolean forceAudioTrack,
-      AssetLoader.Factory assetLoaderFactory,
+      Factory assetLoaderFactory,
       CompositionSettings compositionSettings,
       Listener listener,
       Clock clock,
       Looper looper) {
     editedMediaItems = sequence.editedMediaItems;
     isLooping = sequence.isLooping;
-    this.forceAudioTrack = forceAudioTrack;
-    this.assetLoaderFactory = assetLoaderFactory;
+    this.forceAudioTrack = sequence.forceAudioTrack;
+    this.forceVideoTrack = sequence.forceVideoTrack;
+    this.assetLoaderFactory = new GapInterceptingAssetLoaderFactory(assetLoaderFactory);
     this.compositionSettings = compositionSettings;
     sequenceAssetLoaderListener = listener;
     handler = clock.createHandler(looper, /* callback= */ null);
@@ -131,7 +155,7 @@ import java.util.concurrent.atomic.AtomicInteger;
     // constructor.
     @SuppressWarnings("nullness:argument.type.incompatible")
     AssetLoader currentAssetLoader =
-        assetLoaderFactory.createAssetLoader(
+        this.assetLoaderFactory.createAssetLoader(
             editedMediaItems.get(0), looper, /* listener= */ this, compositionSettings);
     this.currentAssetLoader = currentAssetLoader;
   }
@@ -157,7 +181,7 @@ import java.util.concurrent.atomic.AtomicInteger;
       return progressState;
     }
 
-    int progress = currentMediaItemIndex * 100 / mediaItemCount;
+    int progress = percentInt(currentMediaItemIndex, mediaItemCount);
     if (progressState == PROGRESS_STATE_AVAILABLE) {
       progress += progressHolder.progress / mediaItemCount;
     }
@@ -188,10 +212,15 @@ import java.util.concurrent.atomic.AtomicInteger;
     if ((sequenceLoopCount * editedMediaItems.size() + currentMediaItemIndex)
         >= processedInputsSize) {
       MediaItem mediaItem = editedMediaItems.get(currentMediaItemIndex).mediaItem;
-      ImmutableMap<Integer, String> decoders = currentAssetLoader.getDecoderNames();
+      ImmutableMap<Integer, String> decoders = getDecoderNames();
       processedInputsBuilder.add(
           new ExportResult.ProcessedInput(
-              mediaItem, decoders.get(C.TRACK_TYPE_AUDIO), decoders.get(C.TRACK_TYPE_VIDEO)));
+              mediaItem,
+              currentAssetDurationUs,
+              currentAudioInputFormat,
+              currentVideoInputFormat,
+              decoders.get(C.TRACK_TYPE_AUDIO),
+              decoders.get(C.TRACK_TYPE_VIDEO)));
       processedInputsSize++;
     }
   }
@@ -228,14 +257,32 @@ import java.util.concurrent.atomic.AtomicInteger;
         isAudio ? "audio" : "video",
         inputFormat);
 
-    if (!isCurrentAssetFirstAsset) {
-      return isAudio ? decodeAudio : decodeVideo;
+    if (isAudio) {
+      currentAudioInputFormat = inputFormat;
+    } else {
+      currentVideoInputFormat = inputFormat;
     }
 
-    boolean addForcedAudioTrack = forceAudioTrack && reportedTrackCount.get() == 1 && !isAudio;
+    if (!isCurrentAssetFirstAsset) {
+      boolean decode = isAudio ? decodeAudio : decodeVideo;
+      if (decode) {
+        checkArgument((supportedOutputTypes & SUPPORTED_OUTPUT_TYPE_DECODED) != 0);
+      } else {
+        checkArgument((supportedOutputTypes & SUPPORTED_OUTPUT_TYPE_ENCODED) != 0);
+      }
+      return decode;
+    }
+
+    boolean addForcedAudioTrack = false;
+    boolean addForcedVideoTrack = false;
+    if (reportedTrackCount.get() == 1) {
+      addForcedAudioTrack = forceAudioTrack && !isAudio;
+      addForcedVideoTrack = forceVideoTrack && isAudio;
+    }
 
     if (!isTrackCountReported) {
-      int trackCount = reportedTrackCount.get() + (addForcedAudioTrack ? 1 : 0);
+      int trackCount =
+          reportedTrackCount.get() + (addForcedAudioTrack || addForcedVideoTrack ? 1 : 0);
       sequenceAssetLoaderListener.onTrackCount(trackCount);
       isTrackCountReported = true;
     }
@@ -253,6 +300,11 @@ import java.util.concurrent.atomic.AtomicInteger;
       sequenceAssetLoaderListener.onTrackAdded(
           FORCE_AUDIO_TRACK_FORMAT, SUPPORTED_OUTPUT_TYPE_DECODED);
       decodeAudio = true;
+    }
+    if (addForcedVideoTrack) {
+      sequenceAssetLoaderListener.onTrackAdded(
+          BLANK_IMAGE_BITMAP_FORMAT, SUPPORTED_OUTPUT_TYPE_DECODED);
+      decodeVideo = true;
     }
 
     return decodeOutput;
@@ -272,6 +324,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
     SampleConsumerWrapper sampleConsumer;
     if (isCurrentAssetFirstAsset) {
+      if (trackType == C.TRACK_TYPE_VIDEO) {
+        sequenceHasVideo = true;
+      } else {
+        sequenceHasAudio = true;
+      }
       @Nullable
       SampleConsumer wrappedSampleConsumer = sequenceAssetLoaderListener.onOutputFormat(format);
       if (wrappedSampleConsumer == null) {
@@ -280,49 +337,79 @@ import java.util.concurrent.atomic.AtomicInteger;
       sampleConsumer = new SampleConsumerWrapper(wrappedSampleConsumer, trackType);
       sampleConsumersByTrackType.put(trackType, sampleConsumer);
 
-      if (forceAudioTrack && reportedTrackCount.get() == 1 && trackType == C.TRACK_TYPE_VIDEO) {
-        SampleConsumer wrappedAudioSampleConsumer =
-            checkStateNotNull(
-                sequenceAssetLoaderListener.onOutputFormat(
-                    FORCE_AUDIO_TRACK_FORMAT
-                        .buildUpon()
-                        .setSampleMimeType(MimeTypes.AUDIO_RAW)
-                        .setPcmEncoding(C.ENCODING_PCM_16BIT)
-                        .build()));
-        sampleConsumersByTrackType.put(
-            C.TRACK_TYPE_AUDIO, new SampleConsumerWrapper(wrappedAudioSampleConsumer, trackType));
+      if (reportedTrackCount.get() == 1) {
+        if (forceAudioTrack && trackType == C.TRACK_TYPE_VIDEO) {
+          SampleConsumer wrappedAudioSampleConsumer =
+              checkStateNotNull(
+                  sequenceAssetLoaderListener.onOutputFormat(
+                      FORCE_AUDIO_TRACK_FORMAT
+                          .buildUpon()
+                          .setSampleMimeType(MimeTypes.AUDIO_RAW)
+                          .setPcmEncoding(C.ENCODING_PCM_16BIT)
+                          .build()));
+          sampleConsumersByTrackType.put(
+              C.TRACK_TYPE_AUDIO,
+              new SampleConsumerWrapper(wrappedAudioSampleConsumer, C.TRACK_TYPE_AUDIO));
+        } else if (forceVideoTrack && trackType == C.TRACK_TYPE_AUDIO) {
+          SampleConsumer wrappedVideoSampleConsumer =
+              checkStateNotNull(
+                  sequenceAssetLoaderListener.onOutputFormat(BLANK_IMAGE_BITMAP_FORMAT));
+          sampleConsumersByTrackType.put(
+              C.TRACK_TYPE_VIDEO,
+              new SampleConsumerWrapper(wrappedVideoSampleConsumer, C.TRACK_TYPE_VIDEO));
+        }
       }
     } else {
-      // TODO(b/270533049): Remove the check below when implementing blank video frames generation.
-      boolean videoTrackDisappeared =
-          reportedTrackCount.get() == 1
-              && trackType == C.TRACK_TYPE_AUDIO
-              && sampleConsumersByTrackType.size() == 2;
-      checkState(
-          !videoTrackDisappeared,
-          "Inputs with no video track are not supported when the output contains a video track");
+      String missingTrackMessage =
+          trackType == C.TRACK_TYPE_AUDIO
+              ? "The preceding MediaItem does not contain any audio track. If the sequence starts"
+                  + " with an item without audio track (like images), followed by items with"
+                  + " audio tracks, then"
+                  + " EditedMediaItemSequence.Builder.experimentalSetForceAudioTrack() needs to"
+                  + " be set to true."
+              : "The preceding MediaItem does not contain any video track. If the sequence starts"
+                  + " with an item without video track (audio only), followed by items with video"
+                  + " tracks, then"
+                  + " EditedMediaItemSequence.Builder.experimentalSetForceVideoTrack() needs to"
+                  + " be set to true.";
       sampleConsumer =
-          checkStateNotNull(
-              sampleConsumersByTrackType.get(trackType),
-              Util.formatInvariant(
-                  "The preceding MediaItem does not contain any track of type %d. If the"
-                      + " Composition contains a sequence that starts with items without audio"
-                      + " tracks (like images), followed by items with audio tracks,"
-                      + " Composition.Builder.experimentalSetForceAudioTrack() needs to be set to"
-                      + " true.",
-                  trackType));
+          checkStateNotNull(sampleConsumersByTrackType.get(trackType), missingTrackMessage);
     }
     onMediaItemChanged(trackType, format);
     if (reportedTrackCount.get() == 1 && sampleConsumersByTrackType.size() == 2) {
-      for (Map.Entry<Integer, SampleConsumerWrapper> entry :
-          sampleConsumersByTrackType.entrySet()) {
-        int outputTrackType = entry.getKey();
-        if (trackType != outputTrackType) {
-          onMediaItemChanged(outputTrackType, /* outputFormat= */ null);
-        }
+      // One track is missing from the current media item.
+      if (trackType == C.TRACK_TYPE_AUDIO) {
+        // Fill video gap with blank frames.
+        onMediaItemChanged(C.TRACK_TYPE_VIDEO, /* outputFormat= */ BLANK_IMAGE_BITMAP_FORMAT);
+        nonEndedTrackCount.incrementAndGet();
+        handler.post(() -> insertBlankFrames(getBlankImageBitmap()));
+      } else {
+        // Generate audio silence in the AudioGraph by signalling null format.
+        onMediaItemChanged(C.TRACK_TYPE_AUDIO, /* outputFormat= */ null);
       }
     }
     return sampleConsumer;
+  }
+
+  private static Bitmap getBlankImageBitmap() {
+    return Bitmap.createBitmap(
+        new int[] {Color.BLACK},
+        BLANK_IMAGE_BITMAP_WIDTH,
+        BLANK_IMAGE_BITMAP_HEIGHT,
+        Bitmap.Config.ARGB_8888);
+  }
+
+  private void insertBlankFrames(Bitmap bitmap) {
+    SampleConsumerWrapper videoSampleConsumer =
+        checkNotNull(sampleConsumersByTrackType.get(C.TRACK_TYPE_VIDEO));
+    if (videoSampleConsumer.queueInputBitmap(
+            bitmap,
+            new ConstantRateTimestampIterator(currentAssetDurationUs, BLANK_IMAGE_FRAME_RATE))
+        != SampleConsumer.INPUT_RESULT_SUCCESS) {
+      handler.postDelayed(() -> insertBlankFrames(bitmap), RETRY_DELAY_MS);
+    } else {
+      videoSampleConsumer.signalEndOfVideoInput();
+    }
   }
 
   private void onMediaItemChanged(int trackType, @Nullable Format outputFormat) {
@@ -333,13 +420,17 @@ import java.util.concurrent.atomic.AtomicInteger;
       return;
     }
 
+    EditedMediaItem editedMediaItem = editedMediaItems.get(currentMediaItemIndex);
+
     onMediaItemChangedListener.onMediaItemChanged(
-        editedMediaItems.get(currentMediaItemIndex),
+        editedMediaItem,
         /* durationUs= */ (trackType == C.TRACK_TYPE_AUDIO && isLooping && decodeAudio)
             ? C.TIME_UNSET
             : currentAssetDurationUs,
-        /* decodedFormat= */ outputFormat,
-        /* isLast= */ currentMediaItemIndex == editedMediaItems.size() - 1);
+        /* decodedFormat= */ (editedMediaItem.isGap() && trackType == C.TRACK_TYPE_AUDIO)
+            ? null
+            : outputFormat,
+        /* isLast= */ isLastMediaItemInSequence());
   }
 
   // Methods called from any thread.
@@ -365,7 +456,7 @@ import java.util.concurrent.atomic.AtomicInteger;
   @Override
   public void onDurationUs(long durationUs) {
     checkArgument(
-        durationUs != C.TIME_UNSET || currentMediaItemIndex == editedMediaItems.size() - 1,
+        durationUs != C.TIME_UNSET || isLastMediaItemInSequence(),
         "Could not retrieve required duration for EditedMediaItem " + currentMediaItemIndex);
     currentAssetDurationAfterEffectsAppliedUs =
         editedMediaItems.get(currentMediaItemIndex).getDurationAfterEffectsApplied(durationUs);
@@ -384,6 +475,10 @@ import java.util.concurrent.atomic.AtomicInteger;
   @Override
   public void onError(ExportException exportException) {
     sequenceAssetLoaderListener.onError(exportException);
+  }
+
+  private boolean isLastMediaItemInSequence() {
+    return currentMediaItemIndex == editedMediaItems.size() - 1;
   }
 
   // Classes accessed from AssetLoader threads.
@@ -427,7 +522,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
       if (inputBuffer.isEndOfStream()) {
         nonEndedTrackCount.decrementAndGet();
-        if (currentMediaItemIndex < editedMediaItems.size() - 1 || isLooping) {
+        if (!isLastMediaItemInSequence() || isLooping) {
           if (trackType == C.TRACK_TYPE_AUDIO && !isLooping && decodeAudio) {
             // Trigger silence generation (if needed) for a decoded audio track when end of stream
             // is first encountered. This helps us avoid a muxer deadlock when audio track is
@@ -483,6 +578,11 @@ import java.util.concurrent.atomic.AtomicInteger;
     }
 
     @Override
+    public void setOnInputSurfaceReadyListener(Runnable runnable) {
+      sampleConsumer.setOnInputSurfaceReadyListener(runnable);
+    }
+
+    @Override
     public @InputResult int queueInputTexture(int texId, long presentationTimeUs) {
       long globalTimestampUs = totalDurationUs + presentationTimeUs;
       if (isLooping && globalTimestampUs >= maxSequenceDurationUs) {
@@ -523,11 +623,17 @@ import java.util.concurrent.atomic.AtomicInteger;
     @Override
     public void signalEndOfVideoInput() {
       nonEndedTrackCount.decrementAndGet();
-      boolean videoEnded =
-          isLooping ? videoLoopingEnded : currentMediaItemIndex == editedMediaItems.size() - 1;
+      boolean videoEnded = isLooping ? videoLoopingEnded : isLastMediaItemInSequence();
       if (videoEnded) {
         sampleConsumer.signalEndOfVideoInput();
       } else if (nonEndedTrackCount.get() == 0) {
+        switchAssetLoader();
+      }
+    }
+
+    private void onAudioGapSignalled() {
+      int nonEndedTracks = nonEndedTrackCount.decrementAndGet();
+      if (nonEndedTracks == 0 && !isLastMediaItemInSequence()) {
         switchAssetLoader();
       }
     }
@@ -597,6 +703,141 @@ import java.util.concurrent.atomic.AtomicInteger;
     @Override
     public TimestampIterator copyOf() {
       return new ClippingIterator(iterator.copyOf(), clippingValue);
+    }
+  }
+
+  /**
+   * Internally signals that the current asset is a {@linkplain
+   * EditedMediaItemSequence.Builder#addGap(long) gap}, but does no loading or processing of media.
+   *
+   * <p>This component requires downstream components to handle generation of the gap media.
+   */
+  private final class GapSignalingAssetLoader implements AssetLoader {
+
+    private final long durationUs;
+    private final boolean shouldProduceAudio;
+    private final boolean shouldProduceVideo;
+    private final Format audioTrackFormat;
+    private final Format audioTrackDecodedFormat;
+
+    private boolean producedAudio;
+    private boolean producedVideo;
+
+    private GapSignalingAssetLoader(long durationUs) {
+      this.durationUs = durationUs;
+      shouldProduceAudio = sequenceHasAudio || forceAudioTrack;
+      shouldProduceVideo = sequenceHasVideo || forceVideoTrack;
+      checkState(shouldProduceAudio || shouldProduceVideo);
+      this.audioTrackFormat = new Format.Builder().setSampleMimeType(MimeTypes.AUDIO_RAW).build();
+      this.audioTrackDecodedFormat =
+          new Format.Builder()
+              .setSampleMimeType(MimeTypes.AUDIO_RAW)
+              .setSampleRate(44100)
+              .setChannelCount(2)
+              .setPcmEncoding(C.ENCODING_PCM_16BIT)
+              .build();
+    }
+
+    @Override
+    public void start() {
+      onDurationUs(durationUs);
+      int trackCount = shouldProduceAudio && shouldProduceVideo ? 2 : 1;
+      onTrackCount(trackCount);
+      if (shouldProduceAudio) {
+        onTrackAdded(audioTrackFormat, SUPPORTED_OUTPUT_TYPE_DECODED);
+      }
+      if (shouldProduceVideo) {
+        onTrackAdded(BLANK_IMAGE_BITMAP_FORMAT, SUPPORTED_OUTPUT_TYPE_DECODED);
+      }
+      outputFormatToSequenceAssetLoader();
+    }
+
+    @Override
+    public @Transformer.ProgressState int getProgress(ProgressHolder progressHolder) {
+      boolean audioPending = shouldProduceAudio && !producedAudio;
+      boolean videoPending = shouldProduceVideo && !producedVideo;
+      if (audioPending && videoPending) {
+        progressHolder.progress = 0;
+      } else if (!audioPending && !videoPending) {
+        progressHolder.progress = 99;
+      } else {
+        progressHolder.progress = 50;
+      }
+      return PROGRESS_STATE_AVAILABLE;
+    }
+
+    @Override
+    public ImmutableMap<Integer, String> getDecoderNames() {
+      return ImmutableMap.of();
+    }
+
+    @Override
+    public void release() {}
+
+    /** Outputs the gap format, scheduling to try again if unsuccessful. */
+    private void outputFormatToSequenceAssetLoader() {
+      boolean audioPending = shouldProduceAudio && !producedAudio;
+      boolean videoPending = shouldProduceVideo && !producedVideo;
+      checkState(audioPending || videoPending);
+
+      try {
+        boolean shouldRetry = false;
+        if (audioPending) {
+          @Nullable
+          SampleConsumerWrapper sampleConsumerWrapper = onOutputFormat(audioTrackDecodedFormat);
+          if (sampleConsumerWrapper == null) {
+            shouldRetry = true;
+          } else {
+            sampleConsumerWrapper.onAudioGapSignalled();
+            producedAudio = true;
+          }
+        }
+        if (videoPending) {
+          @Nullable
+          SampleConsumerWrapper sampleConsumerWrapper = onOutputFormat(BLANK_IMAGE_BITMAP_FORMAT);
+          if (sampleConsumerWrapper == null) {
+            shouldRetry = true;
+          } else {
+            insertBlankFrames(getBlankImageBitmap());
+            producedVideo = true;
+          }
+        }
+        if (shouldRetry) {
+          handler.postDelayed(this::outputFormatToSequenceAssetLoader, RETRY_DELAY_MS);
+        }
+      } catch (ExportException e) {
+        onError(e);
+      } catch (RuntimeException e) {
+        onError(ExportException.createForAssetLoader(e, ExportException.ERROR_CODE_UNSPECIFIED));
+      }
+    }
+  }
+
+  /**
+   * Intercepts {@link AssetLoader.Factory} calls, when {@linkplain
+   * EditedMediaItemSequence.Builder#addGap(long) a gap} is detected, otherwise forwards them to the
+   * provided {@link AssetLoader.Factory}.
+   *
+   * <p>In the case that a gap is detected, a {@link GapSignalingAssetLoader} is returned.
+   */
+  private final class GapInterceptingAssetLoaderFactory implements AssetLoader.Factory {
+
+    private final AssetLoader.Factory factory;
+
+    public GapInterceptingAssetLoaderFactory(AssetLoader.Factory factory) {
+      this.factory = factory;
+    }
+
+    @Override
+    public AssetLoader createAssetLoader(
+        EditedMediaItem editedMediaItem,
+        Looper looper,
+        Listener listener,
+        CompositionSettings compositionSettings) {
+      if (editedMediaItem.isGap()) {
+        return new GapSignalingAssetLoader(editedMediaItem.durationUs);
+      }
+      return factory.createAssetLoader(editedMediaItem, looper, listener, compositionSettings);
     }
   }
 }

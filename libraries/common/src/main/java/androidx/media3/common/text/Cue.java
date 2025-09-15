@@ -40,7 +40,6 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
-import com.google.common.base.Objects;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.ByteArrayOutputStream;
 import java.lang.annotation.Documented;
@@ -48,6 +47,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.ArrayList;
+import java.util.Objects;
 import org.checkerframework.dataflow.qual.Pure;
 
 /** Contains information about a specific cue, including textual content and formatting data. */
@@ -309,9 +309,10 @@ public final class Cue {
    */
   public final float shearDegrees;
 
-  /**
-   * The shadow to be applied to this clue.
-   */
+  /** The Z index for cue, the larger index will render above the smaller index. May be negative. */
+  @UnstableApi public final int zIndex;
+
+  /** The shadow to be applied to this clue. */
   @Nullable public final TextShadow textShadow;
 
   private Cue(
@@ -332,6 +333,7 @@ public final class Cue {
       int windowColor,
       @VerticalType int verticalType,
       float shearDegrees,
+      int zIndex,
       @Nullable TextShadow textShadow) {
     // Exactly one of text or bitmap should be set.
     if (text == null) {
@@ -362,6 +364,7 @@ public final class Cue {
     this.textSize = textSize;
     this.verticalType = verticalType;
     this.shearDegrees = shearDegrees;
+    this.zIndex = zIndex;
     this.textShadow = textShadow;
   }
 
@@ -399,12 +402,13 @@ public final class Cue {
         && textSize == that.textSize
         && verticalType == that.verticalType
         && shearDegrees == that.shearDegrees
+        && zIndex == that.zIndex
         && textShadow == that.textShadow;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(
+    return Objects.hash(
         text,
         textAlignment,
         multiRowAlignment,
@@ -422,6 +426,7 @@ public final class Cue {
         textSize,
         verticalType,
         shearDegrees,
+        zIndex,
         textShadow);
   }
 
@@ -445,6 +450,7 @@ public final class Cue {
     @ColorInt private int windowColor;
     private @VerticalType int verticalType;
     private float shearDegrees;
+    private int zIndex;
     @Nullable private TextShadow textShadow;
 
     public Builder() {
@@ -485,6 +491,7 @@ public final class Cue {
       windowColor = cue.windowColor;
       verticalType = cue.verticalType;
       shearDegrees = cue.shearDegrees;
+      zIndex = cue.zIndex;
       textShadow = cue.textShadow;
     }
 
@@ -493,11 +500,14 @@ public final class Cue {
      *
      * <p>Note that {@code text} may be decorated with styling spans.
      *
+     * <p>Note that this will also set the {@code bitmap} to null.
+     *
      * @see Cue#text
      */
     @CanIgnoreReturnValue
     public Builder setText(CharSequence text) {
       this.text = text;
+      this.bitmap = null;
       return this;
     }
 
@@ -515,11 +525,14 @@ public final class Cue {
     /**
      * Sets the cue image.
      *
+     * <p>Note that this will also set the {@code text} to null.
+     *
      * @see Cue#bitmap
      */
     @CanIgnoreReturnValue
     public Builder setBitmap(Bitmap bitmap) {
       this.bitmap = bitmap;
+      this.text = null;
       return this;
     }
 
@@ -836,6 +849,19 @@ public final class Cue {
       return verticalType;
     }
 
+    /** Sets the zIndex for this Cue. */
+    @CanIgnoreReturnValue
+    public Builder setZIndex(int zIndex) {
+      this.zIndex = zIndex;
+      return this;
+    }
+
+    /** Gets the zIndex for this Cue. */
+    @Pure
+    public int getZIndex() {
+      return zIndex;
+    }
+
     /** Build the cue. */
     public Cue build() {
       return new Cue(
@@ -856,6 +882,7 @@ public final class Cue {
           windowColor,
           verticalType,
           shearDegrees,
+          zIndex,
           textShadow);
     }
   }
@@ -879,7 +906,9 @@ public final class Cue {
   private static final String FIELD_WINDOW_COLOR_SET = Util.intToStringMaxRadix(14);
   private static final String FIELD_VERTICAL_TYPE = Util.intToStringMaxRadix(15);
   private static final String FIELD_SHEAR_DEGREES = Util.intToStringMaxRadix(16);
-  private static final String FIELD_SHADOW = Util.intToStringMaxRadix(17);
+  private static final String FIELD_Z_INDEX = Util.intToStringMaxRadix(19);
+
+  private static final String FIELD_SHADOW = Util.intToStringMaxRadix(101);
 
   /**
    * Returns a {@link Bundle} that can be serialized to bytes.
@@ -955,6 +984,7 @@ public final class Cue {
     bundle.putInt(FIELD_WINDOW_COLOR, windowColor);
     bundle.putInt(FIELD_VERTICAL_TYPE, verticalType);
     bundle.putFloat(FIELD_SHEAR_DEGREES, shearDegrees);
+    bundle.putInt(FIELD_Z_INDEX, zIndex);
     if (textShadow != null) {
       bundle.putBundle(FIELD_SHADOW, textShadow.toBundle());
     }
@@ -1030,8 +1060,10 @@ public final class Cue {
     if (bundle.containsKey(FIELD_SHEAR_DEGREES)) {
       builder.setShearDegrees(bundle.getFloat(FIELD_SHEAR_DEGREES));
     }
-    Bundle textShadowBundle = bundle.containsKey(FIELD_SHADOW) ? bundle.getBundle(FIELD_SHADOW) : null;
-    if (textShadowBundle != null) {
+    if (bundle.containsKey(FIELD_Z_INDEX)) {
+      builder.setZIndex(bundle.getInt(FIELD_Z_INDEX));
+    }
+    if (bundle.containsKey(FIELD_SHADOW)) {
       builder.setTextShadow(TextShadow.fromBundle(bundle.getBundle(FIELD_SHADOW)));
     }
     return builder.build();

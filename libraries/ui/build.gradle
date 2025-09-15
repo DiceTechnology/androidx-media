@@ -37,8 +37,7 @@ android {
 apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
 
 dependencies {
-    implementation project(modulePrefix + 'lib-common')
-    implementation 'androidx.media:media:' + androidxMediaVersion
+    api project(modulePrefix + 'lib-common')
     implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
     implementation 'androidx.recyclerview:recyclerview:' + androidxRecyclerViewVersion
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion

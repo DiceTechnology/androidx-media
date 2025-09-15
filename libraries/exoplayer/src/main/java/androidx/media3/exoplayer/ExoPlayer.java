@@ -15,6 +15,7 @@
  */
 package androidx.media3.exoplayer;
 
+import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 import static androidx.media3.common.util.Assertions.checkArgument;
 import static androidx.media3.common.util.Assertions.checkNotNull;
 import static androidx.media3.common.util.Assertions.checkState;
@@ -32,11 +33,11 @@ import android.view.TextureView;
 import androidx.annotation.IntRange;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
+import androidx.annotation.RestrictTo;
 import androidx.annotation.VisibleForTesting;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.AuxEffectInfo;
 import androidx.media3.common.C;
-import androidx.media3.common.DeviceInfo;
 import androidx.media3.common.Effect;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
@@ -45,8 +46,6 @@ import androidx.media3.common.PriorityTaskManager;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
-import androidx.media3.common.VideoSize;
-import androidx.media3.common.text.CueGroup;
 import androidx.media3.common.util.Clock;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -140,11 +139,11 @@ import java.util.List;
  *       otherwise. For the vast majority of cases this should be the application's main thread.
  *       Using the application's main thread is also a requirement when using ExoPlayer's UI
  *       components or the IMA extension. The thread on which an ExoPlayer instance must be accessed
- *       can be explicitly specified by passing a `Looper` when creating the player. If no `Looper`
- *       is specified, then the `Looper` of the thread that the player is created on is used, or if
- *       that thread does not have a `Looper`, the `Looper` of the application's main thread is
- *       used. In all cases the `Looper` of the thread from which the player must be accessed can be
- *       queried using {@link #getApplicationLooper()}.
+ *       can be explicitly specified by passing a {@link Looper} when creating the player. If no
+ *       {@code Looper} is specified, then the {@code Looper} of the thread that the player is
+ *       created on is used, or if that thread does not have a {@code Looper}, the {@code Looper} of
+ *       the application's main thread is used. In all cases the {@code Looper} of the thread from
+ *       which the player must be accessed can be queried using {@link #getApplicationLooper()}.
  *   <li>Registered listeners are called on the thread associated with {@link
  *       #getApplicationLooper()}. Note that this means registered listeners are called on the same
  *       thread which must be used to access the player.
@@ -163,259 +162,6 @@ import java.util.List;
  * </ul>
  */
 public interface ExoPlayer extends Player {
-
-  /**
-   * @deprecated Use {@link ExoPlayer}, as all methods are defined by that interface.
-   */
-  @UnstableApi
-  @Deprecated
-  interface AudioComponent {
-
-    /**
-     * @deprecated Use {@link Player#setAudioAttributes(AudioAttributes, boolean)} instead.
-     */
-    @Deprecated
-    void setAudioAttributes(AudioAttributes audioAttributes, boolean handleAudioFocus);
-
-    /**
-     * @deprecated Use {@link Player#getAudioAttributes()} instead.
-     */
-    @Deprecated
-    AudioAttributes getAudioAttributes();
-
-    /**
-     * @deprecated Use {@link ExoPlayer#setAudioSessionId(int)} instead.
-     */
-    @Deprecated
-    void setAudioSessionId(int audioSessionId);
-
-    /**
-     * @deprecated Use {@link ExoPlayer#getAudioSessionId()} instead.
-     */
-    @Deprecated
-    int getAudioSessionId();
-
-    /**
-     * @deprecated Use {@link ExoPlayer#setAuxEffectInfo(AuxEffectInfo)} instead.
-     */
-    @Deprecated
-    void setAuxEffectInfo(AuxEffectInfo auxEffectInfo);
-
-    /**
-     * @deprecated Use {@link ExoPlayer#clearAuxEffectInfo()} instead.
-     */
-    @Deprecated
-    void clearAuxEffectInfo();
-
-    /**
-     * @deprecated Use {@link Player#setVolume(float)} instead.
-     */
-    @Deprecated
-    void setVolume(float audioVolume);
-
-    /**
-     * @deprecated Use {@link Player#getVolume()} instead.
-     */
-    @Deprecated
-    float getVolume();
-
-    /**
-     * @deprecated Use {@link ExoPlayer#setSkipSilenceEnabled(boolean)} instead.
-     */
-    @Deprecated
-    void setSkipSilenceEnabled(boolean skipSilenceEnabled);
-
-    /**
-     * @deprecated Use {@link ExoPlayer#getSkipSilenceEnabled()} instead.
-     */
-    @Deprecated
-    boolean getSkipSilenceEnabled();
-  }
-
-  /**
-   * @deprecated Use {@link ExoPlayer}, as all methods are defined by that interface.
-   */
-  @UnstableApi
-  @Deprecated
-  interface VideoComponent {
-
-    /**
-     * @deprecated Use {@link ExoPlayer#setVideoScalingMode(int)} instead.
-     */
-    @Deprecated
-    void setVideoScalingMode(@C.VideoScalingMode int videoScalingMode);
-
-    /**
-     * @deprecated Use {@link ExoPlayer#getVideoScalingMode()} instead.
-     */
-    @Deprecated
-    @C.VideoScalingMode
-    int getVideoScalingMode();
-
-    /**
-     * @deprecated Use {@link ExoPlayer#setVideoChangeFrameRateStrategy(int)} instead.
-     */
-    @Deprecated
-    void setVideoChangeFrameRateStrategy(
-        @C.VideoChangeFrameRateStrategy int videoChangeFrameRateStrategy);
-
-    /**
-     * @deprecated Use {@link ExoPlayer#getVideoChangeFrameRateStrategy()} instead.
-     */
-    @Deprecated
-    @C.VideoChangeFrameRateStrategy
-    int getVideoChangeFrameRateStrategy();
-
-    /**
-     * @deprecated Use {@link ExoPlayer#setVideoFrameMetadataListener(VideoFrameMetadataListener)}
-     *     instead.
-     */
-    @Deprecated
-    void setVideoFrameMetadataListener(VideoFrameMetadataListener listener);
-
-    /**
-     * @deprecated Use {@link ExoPlayer#clearVideoFrameMetadataListener(VideoFrameMetadataListener)}
-     *     instead.
-     */
-    @Deprecated
-    void clearVideoFrameMetadataListener(VideoFrameMetadataListener listener);
-
-    /**
-     * @deprecated Use {@link ExoPlayer#setCameraMotionListener(CameraMotionListener)} instead.
-     */
-    @Deprecated
-    void setCameraMotionListener(CameraMotionListener listener);
-
-    /**
-     * @deprecated Use {@link ExoPlayer#clearCameraMotionListener(CameraMotionListener)} instead.
-     */
-    @Deprecated
-    void clearCameraMotionListener(CameraMotionListener listener);
-
-    /**
-     * @deprecated Use {@link Player#clearVideoSurface()} instead.
-     */
-    @Deprecated
-    void clearVideoSurface();
-
-    /**
-     * @deprecated Use {@link Player#clearVideoSurface(Surface)} instead.
-     */
-    @Deprecated
-    void clearVideoSurface(@Nullable Surface surface);
-
-    /**
-     * @deprecated Use {@link Player#setVideoSurface(Surface)} instead.
-     */
-    @Deprecated
-    void setVideoSurface(@Nullable Surface surface);
-
-    /**
-     * @deprecated Use {@link Player#setVideoSurfaceHolder(SurfaceHolder)} instead.
-     */
-    @Deprecated
-    void setVideoSurfaceHolder(@Nullable SurfaceHolder surfaceHolder);
-
-    /**
-     * @deprecated Use {@link Player#clearVideoSurfaceHolder(SurfaceHolder)} instead.
-     */
-    @Deprecated
-    void clearVideoSurfaceHolder(@Nullable SurfaceHolder surfaceHolder);
-
-    /**
-     * @deprecated Use {@link Player#setVideoSurfaceView(SurfaceView)} instead.
-     */
-    @Deprecated
-    void setVideoSurfaceView(@Nullable SurfaceView surfaceView);
-
-    /**
-     * @deprecated Use {@link Player#clearVideoSurfaceView(SurfaceView)} instead.
-     */
-    @Deprecated
-    void clearVideoSurfaceView(@Nullable SurfaceView surfaceView);
-
-    /**
-     * @deprecated Use {@link Player#setVideoTextureView(TextureView)} instead.
-     */
-    @Deprecated
-    void setVideoTextureView(@Nullable TextureView textureView);
-
-    /**
-     * @deprecated Use {@link Player#clearVideoTextureView(TextureView)} instead.
-     */
-    @Deprecated
-    void clearVideoTextureView(@Nullable TextureView textureView);
-
-    /**
-     * @deprecated Use {@link Player#getVideoSize()} instead.
-     */
-    @Deprecated
-    VideoSize getVideoSize();
-  }
-
-  /**
-   * @deprecated Use {@link Player}, as all methods are defined by that interface.
-   */
-  @UnstableApi
-  @Deprecated
-  interface TextComponent {
-
-    /**
-     * @deprecated Use {@link Player#getCurrentCues()} instead.
-     */
-    @Deprecated
-    CueGroup getCurrentCues();
-  }
-
-  /**
-   * @deprecated Use {@link Player}, as all methods are defined by that interface.
-   */
-  @UnstableApi
-  @Deprecated
-  interface DeviceComponent {
-
-    /**
-     * @deprecated Use {@link Player#getDeviceInfo()} instead.
-     */
-    @Deprecated
-    DeviceInfo getDeviceInfo();
-
-    /**
-     * @deprecated Use {@link Player#getDeviceVolume()} instead.
-     */
-    @Deprecated
-    int getDeviceVolume();
-
-    /**
-     * @deprecated Use {@link Player#isDeviceMuted()} instead.
-     */
-    @Deprecated
-    boolean isDeviceMuted();
-
-    /**
-     * @deprecated Use {@link Player#setDeviceVolume(int)} instead.
-     */
-    @Deprecated
-    void setDeviceVolume(int volume);
-
-    /**
-     * @deprecated Use {@link Player#increaseDeviceVolume()} instead.
-     */
-    @Deprecated
-    void increaseDeviceVolume();
-
-    /**
-     * @deprecated Use {@link Player#decreaseDeviceVolume()} instead.
-     */
-    @Deprecated
-    void decreaseDeviceVolume();
-
-    /**
-     * @deprecated Use {@link Player#setDeviceMuted(boolean)} instead.
-     */
-    @Deprecated
-    void setDeviceMuted(boolean muted);
-  }
 
   /** A listener for audio offload events. */
   @UnstableApi
@@ -467,7 +213,6 @@ public interface ExoPlayer extends Player {
    *
    * <p>See {@link #Builder(Context)} for the list of default values.
    */
-  @SuppressWarnings("deprecation")
   final class Builder {
 
     /* package */ final Context context;
@@ -493,6 +238,7 @@ public interface ExoPlayer extends Player {
     @C.VideoChangeFrameRateStrategy /* package */ int videoChangeFrameRateStrategy;
     /* package */ boolean useLazyPreparation;
     /* package */ SeekParameters seekParameters;
+    /* package */ ScrubbingModeParameters scrubbingModeParameters;
     /* package */ long seekBackIncrementMs;
     /* package */ long seekForwardIncrementMs;
     /* package */ long maxSeekToPreviousPositionMs;
@@ -501,11 +247,12 @@ public interface ExoPlayer extends Player {
     /* package */ long detachSurfaceTimeoutMs;
     /* package */ boolean pauseAtEndOfMediaItems;
     /* package */ boolean usePlatformDiagnostics;
-    @Nullable /* package */ Looper playbackLooper;
+    @Nullable /* package */ PlaybackLooperProvider playbackLooperProvider;
     /* package */ boolean buildCalled;
     /* package */ boolean suppressPlaybackOnUnsuitableOutput;
     /* package */ String playerName;
     /* package */ boolean dynamicSchedulingEnabled;
+    /* package */ SuitableOutputChecker suitableOutputChecker;
 
     /**
      * Creates a builder.
@@ -535,6 +282,7 @@ public interface ExoPlayer extends Player {
      *   <li>{@link AudioAttributes}: {@link AudioAttributes#DEFAULT}, not handling audio focus
      *   <li>{@link C.WakeMode}: {@link C#WAKE_MODE_NONE}
      *   <li>{@code handleAudioBecomingNoisy}: {@code false}
+     *   <li>{@code suppressPlaybackOnUnsuitableOutput}: {@code false}
      *   <li>{@code skipSilenceEnabled}: {@code false}
      *   <li>{@link C.VideoScalingMode}: {@link C#VIDEO_SCALING_MODE_DEFAULT}
      *   <li>{@link C.VideoChangeFrameRateStrategy}: {@link
@@ -705,6 +453,7 @@ public interface ExoPlayer extends Player {
       seekBackIncrementMs = C.DEFAULT_SEEK_BACK_INCREMENT_MS;
       seekForwardIncrementMs = C.DEFAULT_SEEK_FORWARD_INCREMENT_MS;
       maxSeekToPreviousPositionMs = C.DEFAULT_MAX_SEEK_TO_PREVIOUS_POSITION_MS;
+      scrubbingModeParameters = ScrubbingModeParameters.DEFAULT;
       livePlaybackSpeedControl = new DefaultLivePlaybackSpeedControl.Builder().build();
       clock = Clock.DEFAULT;
       releaseTimeoutMs = DEFAULT_RELEASE_TIMEOUT_MS;
@@ -712,6 +461,7 @@ public interface ExoPlayer extends Player {
       usePlatformDiagnostics = true;
       playerName = "";
       priority = C.PRIORITY_PLAYBACK;
+      suitableOutputChecker = new DefaultSuitableOutputChecker();
     }
 
     /**
@@ -736,6 +486,9 @@ public interface ExoPlayer extends Player {
      *
      * <p>If enabled, ExoPlayer's playback loop will run as rarely as possible by scheduling work
      * for when {@link Renderer} progress can be made.
+     *
+     * <p>If a custom {@link AudioSink} is used then it must correctly implement {@link
+     * AudioSink#getAudioTrackBufferSizeUs()} to enable dynamic scheduling for audio playback.
      *
      * <p>This method is experimental, and will be renamed or removed in a future release.
      *
@@ -1102,7 +855,6 @@ public interface ExoPlayer extends Player {
      * @throws IllegalStateException If {@link #build()} has already been called.
      */
     @CanIgnoreReturnValue
-    @UnstableApi
     public Builder setSeekBackIncrementMs(@IntRange(from = 1) long seekBackIncrementMs) {
       checkArgument(seekBackIncrementMs > 0);
       checkState(!buildCalled);
@@ -1119,7 +871,6 @@ public interface ExoPlayer extends Player {
      * @throws IllegalStateException If {@link #build()} has already been called.
      */
     @CanIgnoreReturnValue
-    @UnstableApi
     public Builder setSeekForwardIncrementMs(@IntRange(from = 1) long seekForwardIncrementMs) {
       checkArgument(seekForwardIncrementMs > 0);
       checkState(!buildCalled);
@@ -1143,6 +894,22 @@ public interface ExoPlayer extends Player {
       checkArgument(maxSeekToPreviousPositionMs >= 0L);
       checkState(!buildCalled);
       this.maxSeekToPreviousPositionMs = maxSeekToPreviousPositionMs;
+      return this;
+    }
+
+    /**
+     * Sets the parameters that control the behavior in {@linkplain #setScrubbingModeEnabled
+     * scrubbing mode}.
+     *
+     * @param scrubbingModeParameters The {@link ScrubbingModeParameters}.
+     * @return This builder.
+     * @throws IllegalStateException If {@link #build()} has already been called.
+     */
+    @CanIgnoreReturnValue
+    @UnstableApi
+    public Builder setScrubbingModeParameters(ScrubbingModeParameters scrubbingModeParameters) {
+      checkState(!buildCalled);
+      this.scrubbingModeParameters = checkNotNull(scrubbingModeParameters);
       return this;
     }
 
@@ -1261,6 +1028,26 @@ public interface ExoPlayer extends Player {
     }
 
     /**
+     * Sets the {@link SuitableOutputChecker} to check the suitability of the selected outputs for
+     * playback.
+     *
+     * <p>If this method is not called, the library uses a default implementation based on framework
+     * APIs.
+     *
+     * @return This builder.
+     * @throws IllegalStateException If {@link #build()} has already been called.
+     */
+    @CanIgnoreReturnValue
+    @UnstableApi
+    @RestrictTo(LIBRARY_GROUP)
+    @VisibleForTesting
+    public Builder setSuitableOutputChecker(SuitableOutputChecker suitableOutputChecker) {
+      checkState(!buildCalled);
+      this.suitableOutputChecker = suitableOutputChecker;
+      return this;
+    }
+
+    /**
      * Sets the {@link Looper} that will be used for playback.
      *
      * <p>The backing thread should run with priority {@link Process#THREAD_PRIORITY_AUDIO} and
@@ -1268,13 +1055,30 @@ public interface ExoPlayer extends Player {
      *
      * @param playbackLooper A {@link Looper}.
      * @return This builder.
-     * @throws IllegalStateException If {@link #build()} has already been called.
+     * @throws IllegalStateException If {@link #build()} has already been called, or when the
+     *     {@linkplain Looper#getMainLooper() main looper} is passed in.
      */
     @CanIgnoreReturnValue
     @UnstableApi
     public Builder setPlaybackLooper(Looper playbackLooper) {
+      checkState(!buildCalled && playbackLooper != Looper.getMainLooper());
+      this.playbackLooperProvider = new PlaybackLooperProvider(playbackLooper);
+      return this;
+    }
+
+    /**
+     * Sets the {@link PlaybackLooperProvider} that will be used for playback.
+     *
+     * @param playbackLooperProvider A {@link PlaybackLooperProvider}.
+     * @return This builder.
+     * @throws IllegalStateException If {@link #build()} has already been called.
+     */
+    @CanIgnoreReturnValue
+    @UnstableApi
+    @RestrictTo(LIBRARY_GROUP)
+    public Builder setPlaybackLooperProvider(PlaybackLooperProvider playbackLooperProvider) {
       checkState(!buildCalled);
-      this.playbackLooper = playbackLooper;
+      this.playbackLooperProvider = playbackLooperProvider;
       return this;
     }
 
@@ -1307,6 +1111,7 @@ public interface ExoPlayer extends Player {
       return new ExoPlayerImpl(/* builder= */ this, /* wrappingPlayer= */ null);
     }
 
+    @SuppressWarnings("deprecation") // Building deprecated class.
     /* package */ SimpleExoPlayer buildSimpleExoPlayer() {
       checkState(!buildCalled);
       buildCalled = true;
@@ -1330,46 +1135,6 @@ public interface ExoPlayer extends Player {
   @Override
   @Nullable
   ExoPlaybackException getPlayerError();
-
-  /**
-   * @deprecated Use {@link ExoPlayer}, as the {@link AudioComponent} methods are defined by that
-   *     interface.
-   */
-  @SuppressWarnings("deprecation") // Intentionally returning deprecated type
-  @UnstableApi
-  @Nullable
-  @Deprecated
-  AudioComponent getAudioComponent();
-
-  /**
-   * @deprecated Use {@link ExoPlayer}, as the {@link VideoComponent} methods are defined by that
-   *     interface.
-   */
-  @SuppressWarnings("deprecation") // Intentionally returning deprecated type
-  @UnstableApi
-  @Nullable
-  @Deprecated
-  VideoComponent getVideoComponent();
-
-  /**
-   * @deprecated Use {@link Player}, as the {@link TextComponent} methods are defined by that
-   *     interface.
-   */
-  @SuppressWarnings("deprecation") // Intentionally returning deprecated type
-  @UnstableApi
-  @Nullable
-  @Deprecated
-  TextComponent getTextComponent();
-
-  /**
-   * @deprecated Use {@link Player}, as the {@link DeviceComponent} methods are defined by that
-   *     interface.
-   */
-  @SuppressWarnings("deprecation") // Intentionally returning deprecated type
-  @UnstableApi
-  @Nullable
-  @Deprecated
-  DeviceComponent getDeviceComponent();
 
   /**
    * Adds a listener to receive audio offload events.
@@ -1434,6 +1199,19 @@ public interface ExoPlayer extends Player {
    */
   @UnstableApi
   Renderer getRenderer(int index);
+
+  /**
+   * Returns the secondary renderer at the given index.
+   *
+   * @param index The index of the secondary renderer.
+   * @return The secondary renderer at this index, or null if there is no secondary renderer at this
+   *     index.
+   */
+  @UnstableApi
+  @Nullable
+  default Renderer getSecondaryRenderer(int index) {
+    return null;
+  }
 
   /**
    * Returns the track selector that this player uses, or null if track selection is not supported.
@@ -1604,6 +1382,15 @@ public interface ExoPlayer extends Player {
   void setShuffleOrder(ShuffleOrder shuffleOrder);
 
   /**
+   * Returns the shuffle order.
+   *
+   * <p>The {@link ShuffleOrder} returned will have the same length as the current playlist ({@link
+   * Player#getMediaItemCount()}).
+   */
+  @UnstableApi
+  ShuffleOrder getShuffleOrder();
+
+  /**
    * Sets the {@linkplain PreloadConfiguration preload configuration} to configure playlist
    * preloading.
    *
@@ -1692,6 +1479,42 @@ public interface ExoPlayer extends Player {
   boolean getSkipSilenceEnabled();
 
   /**
+   * Sets whether to optimize the player for scrubbing (many frequent seeks).
+   *
+   * <p>The player may consume more resources in this mode, so it should only be used for short
+   * periods of time in response to user interaction (e.g. dragging on a progress bar UI element).
+   *
+   * <p>During scrubbing mode playback is {@linkplain Player#getPlaybackSuppressionReason()
+   * suppressed} with {@link Player#PLAYBACK_SUPPRESSION_REASON_SCRUBBING}.
+   *
+   * @param scrubbingModeEnabled Whether scrubbing mode should be enabled.
+   */
+  @UnstableApi
+  void setScrubbingModeEnabled(boolean scrubbingModeEnabled);
+
+  /**
+   * Returns whether the player is optimized for scrubbing (many frequent seeks).
+   *
+   * <p>See {@link #setScrubbingModeEnabled(boolean)}.
+   */
+  @UnstableApi
+  boolean isScrubbingModeEnabled();
+
+  /**
+   * Sets the parameters that control behavior in {@linkplain #setScrubbingModeEnabled scrubbing
+   * mode}.
+   */
+  @UnstableApi
+  void setScrubbingModeParameters(ScrubbingModeParameters scrubbingModeParameters);
+
+  /**
+   * Gets the parameters that control behavior in {@linkplain #setScrubbingModeEnabled scrubbing
+   * mode}.
+   */
+  @UnstableApi
+  ScrubbingModeParameters getScrubbingModeParameters();
+
+  /**
    * Sets a {@link List} of {@linkplain Effect video effects} that will be applied to each video
    * frame.
    *
@@ -1700,6 +1523,10 @@ public interface ExoPlayer extends Player {
    * message} to the {@linkplain Renderer video renderer} with type {@link
    * Renderer#MSG_SET_VIDEO_OUTPUT_RESOLUTION} after calling this method. For {@link SurfaceView},
    * {@link TextureView} and {@link SurfaceHolder} output this happens automatically.
+   *
+   * <p>Pass {@link androidx.media3.common.VideoFrameProcessor#REDRAW} to force the effect pipeline
+   * to redraw the effects immediately. To accurately interleave redraws, listen to {@link
+   * VideoFrameMetadataListener#onVideoFrameAboutToBeRendered} events.
    *
    * <p>The following limitations exist for using {@linkplain Effect video effects}:
    *

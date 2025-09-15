@@ -15,6 +15,7 @@
  */
 package androidx.media3.session;
 
+import static android.os.Build.VERSION.SDK_INT;
 import static androidx.media3.common.util.Assertions.checkNotNull;
 
 import android.app.ForegroundServiceStartNotAllowedException;
@@ -25,15 +26,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.os.Build;
 import android.view.KeyEvent;
-import androidx.annotation.DoNotInline;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.content.ContextCompat;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.UnstableApi;
-import androidx.media3.common.util.Util;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -109,8 +107,36 @@ public class MediaButtonReceiver extends BroadcastReceiver {
     MediaSessionService.SERVICE_INTERFACE
   };
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Apps can override this method if the default behaviour doesn't match their needs. When doing
+   * that, an app would eventually call {@link #handleIntentAndMaybeStartTheService(Context,
+   * Intent)} to continue the process to start the service. If you are not calling this method, then
+   * using this class probably is not needed. Instead, a custom implementation of {@link
+   * BroadcastReceiver} can be provided in the manifest for the action {@link
+   * Intent#ACTION_MEDIA_BUTTON}.
+   *
+   * <p>The recommended approach is to use this receiver without overriding this method, but instead
+   * use {@link #shouldStartForegroundService(Context, Intent)} to indicate whether to start the
+   * service or not. When overriding this method, we can't provide further support because the
+   * strongly recommended way to handle the intent is using the default implementation.
+   */
   @Override
-  public final void onReceive(Context context, @Nullable Intent intent) {
+  public void onReceive(Context context, @Nullable Intent intent) {
+    handleIntentAndMaybeStartTheService(context, intent);
+  }
+
+  /**
+   * Handles the intent and starts the service if {@link #shouldStartForegroundService} indicates to
+   * do so.
+   *
+   * @param context The context.
+   * @param intent The intent.
+   */
+  @UnstableApi
+  protected final void handleIntentAndMaybeStartTheService(
+      Context context, @Nullable Intent intent) {
     if (intent == null
         || !Objects.equals(intent.getAction(), Intent.ACTION_MEDIA_BUTTON)
         || !intent.hasExtra(Intent.EXTRA_KEY_EVENT)) {
@@ -118,11 +144,16 @@ public class MediaButtonReceiver extends BroadcastReceiver {
       return;
     }
 
-    if (Util.SDK_INT >= 26) {
-      @Nullable
-      KeyEvent keyEvent = checkNotNull(intent.getExtras()).getParcelable(Intent.EXTRA_KEY_EVENT);
-      if (keyEvent != null
-          && keyEvent.getKeyCode() != KeyEvent.KEYCODE_MEDIA_PLAY
+    @Nullable
+    KeyEvent keyEvent = checkNotNull(intent.getExtras()).getParcelable(Intent.EXTRA_KEY_EVENT);
+    if (keyEvent == null
+        || keyEvent.getAction() != KeyEvent.ACTION_DOWN
+        || keyEvent.getRepeatCount() != 0) {
+      // Only handle the intent once with the earliest key event that arrives.
+      return;
+    }
+    if (SDK_INT >= 26) {
+      if (keyEvent.getKeyCode() != KeyEvent.KEYCODE_MEDIA_PLAY
           && keyEvent.getKeyCode() != KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
           && keyEvent.getKeyCode() != KeyEvent.KEYCODE_HEADSETHOOK) {
         // Starting with Android 8 (API 26), the service must be started immediately in the
@@ -143,14 +174,23 @@ public class MediaButtonReceiver extends BroadcastReceiver {
     for (String action : ACTIONS) {
       ComponentName mediaButtonServiceComponentName = getServiceComponentByAction(context, action);
       if (mediaButtonServiceComponentName != null) {
-        intent.setComponent(mediaButtonServiceComponentName);
+        Intent serviceIntent = new Intent();
+        serviceIntent.setComponent(mediaButtonServiceComponentName);
+        serviceIntent.fillIn(intent, 0);
+        if (!shouldStartForegroundService(context, serviceIntent)) {
+          Log.i(
+              TAG,
+              "onReceive(Intent) does not start the media button event target service into the"
+                  + " foreground on app request: "
+                  + mediaButtonServiceComponentName.getClassName());
+          return;
+        }
         try {
-          ContextCompat.startForegroundService(context, intent);
+          ContextCompat.startForegroundService(context, serviceIntent);
         } catch (/* ForegroundServiceStartNotAllowedException */ IllegalStateException e) {
-          if (Build.VERSION.SDK_INT >= 31
-              && Api31.instanceOfForegroundServiceStartNotAllowedException(e)) {
+          if (SDK_INT >= 31 && Api31.instanceOfForegroundServiceStartNotAllowedException(e)) {
             onForegroundServiceStartNotAllowedException(
-                intent, Api31.castToForegroundServiceStartNotAllowedException(e));
+                serviceIntent, Api31.castToForegroundServiceStartNotAllowedException(e));
           } else {
             throw e;
           }
@@ -160,6 +200,30 @@ public class MediaButtonReceiver extends BroadcastReceiver {
     }
     throw new IllegalStateException(
         "Could not find any Service that handles any of the actions " + Arrays.toString(ACTIONS));
+  }
+
+  /**
+   * Returns whether to start the {@linkplain Intent#getComponent() media button event target
+   * service} into the foreground.
+   *
+   * <p>Returns true by default. Apps can override this method to decide to not start a service when
+   * receiving an event with {@link KeyEvent#KEYCODE_MEDIA_PLAY} or {@link
+   * KeyEvent#KEYCODE_MEDIA_PLAY_PAUSE} that should be suppressed.
+   *
+   * <p>Note: Once the service is started into the foreground by the receiver, the app must start
+   * playback to get into the foreground or the system will crash the service with a {@code
+   * ForegroundServiceDidNotStartInTimeException} or an {@link IllegalStateException}.
+   *
+   * @param context The {@link Context} that {@linkplain #onReceive(Context, Intent) was received by
+   *     the media button event receiver}.
+   * @param intent The intent that will be used by {@linkplain
+   *     Context#startForegroundService(Intent) for starting the foreground service}.
+   * @return true if the service should be {@linkplain ContextCompat#startForegroundService(Context,
+   *     Intent) started as a foreground service}. If false is returned the service is not started
+   *     and the receiver call is a no-op.
+   */
+  protected boolean shouldStartForegroundService(Context context, Intent intent) {
+    return true;
   }
 
   /**
@@ -222,7 +286,6 @@ public class MediaButtonReceiver extends BroadcastReceiver {
     /**
      * Returns true if the passed exception is a {@link ForegroundServiceStartNotAllowedException}.
      */
-    @DoNotInline
     public static boolean instanceOfForegroundServiceStartNotAllowedException(
         IllegalStateException e) {
       return e instanceof ForegroundServiceStartNotAllowedException;
@@ -232,7 +295,6 @@ public class MediaButtonReceiver extends BroadcastReceiver {
      * Casts the {@link IllegalStateException} to a {@link
      * ForegroundServiceStartNotAllowedException} and throws an exception if the cast fails.
      */
-    @DoNotInline
     public static ForegroundServiceStartNotAllowedException
         castToForegroundServiceStartNotAllowedException(IllegalStateException e) {
       return (ForegroundServiceStartNotAllowedException) e;
