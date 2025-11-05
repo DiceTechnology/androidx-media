@@ -88,7 +88,7 @@ public class SubtitleExtractor implements Extractor {
   private final List<Sample> samples;
   private final ParsableByteArray scratchSampleArray;
 
-  private final boolean needsSegmentedSubtitleWorkarounduse;
+  private final boolean useSegmentedSubtitleWorkaround;
 
   private byte[] subtitleData;
   private @MonotonicNonNull TrackOutput trackOutput;
@@ -121,7 +121,7 @@ public class SubtitleExtractor implements Extractor {
     timestamps = Util.EMPTY_LONG_ARRAY;
     seekTimeUs = C.TIME_UNSET;
 
-    needsSegmentedSubtitleWorkarounduse = subtitleParser instanceof WebvttParser;
+    useSegmentedSubtitleWorkaround = subtitleParser instanceof WebvttParser;
   }
 
   @Override
@@ -166,7 +166,7 @@ public class SubtitleExtractor implements Extractor {
         parseAndWriteToOutput();
         // We do not change the state to STATE_FINISHED, otherwise for segmented webvtt on dash
         // we will show the subtitle in the first vtt file, and miss all subtitles in next vtt file.
-        if (needsSegmentedSubtitleWorkarounduse) return RESULT_END_OF_INPUT;
+        if (useSegmentedSubtitleWorkaround) return RESULT_END_OF_INPUT;
         state = STATE_FINISHED;
       }
     }
