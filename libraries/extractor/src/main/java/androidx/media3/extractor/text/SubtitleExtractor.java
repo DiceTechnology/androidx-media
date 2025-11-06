@@ -34,6 +34,7 @@ import androidx.media3.extractor.ExtractorOutput;
 import androidx.media3.extractor.IndexSeekMap;
 import androidx.media3.extractor.PositionHolder;
 import androidx.media3.extractor.TrackOutput;
+import androidx.media3.extractor.text.webvtt.WebvttParser;
 import com.google.common.primitives.Ints;
 import java.io.IOException;
 import java.lang.annotation.Documented;
@@ -92,6 +93,8 @@ public class SubtitleExtractor implements Extractor {
   private final List<Sample> samples;
   private final ParsableByteArray scratchSampleArray;
 
+  private final boolean useSegmentedSubtitleWorkaround;
+
   private byte[] subtitleData;
   private @MonotonicNonNull TrackOutput trackOutput;
   private int bytesRead;
@@ -128,6 +131,8 @@ public class SubtitleExtractor implements Extractor {
     state = STATE_CREATED;
     timestamps = Util.EMPTY_LONG_ARRAY;
     seekTimeUs = C.TIME_UNSET;
+
+    useSegmentedSubtitleWorkaround = subtitleParser instanceof WebvttParser;
   }
 
   @Override
@@ -172,6 +177,9 @@ public class SubtitleExtractor implements Extractor {
       boolean inputFinished = readFromInput(input);
       if (inputFinished) {
         parseAndWriteToOutput();
+        // We do not change the state to STATE_FINISHED, otherwise for segmented webvtt on dash
+        // we will show the subtitle in the first vtt file, and miss all subtitles in next vtt file.
+        if (useSegmentedSubtitleWorkaround) return RESULT_END_OF_INPUT;
         state = STATE_FINISHED;
       }
     }

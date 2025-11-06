@@ -978,6 +978,28 @@
         "subtitle_language": "en"
       },
       {
+        "name": "dash segmented webvtt",
+        "uri": "https://sample-videos-zyrkp2nj.s3.eu-west-1.amazonaws.com/white-60s/dash_fmp4_clear_subs/master_2_forced.mpd"
+      },
+      {
+        "name": "hls segmented webvtt",
+        "uri": "https://sample-videos-zyrkp2nj.s3.eu-west-1.amazonaws.com/white-60s/hls_fmp4_clear_subs/master_2_forced.m3u8"
+      },
+      {
+        "name": "dash sideload webvtt",
+        "uri": "https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd",
+        "subtitle_uri": "https://dve-subtitles.imggaming.com/560967/776847/vtt/subtitle-en-US-245273-1712171888041.vtt",
+        "subtitle_mime_type": "text/vtt",
+        "subtitle_language": "cn"
+      },
+      {
+        "name": "hls sideload webvtt",
+        "uri": "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8",
+        "subtitle_uri": "https://dve-subtitles.imggaming.com/560967/776847/vtt/subtitle-en-US-245273-1712171888041.vtt",
+        "subtitle_mime_type": "text/vtt",
+        "subtitle_language": "cn"
+      },
+      {
         "name": "WebVTT Japanese features",
         "uri": "https://html5demos.com/assets/dizzy.mp4",
         "subtitle_uri": "https://storage.googleapis.com/exoplayer-test-media-1/webvtt/japanese.vtt",
