@@ -63,6 +63,11 @@ public class ForwardingExtractor implements Extractor {
   }
 
   @Override
+  public void debugSamples() {
+    delegate.debugSamples();
+  }
+
+  @Override
   public Extractor getUnderlyingImplementation() {
     return delegate.getUnderlyingImplementation();
   }

@@ -57,6 +57,11 @@ public class ForwardingTrackOutput implements TrackOutput {
   }
 
   @Override
+  public void debugSamples() {
+    trackOutput.debugSamples();
+  }
+
+  @Override
   public int sampleData(
       DataReader input, int length, boolean allowEndOfInput, @SampleDataPart int sampleDataPart)
       throws IOException {

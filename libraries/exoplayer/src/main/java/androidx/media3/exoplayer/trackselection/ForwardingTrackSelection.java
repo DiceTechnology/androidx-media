@@ -20,6 +20,7 @@ import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.util.UnstableApi;
+import androidx.media3.exoplayer.endeavor.TrackCollector;
 import androidx.media3.exoplayer.source.chunk.Chunk;
 import androidx.media3.exoplayer.source.chunk.MediaChunk;
 import androidx.media3.exoplayer.source.chunk.MediaChunkIterator;
@@ -81,6 +82,21 @@ public class ForwardingTrackSelection implements ExoTrackSelection {
   }
 
   @Override
+  public void useTwoPhaseSwitch() {
+    trackSelection.useTwoPhaseSwitch();
+  }
+
+  @Override
+  public int getSelectingIndexInTrackGroup() {
+    return trackSelection.getSelectingIndexInTrackGroup();
+  }
+
+  @Override
+  public void completeTwoPhaseSwitch() {
+    trackSelection.completeTwoPhaseSwitch();
+  }
+
+  @Override
   public void onPlaybackSpeed(float playbackSpeed) {
     trackSelection.onPlaybackSpeed(playbackSpeed);
   }
@@ -120,6 +136,11 @@ public class ForwardingTrackSelection implements ExoTrackSelection {
   public boolean shouldCancelChunkLoad(
       long playbackPositionUs, Chunk loadingChunk, List<? extends MediaChunk> queue) {
     return trackSelection.shouldCancelChunkLoad(playbackPositionUs, loadingChunk, queue);
+  }
+
+  @Override
+  public void setTrackCollector(TrackCollector trackCollector) {
+    trackSelection.setTrackCollector(trackCollector);
   }
 
   @Override

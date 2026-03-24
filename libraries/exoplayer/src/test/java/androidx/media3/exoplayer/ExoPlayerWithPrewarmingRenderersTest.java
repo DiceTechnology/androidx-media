@@ -563,14 +563,16 @@ public class ExoPlayerWithPrewarmingRenderersTest {
               MappedTrackInfo mappedTrackInfo,
               @RendererCapabilities.Capabilities int[][][] rendererFormatSupports,
               @RendererCapabilities.AdaptiveSupport int[] rendererMixedMimeTypeAdaptationSupports,
-              Parameters params)
+              Parameters params,
+              Format selectedVideoFormat)
               throws ExoPlaybackException {
             Pair<ExoTrackSelection.Definition, Integer> result =
                 super.selectAudioTrack(
                     mappedTrackInfo,
                     rendererFormatSupports,
                     rendererMixedMimeTypeAdaptationSupports,
-                    params);
+                    params,
+                    selectedVideoFormat);
             selectedAudioTrack.set(result);
             return result;
           }

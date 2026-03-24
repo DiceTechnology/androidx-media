@@ -3133,7 +3133,7 @@ public class DefaultTrackSelector extends MappingTrackSelector
   // Image track selection implementation.
 
   /**
-   * Called by {@link #selectAllTracks(MappedTrackInfo, int[][][], int[], Parameters)} to create a
+   * Called by {@link #selectAllTracks(MappedTrackInfo, int[][][], int[], Parameters, MediaPeriodId, Timeline)} to create a
    * {@link ExoTrackSelection.Definition} for an image track selection.
    *
    * @param mappedTrackInfo Mapped track information.
