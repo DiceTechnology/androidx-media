@@ -69,8 +69,6 @@ import androidx.media3.common.Timeline;
 import androidx.media3.common.Timeline.Period;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.VideoSize;
-import androidx.media3.common.endeavor.LimitedSeekRange;
-import androidx.media3.common.endeavor.TimelineAdjuster;
 import androidx.media3.common.text.CueGroup;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.RepeatModeUtil;
@@ -340,9 +338,6 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
   private boolean controllerHideDuringAds;
   private boolean controllerHideOnTouch;
   private boolean enableComposeSurfaceSyncWorkaround;
-
-  /** Indicates if the playback media is currently prepared. */
-  private boolean isPlaybackPrepared = true;
 
   public PlayerView(Context context) {
     this(context, /* attrs= */ null);
@@ -1333,32 +1328,6 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
     controller.setExtraAdGroupMarkers(extraAdGroupTimesMs, extraPlayedAdGroups);
   }
 
-  public void setExtraTimelineAdjuster(TimelineAdjuster timelineAdjuster) {
-    if (controller != null) {
-      controller.setExtraTimelineAdjuster(timelineAdjuster);
-    }
-  }
-
-  public void setLimitedSeekRange(LimitedSeekRange limitedSeekRange) {
-    if (controller != null) {
-      controller.setLimitedSeekRange(limitedSeekRange);
-    }
-  }
-
-  /**
-   * Sets whether the the playback media is currently prepared.
-   *
-   * @param prepared Indicates if the playback media is currently prepared.
-   */
-  public void setPlaybackPrepared(boolean prepared) {
-    if (prepared && !isPlaybackPrepared) {
-      mainLooperHandler.postDelayed(() -> isPlaybackPrepared = true, 200L);
-      componentListener.hideShutterView();
-    } else if (!prepared && isPlaybackPrepared) {
-      isPlaybackPrepared = false;
-    }
-  }
-
   /**
    * Sets the {@link AspectRatioFrameLayout.AspectRatioListener}.
    *
@@ -1924,12 +1893,6 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
 
     @Override
     public void onRenderedFirstFrame() {
-      if (isPlaybackPrepared) {
-        hideShutterView();
-      }
-    }
-
-    private void hideShutterView() {
       if (shutterView != null) {
         shutterView.setVisibility(INVISIBLE);
         if (hasSelectedImageTrack()) {
