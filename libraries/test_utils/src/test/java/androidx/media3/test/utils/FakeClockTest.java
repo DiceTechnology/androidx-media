@@ -32,10 +32,10 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.util.ConditionVariable;
 import androidx.media3.common.util.HandlerWrapper;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import com.google.common.base.Objects;
 import com.google.common.collect.Iterables;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -617,12 +617,12 @@ public final class FakeClockTest {
       return what == that.what
           && arg1 == that.arg1
           && arg2 == that.arg2
-          && Objects.equal(obj, that.obj);
+          && Objects.equals(obj, that.obj);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(what, arg1, arg2, obj);
+      return Objects.hash(what, arg1, arg2, obj);
     }
   }
 }

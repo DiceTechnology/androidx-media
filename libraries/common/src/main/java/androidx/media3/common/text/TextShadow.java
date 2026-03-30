@@ -3,7 +3,6 @@ package androidx.media3.common.text;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.media3.common.util.Util;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 

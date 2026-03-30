@@ -49,7 +49,13 @@ public class DemoTrackNameProvider implements TrackNameProvider {
     } else {
       trackName = buildLanguageOrLabelString(format);
     }
-    return trackName.length() == 0 ? resources.getString(R.string.exo_track_unknown) : trackName;
+    if (!trackName.isEmpty()) {
+      return trackName;
+    }
+    @Nullable String language = format.language;
+    return (language == null || language.trim().isEmpty())
+        ? resources.getString(R.string.exo_track_unknown)
+        : resources.getString(R.string.exo_track_unknown_name, language);
   }
 
   private String buildGroupString(Format format) {
@@ -106,8 +112,7 @@ public class DemoTrackNameProvider implements TrackNameProvider {
     if (TextUtils.isEmpty(language) || C.LANGUAGE_UNDETERMINED.equals(language)) {
       return "";
     }
-    Locale languageLocale =
-        Util.SDK_INT >= 21 ? Locale.forLanguageTag(language) : new Locale(language);
+    Locale languageLocale = Locale.forLanguageTag(language);
     Locale displayLocale = Util.getDefaultDisplayLocale();
     String languageName = languageLocale.getDisplayName(displayLocale);
     if (TextUtils.isEmpty(languageName)) {
@@ -145,7 +150,7 @@ public class DemoTrackNameProvider implements TrackNameProvider {
   private String joinWithSeparator(String... items) {
     String itemList = "";
     for (String item : items) {
-      if (item.length() > 0) {
+      if (!item.isEmpty()) {
         if (TextUtils.isEmpty(itemList)) {
           itemList = item;
         } else {

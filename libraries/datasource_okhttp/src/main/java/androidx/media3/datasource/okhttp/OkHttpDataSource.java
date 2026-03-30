@@ -112,7 +112,6 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
      * @return This factory.
      */
     @CanIgnoreReturnValue
-    @UnstableApi
     public Factory setUserAgent(@Nullable String userAgent) {
       this.userAgent = userAgent;
       return this;
@@ -192,7 +191,7 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
   @Nullable private DataSpec dataSpec;
   @Nullable private Response response;
   @Nullable private InputStream responseByteStream;
-  private boolean opened;
+  private boolean connectionEstablished;
   private long bytesToRead;
   private long bytesRead;
 
@@ -215,7 +214,13 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
   @Override
   @Nullable
   public Uri getUri() {
-    return response == null ? null : Uri.parse(response.request().url().toString());
+    if (response != null) {
+      return Uri.parse(response.request().url().toString());
+    } else if (dataSpec != null) {
+      return dataSpec.uri;
+    } else {
+      return null;
+    }
   }
 
   @UnstableApi
@@ -281,7 +286,7 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
         long documentSize =
             HttpUtil.getDocumentSize(response.headers().get(HttpHeaders.CONTENT_RANGE));
         if (dataSpec.position == documentSize) {
-          opened = true;
+          connectionEstablished = true;
           transferStarted(dataSpec);
           return dataSpec.length != C.LENGTH_UNSET ? dataSpec.length : 0;
         }
@@ -325,7 +330,7 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
       bytesToRead = contentLength != -1 ? (contentLength - bytesToSkip) : C.LENGTH_UNSET;
     }
 
-    opened = true;
+    connectionEstablished = true;
     transferStarted(dataSpec);
 
     try {
@@ -352,11 +357,13 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
   @UnstableApi
   @Override
   public void close() {
-    if (opened) {
-      opened = false;
+    if (connectionEstablished) {
+      connectionEstablished = false;
       transferEnded();
       closeConnectionQuietly();
     }
+    response = null;
+    dataSpec = null;
   }
 
   /** Establishes a connection. */
@@ -524,7 +531,6 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
   private void closeConnectionQuietly() {
     if (response != null) {
       Assertions.checkNotNull(response.body()).close();
-      response = null;
     }
     responseByteStream = null;
   }

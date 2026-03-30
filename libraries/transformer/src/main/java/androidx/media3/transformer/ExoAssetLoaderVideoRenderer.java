@@ -20,6 +20,7 @@ import static androidx.media3.common.util.Assertions.checkStateNotNull;
 import static androidx.media3.transformer.TransformerUtil.getDecoderOutputColor;
 
 import android.media.MediaCodec;
+import android.media.metrics.LogSessionId;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.ColorInfo;
@@ -39,6 +40,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private final Codec.DecoderFactory decoderFactory;
   private final @Composition.HdrMode int hdrMode;
   private final List<Long> decodeOnlyPresentationTimestamps;
+  @Nullable private final LogSessionId logSessionId;
 
   private @MonotonicNonNull SefSlowMotionFlattener sefVideoSlowMotionFlattener;
   private int maxDecoderPendingFrameCount;
@@ -48,17 +50,39 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       Codec.DecoderFactory decoderFactory,
       @Composition.HdrMode int hdrMode,
       TransformerMediaClock mediaClock,
-      AssetLoader.Listener assetLoaderListener) {
+      AssetLoader.Listener assetLoaderListener,
+      @Nullable LogSessionId logSessionId) {
     super(C.TRACK_TYPE_VIDEO, mediaClock, assetLoaderListener);
     this.flattenForSlowMotion = flattenForSlowMotion;
     this.decoderFactory = decoderFactory;
     this.hdrMode = hdrMode;
+    this.logSessionId = logSessionId;
     decodeOnlyPresentationTimestamps = new ArrayList<>();
+    maxDecoderPendingFrameCount = C.INDEX_UNSET;
   }
 
   @Override
   public String getName() {
     return TAG;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The duration is calculated based on the number of {@linkplain #maxDecoderPendingFrameCount
+   * allowed pending frames}.
+   */
+  @Override
+  public long getDurationToProgressUs(long positionUs, long elapsedRealtimeUs) {
+    if (getState() == STATE_ENABLED) {
+      return DEFAULT_IDLE_DURATION_TO_PROGRESS_US;
+    }
+    if (maxDecoderPendingFrameCount == C.INDEX_UNSET) {
+      return DEFAULT_DURATION_TO_PROGRESS_US;
+    }
+    // TODO: b/258809496 - Consider using async API and dynamic scheduling when decoder input
+    //  slots are available.
+    return maxDecoderPendingFrameCount * 2_000L;
   }
 
   @Override
@@ -91,7 +115,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
   @Override
   protected void initDecoder(Format inputFormat) throws ExportException {
-    // TODO(b/278259383): Move surface creation out of sampleConsumer. Init decoder before
+    // TODO: b/278259383 - Move surface creation out of sampleConsumer. Init decoder before
     //  sampleConsumer.
     checkStateNotNull(sampleConsumer);
     boolean isDecoderToneMappingRequired =
@@ -101,7 +125,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         decoderFactory.createForVideoDecoding(
             inputFormat,
             checkNotNull(sampleConsumer.getInputSurface()),
-            isDecoderToneMappingRequired);
+            isDecoderToneMappingRequired,
+            logSessionId);
     maxDecoderPendingFrameCount = decoder.getMaxPendingFrameCount();
   }
 
@@ -113,6 +138,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
     ByteBuffer inputBytes = checkNotNull(inputBuffer.data);
     if (sefVideoSlowMotionFlattener != null) {
+      long streamOffsetUs = getStreamOffsetUs();
       long presentationTimeUs = inputBuffer.timeUs - streamOffsetUs;
       boolean shouldDropInputBuffer =
           sefVideoSlowMotionFlattener.dropOrTransformSample(inputBytes, presentationTimeUs);
@@ -126,10 +152,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
     if (decoder == null) {
       inputBuffer.timeUs -= streamStartPositionUs;
-      if (inputBuffer.timeUs < 0) {
-        inputBuffer.clear();
-        return true;
-      }
     }
     return false;
   }

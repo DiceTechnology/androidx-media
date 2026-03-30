@@ -15,15 +15,14 @@
  */
 package androidx.media3.common;
 
-import static androidx.annotation.VisibleForTesting.PROTECTED;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.ForOverride;
 import java.util.List;
 
 /** Abstract base {@link Player} which implements common implementation independent methods. */
@@ -147,45 +146,9 @@ public abstract class BasePlayer implements Player {
     seekToOffset(getSeekForwardIncrement(), Player.COMMAND_SEEK_FORWARD);
   }
 
-  /**
-   * @deprecated Use {@link #hasPreviousMediaItem()} instead.
-   */
-  @Deprecated
-  @Override
-  public final boolean hasPrevious() {
-    return hasPreviousMediaItem();
-  }
-
-  /**
-   * @deprecated Use {@link #hasPreviousMediaItem()} instead.
-   */
-  @Deprecated
-  @Override
-  public final boolean hasPreviousWindow() {
-    return hasPreviousMediaItem();
-  }
-
   @Override
   public final boolean hasPreviousMediaItem() {
     return getPreviousMediaItemIndex() != C.INDEX_UNSET;
-  }
-
-  /**
-   * @deprecated Use {@link #seekToPreviousMediaItem()} instead.
-   */
-  @Deprecated
-  @Override
-  public final void previous() {
-    seekToPreviousMediaItem();
-  }
-
-  /**
-   * @deprecated Use {@link #seekToPreviousMediaItem()} instead.
-   */
-  @Deprecated
-  @Override
-  public final void seekToPreviousWindow() {
-    seekToPreviousMediaItem();
   }
 
   @Override
@@ -214,45 +177,9 @@ public abstract class BasePlayer implements Player {
     }
   }
 
-  /**
-   * @deprecated Use {@link #hasNextMediaItem()} instead.
-   */
-  @Deprecated
-  @Override
-  public final boolean hasNext() {
-    return hasNextMediaItem();
-  }
-
-  /**
-   * @deprecated Use {@link #hasNextMediaItem()} instead.
-   */
-  @Deprecated
-  @Override
-  public final boolean hasNextWindow() {
-    return hasNextMediaItem();
-  }
-
   @Override
   public final boolean hasNextMediaItem() {
     return getNextMediaItemIndex() != C.INDEX_UNSET;
-  }
-
-  /**
-   * @deprecated Use {@link #seekToNextMediaItem()} instead.
-   */
-  @Deprecated
-  @Override
-  public final void next() {
-    seekToNextMediaItem();
-  }
-
-  /**
-   * @deprecated Use {@link #seekToNextMediaItem()} instead.
-   */
-  @Deprecated
-  @Override
-  public final void seekToNextWindow() {
-    seekToNextMediaItem();
   }
 
   @Override
@@ -303,8 +230,8 @@ public abstract class BasePlayer implements Player {
    * @param seekCommand The {@link Player.Command} used to trigger the seek.
    * @param isRepeatingCurrentItem Whether this seeks repeats the current item.
    */
-  @VisibleForTesting(otherwise = PROTECTED)
-  public abstract void seekTo(
+  @ForOverride
+  protected abstract void seekTo(
       int mediaItemIndex,
       long positionMs,
       @Player.Command int seekCommand,
@@ -394,7 +321,7 @@ public abstract class BasePlayer implements Player {
     long duration = getDuration();
     return position == C.TIME_UNSET || duration == C.TIME_UNSET
         ? 0
-        : duration == 0 ? 100 : Util.constrainValue((int) ((position * 100) / duration), 0, 100);
+        : duration == 0 ? 100 : Util.constrainValue(Util.percentInt(position, duration), 0, 100);
   }
 
   /**

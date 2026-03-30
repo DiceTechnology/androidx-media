@@ -56,7 +56,7 @@ public class DefaultTrackNameProvider implements TrackNameProvider {
     } else {
       trackName = buildLanguageOrLabelString(format);
     }
-    if (trackName.length() != 0) {
+    if (!trackName.isEmpty()) {
       return trackName;
     }
     @Nullable String language = format.language;
@@ -115,8 +115,7 @@ public class DefaultTrackNameProvider implements TrackNameProvider {
     if (TextUtils.isEmpty(language) || C.LANGUAGE_UNDETERMINED.equals(language)) {
       return "";
     }
-    Locale languageLocale =
-        Util.SDK_INT >= 21 ? Locale.forLanguageTag(language) : new Locale(language);
+    Locale languageLocale = Locale.forLanguageTag(language);
     Locale displayLocale = Util.getDefaultDisplayLocale();
     String languageName = languageLocale.getDisplayName(displayLocale);
     if (TextUtils.isEmpty(languageName)) {
@@ -154,7 +153,7 @@ public class DefaultTrackNameProvider implements TrackNameProvider {
   private String joinWithSeparator(String... items) {
     String itemList = "";
     for (String item : items) {
-      if (item.length() > 0) {
+      if (!item.isEmpty()) {
         if (TextUtils.isEmpty(itemList)) {
           itemList = item;
         } else {

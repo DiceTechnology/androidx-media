@@ -32,7 +32,7 @@ android {
 apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
 
 dependencies {
-    implementation project(modulePrefix + 'lib-common')
+    api project(modulePrefix + 'lib-common')
     implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
     testImplementation 'androidx.test:core:' + androidxTestCoreVersion

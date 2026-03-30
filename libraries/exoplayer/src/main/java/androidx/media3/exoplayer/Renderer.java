@@ -58,6 +58,90 @@ import java.util.List;
  * <p style="align:center"><img
  * src="https://developer.android.com/static/images/reference/androidx/media3/exoplayer/renderer-states.svg"
  * alt="Renderer state transitions">
+ *
+ * <h2>Format support</h2>
+ *
+ * The player will select a renderer based on the {@link RendererCapabilities} returned from {@link
+ * #getCapabilities()}. If the capabilities indicate support for a {@link Format}, the renderer is
+ * expected to handle {@link SampleStream} instances containing samples of this {@link Format}.
+ *
+ * <h2>Resource management</h2>
+ *
+ * <p>Renderers should acquire resources like codecs when entering {@link #STATE_ENABLED} for the
+ * first time. As the renderer may transition quickly to and from {@link #STATE_DISABLED}, it is
+ * recommended to hold onto resources even when entering {@link #STATE_DISABLED}. The player will
+ * explicitly call {@link #reset()} if the renderer is no longer needed, at which point any acquired
+ * limited resources should be released.
+ *
+ * <h2>Configuration changes</h2>
+ *
+ * <p>As renderers are created once in the lifetime of a player, they may need to be re-configured
+ * later based on user settings or other environmental changes. This is generally done by handling
+ * {@linkplain PlayerMessage player messages} in {@link #handleMessage}. There are many predefined
+ * common reconfigurations in {@link MessageType}, but custom renderers can add their own handling
+ * as needed.
+ *
+ * <h2>Reading and rendering samples</h2>
+ *
+ * <p>The renderer receives a {@link SampleStream} to read from when {@linkplain #enable enabled}.
+ * When seamlessly transitioning from one item to another, the renderer may get new {@link
+ * SampleStream} instances via {@link #replaceStream}. Note that {@link #replaceStream} may be
+ * called as soon as the {@linkplain C#BUFFER_FLAG_END_OF_STREAM end-of-stream signal} has been read
+ * from the current {@link SampleStream} to allow reading new samples as early as possible. At this
+ * point, the renderer may still be processing samples from the previous stream(s). Once the current
+ * stream has been {@linkplain #setCurrentStreamFinal() marked as final}, no further calls to {@link
+ * #replaceStream} are allowed to happen without first {@link #disable disabling} the renderer
+ * again.
+ *
+ * <p>The player will regularly call {@link #render} to let the renderer make progress. Once the
+ * renderer has prepared its internal pipeline to handle continuous playback progress, it should
+ * report itself as {@link #isReady()}. The player will only transition the renderer to {@link
+ * #STATE_STARTED} if it reports itself as ready. If the renderer is blocked from making progress,
+ * it should return {@code false} from {@link #isReady()}, which will result in a {@link #stop()}
+ * operation back to {@link #STATE_ENABLED}.
+ *
+ * <p>As long as it is in {@link #STATE_STARTED}, the renderer is expected to actively output the
+ * data it is processing in line with the current playback position passed to {@link #render}. The
+ * only exception is the very first sample (for example the first video frame), that is allowed to
+ * be output in {@link #STATE_ENABLED} if the {@code mayRenderStartOfStream} flag was set in {@link
+ * #enable} or later set via {@link #enableMayRenderStartOfStream()}.
+ *
+ * <p>Once the renderer finished all processing it needs to do (that is, no further call to {@link
+ * #render} is needed) and the current stream is {@linkplain #isCurrentStreamFinal() final}, it
+ * should report itself as {@link #isEnded()}.
+ *
+ * <h2>Timestamps and offsets</h2>
+ *
+ * <p>The renderer deals with potentially multiple consecutive input streams and has to handle
+ * position updates and stream transitions. This means there are multiple types of timestamps and
+ * offsets relevant in the context of this class:
+ *
+ * <ul>
+ *   <li><b>{@link SampleStream} timestamp</b>: The timestamp associated with each sample read from
+ *       a {@link SampleStream}. This corresponds to the time in the {@link Timeline.Period} this
+ *       stream belongs to. The current playback context can be obtained by using the {@link
+ *       #setTimeline Timeline} and the {@link MediaPeriodId} provided together with each {@link
+ *       SampleStream}.
+ *   <li><b>Renderer timestamp</b>: The timestamp of the overall playback. This is a continuously
+ *       increasing value across all input sample streams and what it passed to {@link #render} as
+ *       the current {@code positionUs}.
+ *   <li><b>Stream offset</b>: The constant offset between the current <i>{@link SampleStream}
+ *       timestamps</i> and the <i>renderer timestamp</i>. This value is provided when setting a new
+ *       stream in {@link #enable} or {@link #replaceStream}.
+ *   <li><b>Stream start position</b>: The <i>renderer timestamp</i> at which the current {@link
+ *       SampleStream} first starts playing. This value is provided when setting a new stream in
+ *       {@link #enable} or {@link #replaceStream}. Note that it may be different from the <i>Stream
+ *       offset</i> as streams can start at non-zero <i>{@link SampleStream} timestamps</i>.
+ *   <li><b>Reset position</b>: The <i>Renderer timestamp</i> at which continuous playback last
+ *       started. This is either the <i>stream start position</i> provided in {@link #enable}, or
+ *       the position set in any subsequent {@link #resetPosition} call. Note that this value is not
+ *       changed when playback transitions seamlessly to a new stream after calling {@link
+ *       #replaceStream}. After any position reset, the samples read next are those needed to start
+ *       playback at the intended <i>reset position</i>. In some cases, the renderer will encounter
+ *       output data before the intended <i>reset position</i> (for example video frames starting
+ *       from the previous keyframe). In these cases, the renderer should drop data internally and
+ *       only start producing output at the intended <i>reset position</i>.
+ * </ul>
  */
 @UnstableApi
 public interface Renderer extends PlayerMessage.Target {
@@ -69,6 +153,15 @@ public interface Renderer extends PlayerMessage.Target {
    * @see #getDurationToProgressUs
    */
   long DEFAULT_DURATION_TO_PROGRESS_US = 10_000L;
+
+  /**
+   * Default duration to progress reported if the renderer does not need calls to {@link #render} to
+   * progress, if it's in {@link #STATE_ENABLED} and already {@linkplain #isReady() ready} or
+   * {@linkplain #isEnded() ended}.
+   *
+   * @see #getDurationToProgressUs
+   */
+  long DEFAULT_IDLE_DURATION_TO_PROGRESS_US = 1_000_000L;
 
   /**
    * Some renderers can signal when {@link #render(long, long)} should be called.
@@ -125,7 +218,9 @@ public interface Renderer extends PlayerMessage.Target {
         MSG_SET_VIDEO_EFFECTS,
         MSG_SET_VIDEO_OUTPUT_RESOLUTION,
         MSG_SET_IMAGE_OUTPUT,
-        MSG_SET_PRIORITY
+        MSG_SET_PRIORITY,
+        MSG_TRANSFER_RESOURCES,
+        MSG_SET_SCRUBBING_MODE
       })
   public @interface MessageType {}
 
@@ -158,10 +253,6 @@ public interface Renderer extends PlayerMessage.Target {
    *
    * <p>If tunneling is enabled by the track selector, the specified audio attributes will be
    * ignored, but they will take effect if audio is later played without tunneling.
-   *
-   * <p>If the device is running a build before platform API version 21, audio attributes cannot be
-   * set directly on the underlying audio track. In this case, the usage will be mapped onto an
-   * equivalent stream type using {@link Util#getStreamTypeForAudioUsage(int)}.
    *
    * <p>To get audio attributes that are equivalent to a legacy stream type, pass the stream type to
    * {@link Util#getAudioUsageForStreamType(int)} and use the returned {@link C.AudioUsage} to build
@@ -266,6 +357,20 @@ public interface Renderer extends PlayerMessage.Target {
    * constants for predefined values.
    */
   int MSG_SET_PRIORITY = 16;
+
+  /**
+   * The type of message that can be passed to a renderer to direct it to transfer relevant
+   * resources to another renderer. The message payload should be a instance of the same {@link
+   * Renderer} type as the renderer being passed the message.
+   */
+  int MSG_TRANSFER_RESOURCES = 17;
+
+  /**
+   * The type of message that can be passed to a renderer to direct it to enable or disable
+   * scrubbing mode. The message payload should be a {@link ScrubbingModeParameters} instance to
+   * enable or {@code null} to disable scrubbing mode.
+   */
+  int MSG_SET_SCRUBBING_MODE = 18;
 
   /**
    * Applications or extensions may define custom {@code MSG_*} constants that can be passed to
@@ -447,7 +552,13 @@ public interface Renderer extends PlayerMessage.Target {
    * Returns minimum amount of playback clock time that must pass in order for the {@link #render}
    * call to make progress.
    *
-   * <p>The default return time is {@link #DEFAULT_DURATION_TO_PROGRESS_US}.
+   * <p>This method may be called when the renderer is in the following states: {@link
+   * #STATE_ENABLED}, {@link #STATE_STARTED}.
+   *
+   * <p>The default return time is {@link #DEFAULT_DURATION_TO_PROGRESS_US} if the renderer is in
+   * {@link #STATE_STARTED}, or in {@link #STATE_ENABLED} and not yet {@linkplain #isReady() ready}
+   * or {@linkplain #isEnded() ended}. Otherwise, it returns {@link
+   * #DEFAULT_IDLE_DURATION_TO_PROGRESS_US}.
    *
    * @param positionUs The current render position in microseconds, measured at the start of the
    *     current iteration of the rendering loop.
@@ -457,7 +568,9 @@ public interface Renderer extends PlayerMessage.Target {
    *     progress.
    */
   default long getDurationToProgressUs(long positionUs, long elapsedRealtimeUs) {
-    return DEFAULT_DURATION_TO_PROGRESS_US;
+    return getState() == STATE_ENABLED && (isReady() || isEnded())
+        ? DEFAULT_IDLE_DURATION_TO_PROGRESS_US
+        : DEFAULT_DURATION_TO_PROGRESS_US;
   }
 
   /**

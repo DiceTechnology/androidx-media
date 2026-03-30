@@ -15,6 +15,8 @@
  */
 package androidx.media3.exoplayer.source.chunk;
 
+import static android.os.Build.VERSION.SDK_INT;
+import static androidx.media3.common.util.Assertions.checkNotNull;
 import static androidx.media3.exoplayer.source.mediaparser.MediaParserUtil.PARAMETER_EAGERLY_EXPOSE_TRACK_TYPE;
 import static androidx.media3.exoplayer.source.mediaparser.MediaParserUtil.PARAMETER_EXPOSE_CAPTION_FORMATS;
 import static androidx.media3.exoplayer.source.mediaparser.MediaParserUtil.PARAMETER_EXPOSE_CHUNK_INDEX_AS_MEDIA_FORMAT;
@@ -33,7 +35,6 @@ import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.Assertions;
 import androidx.media3.common.util.UnstableApi;
-import androidx.media3.common.util.Util;
 import androidx.media3.exoplayer.analytics.PlayerId;
 import androidx.media3.exoplayer.source.mediaparser.InputReaderAdapterV30;
 import androidx.media3.exoplayer.source.mediaparser.MediaParserUtil;
@@ -44,6 +45,10 @@ import androidx.media3.extractor.ExtractorInput;
 import androidx.media3.extractor.ExtractorOutput;
 import androidx.media3.extractor.SeekMap;
 import androidx.media3.extractor.TrackOutput;
+import androidx.media3.extractor.text.DefaultSubtitleParserFactory;
+import androidx.media3.extractor.text.SubtitleExtractor;
+import androidx.media3.extractor.text.SubtitleParser;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,22 +61,91 @@ public final class MediaParserChunkExtractor implements ChunkExtractor {
   // Maximum TAG length is 23 characters.
   private static final String TAG = "MediaPrsrChunkExtractor";
 
-  public static final ChunkExtractor.Factory FACTORY =
-      (primaryTrackType,
-          format,
-          enableEventMessageTrack,
-          closedCaptionFormats,
-          playerEmsgTrackOutput,
-          playerId) -> {
-        if (!MimeTypes.isText(format.containerMimeType)) {
-          // Container is either Matroska or Fragmented MP4.
-          return new MediaParserChunkExtractor(
-              primaryTrackType, format, closedCaptionFormats, playerId);
-        } else {
-          // This is a text track that does not require an extractor.
+  /** A {@link ChunkExtractor.Factory} for {@link MediaParserChunkExtractor} instances. */
+  public static class Factory implements ChunkExtractor.Factory {
+
+    private SubtitleParser.Factory subtitleParserFactory;
+    private boolean parseSubtitlesDuringExtraction;
+
+    public Factory() {
+      subtitleParserFactory = new DefaultSubtitleParserFactory();
+    }
+
+    @CanIgnoreReturnValue
+    @Override
+    public Factory setSubtitleParserFactory(SubtitleParser.Factory subtitleParserFactory) {
+      this.subtitleParserFactory = checkNotNull(subtitleParserFactory);
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    @Override
+    public Factory experimentalParseSubtitlesDuringExtraction(
+        boolean parseSubtitlesDuringExtraction) {
+      this.parseSubtitlesDuringExtraction = parseSubtitlesDuringExtraction;
+      return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This implementation performs transcoding of the original format to {@link
+     * MimeTypes#APPLICATION_MEDIA3_CUES} if it is supported by {@link SubtitleParser.Factory}.
+     *
+     * <p>To modify the support behavior, you can {@linkplain
+     * #setSubtitleParserFactory(SubtitleParser.Factory) set your own subtitle parser factory}.
+     */
+    @Override
+    public Format getOutputTextFormat(Format sourceFormat) {
+      if (parseSubtitlesDuringExtraction && subtitleParserFactory.supportsFormat(sourceFormat)) {
+        return sourceFormat
+            .buildUpon()
+            .setSampleMimeType(MimeTypes.APPLICATION_MEDIA3_CUES)
+            .setCueReplacementBehavior(
+                subtitleParserFactory.getCueReplacementBehavior(sourceFormat))
+            .setCodecs(
+                sourceFormat.sampleMimeType
+                    + (sourceFormat.codecs != null ? " " + sourceFormat.codecs : ""))
+            .setSubsampleOffsetUs(Format.OFFSET_SAMPLE_RELATIVE)
+            .build();
+      } else {
+        return sourceFormat;
+      }
+    }
+
+    @Nullable
+    @Override
+    public ChunkExtractor createProgressiveMediaExtractor(
+        @C.TrackType int primaryTrackType,
+        Format representationFormat,
+        boolean enableEventMessageTrack,
+        List<Format> closedCaptionFormats,
+        @Nullable TrackOutput playerEmsgTrackOutput,
+        PlayerId playerId) {
+      if (!MimeTypes.isText(representationFormat.containerMimeType)) {
+        // Container is either Matroska or Fragmented MP4.
+        return new MediaParserChunkExtractor(
+            primaryTrackType, representationFormat, closedCaptionFormats, playerId);
+      } else {
+        if (!parseSubtitlesDuringExtraction) {
+          // Subtitles will be parsed after decoding
           return null;
+        } else {
+          return new BundledChunkExtractor(
+              new SubtitleExtractor(
+                  subtitleParserFactory.create(representationFormat), representationFormat),
+              primaryTrackType,
+              representationFormat);
         }
-      };
+      }
+    }
+  }
+
+  /**
+   * @deprecated {@link ChunkExtractor.Factory} is mutable, so a static instance is not safe.
+   *     Instantiate a new {@link Factory} instead.
+   */
+  @Deprecated public static final ChunkExtractor.Factory FACTORY = new Factory();
 
   private final OutputConsumerAdapterV30 outputConsumerAdapter;
   private final InputReaderAdapterV30 inputReaderAdapter;
@@ -122,7 +196,7 @@ public final class MediaParserChunkExtractor implements ChunkExtractor {
           MediaParserUtil.toCaptionsMediaFormat(closedCaptionFormats.get(i)));
     }
     mediaParser.setParameter(PARAMETER_EXPOSE_CAPTION_FORMATS, closedCaptionMediaFormats);
-    if (Util.SDK_INT >= 31) {
+    if (SDK_INT >= 31) {
       MediaParserUtil.setLogSessionIdOnMediaParser(mediaParser, playerId);
     }
     outputConsumerAdapter.setMuxedCaptionFormats(closedCaptionFormats);

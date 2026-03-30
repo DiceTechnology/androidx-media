@@ -1,9 +1,7 @@
 package androidx.media3.extractor.metadata.scte35;
 
-import android.os.Parcel;
 import androidx.media3.common.C;
 import androidx.media3.common.util.ParsableByteArray;
-import androidx.media3.common.util.Util;
 
 /** A {@link SpliceDescriptor} that defines a segmentation descriptor. */
 public class SegmentationDescriptor extends SpliceDescriptor {
@@ -217,52 +215,5 @@ public class SegmentationDescriptor extends SpliceDescriptor {
         segmentsExpected,
         subSegmentNum,
         subSegmentsExpected);
-  }
-
-  static SegmentationDescriptor fromParcel(Parcel in) {
-    // We had read the first int of spliceDescriptorTag.
-    return new SegmentationDescriptor(
-        in.readInt(),
-        in.readString(),
-        in.readLong(),
-        in.readByte() == 1,
-        in.readByte() == 1,
-        in.readByte() == 1,
-        in.readByte() == 1,
-        in.readByte() == 1,
-        in.readByte() == 1,
-        in.readByte() == 1,
-        in.readLong(),
-        in.readInt(),
-        in.readInt(),
-        Util.castNonNull(in.createByteArray()),
-        SegmentationType.from(in.readInt()),
-        in.readInt(),
-        in.readInt(),
-        in.readInt(),
-        in.readInt());
-  }
-
-  @Override
-  public void writeToParcel(Parcel dest) {
-    super.writeToParcel(dest);
-    // More fields.
-    dest.writeLong(segmentationEventId);
-    dest.writeByte((byte) (segmentationEventCancelIndicator ? 1 : 0));
-    dest.writeByte((byte) (programSegmentationFlag ? 1 : 0));
-    dest.writeByte((byte) (segmentationDurationFlag ? 1 : 0));
-    dest.writeByte((byte) (deliveryNotRestrictedFlag ? 1 : 0));
-    dest.writeByte((byte) (webDeliveryAllowedFlag ? 1 : 0));
-    dest.writeByte((byte) (noRegionalBlackoutFlag ? 1 : 0));
-    dest.writeByte((byte) (archiveAllowedFlag ? 1 : 0));
-    dest.writeLong(segmentationDurationUs);
-    dest.writeInt(segmentationUpidType);
-    dest.writeInt(segmentationUpidLength);
-    dest.writeByteArray(segmentationUpid);
-    dest.writeInt(segmentationType.getId());
-    dest.writeInt(segmentNum);
-    dest.writeInt(segmentsExpected);
-    dest.writeInt(subSegmentNum);
-    dest.writeInt(subSegmentsExpected);
   }
 }

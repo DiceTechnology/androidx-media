@@ -16,8 +16,6 @@ public class LimitedSeekRange {
 
   private final long startTimeMs; // UTC timestamp, millisecond
   private final long endTimeMs; // UTC timestamp, millisecond
-  @Deprecated
-  private final boolean seekToStart;
   private final boolean useAsLive;
 
   private long timestampOffsetMs;
@@ -27,7 +25,6 @@ public class LimitedSeekRange {
   private LimitedSeekRange(long startTimeMs, long endTimeMs, boolean seekToStart, boolean useAsLive) {
     this.startTimeMs = startTimeMs;
     this.endTimeMs = endTimeMs;
-    this.seekToStart = seekToStart;
     this.useAsLive = useAsLive;
     timestampOffsetMs = C.TIME_UNSET;
     factStartTimeMs = startTimeMs;
@@ -43,11 +40,6 @@ public class LimitedSeekRange {
 
   public long getOriginalEndTimeMs() {
     return endTimeMs;
-  }
-
-  @Deprecated
-  public boolean isSeekToStart() {
-    return seekToStart;
   }
 
   public boolean isUseAsLive() {
@@ -204,59 +196,14 @@ public class LimitedSeekRange {
     return !isValidTimeStamp(endTimeMs) || endTimeMs > nowMs;
   }
 
-  /**
-   * @deprecated Use {@link #create(String, String)} instead.
-   */
-  @Deprecated
-  // Generate limited seek range.
-  public static LimitedSeekRange from(String startDate, String endDate, boolean seekToStart) {
-    try {
-      return from(toTimeMs(startDate), toTimeMs(endDate), seekToStart);
-    } catch (Exception e) {
-      return null;
-    }
-  }
-
-  /**
-   * @deprecated Use {@link #create(String, String, boolean)} instead.
-   */
-  @Deprecated
-  // Generate limited seek range.
-  public static LimitedSeekRange from(String startDate, String endDate, boolean seekToStart, boolean useAsLive) {
-    try {
-      return from(toTimeMs(startDate), toTimeMs(endDate), seekToStart, useAsLive);
-    } catch (Exception e) {
-      return null;
-    }
-  }
-
-  /**
-   * @deprecated Use {@link #create(long, long)} instead.
-   */
-  @Deprecated
-  // Generate limited seek range.
-  public static LimitedSeekRange from(long startTimeMs, long endTimeMs, boolean seekToStart) {
-    return from(startTimeMs, endTimeMs, seekToStart, isUseAsLive(endTimeMs));
-  }
-
-
-  /**
-   * @deprecated Use {@link #create(long, long, boolean)} instead.
-   */
-  @Deprecated
-  // Generate limited seek range.
-  public static LimitedSeekRange from(long startTimeMs, long endTimeMs, boolean seekToStart, boolean useAsLive) {
-    return create(startTimeMs, endTimeMs, seekToStart, useAsLive);
-  }
-
   // Generate limited seek range based on current time, just for testing
-  public static LimitedSeekRange mock(int backHours, long durationMs, boolean seekToStart) {
+  public static LimitedSeekRange mock(int backHours, long durationMs) {
     GregorianCalendar calendar = new GregorianCalendar();
     calendar.set(Calendar.MINUTE, 0);
     calendar.set(Calendar.SECOND, 0);
     calendar.add(Calendar.HOUR_OF_DAY, -backHours);
     long startTimeMs = calendar.getTimeInMillis();
-    return from(startTimeMs, startTimeMs + durationMs, seekToStart);
+    return create(startTimeMs, startTimeMs + durationMs);
   }
 
   @Override
@@ -271,7 +218,6 @@ public class LimitedSeekRange {
     LimitedSeekRange other = (LimitedSeekRange) obj;
     return startTimeMs == other.startTimeMs
         && endTimeMs == other.endTimeMs
-        && seekToStart == other.seekToStart
         && useAsLive == other.useAsLive
         && timestampOffsetMs == other.timestampOffsetMs
         && factStartTimeMs == other.factStartTimeMs
@@ -282,7 +228,6 @@ public class LimitedSeekRange {
   public int hashCode() {
     int result = (int) (startTimeMs ^ (startTimeMs >>> 32));
     result = 31 * result + (int) (endTimeMs ^ (endTimeMs >>> 32));
-    result = 31 * result + (seekToStart ? 1 : 0);
     result = 31 * result + (useAsLive ? 1 : 0);
     result = 31 * result + (int) (timestampOffsetMs ^ (timestampOffsetMs >>> 32));
     result = 31 * result + (int) (factStartTimeMs ^ (factStartTimeMs >>> 32));
@@ -294,12 +239,11 @@ public class LimitedSeekRange {
   @Override
   public String toString() {
     return String.format(
-        "LimitedSeekRange{startTime='%tT', factStartTime='%tT', duration=%.1fhr, timestampOffset=%.1fhr, seekToStart=%b, useAsLive=%b, playbackEnded=%b}",
+        "LimitedSeekRange{startTime='%tT', factStartTime='%tT', duration=%.1fhr, timestampOffset=%.1fhr, useAsLive=%b, playbackEnded=%b}",
         new Date(startTimeMs),
         new Date(factStartTimeMs),
         useAsLive ? 24f : (endTimeMs - startTimeMs) / 3600_000f,
         timestampOffsetMs / 3600_000f,
-        seekToStart,
         useAsLive,
         playbackEnded);
   }

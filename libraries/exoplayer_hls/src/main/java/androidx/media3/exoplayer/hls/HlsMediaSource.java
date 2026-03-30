@@ -68,6 +68,7 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.List;
+import java.util.Objects;
 
 /** An HLS {@link MediaSource}. */
 @UnstableApi
@@ -99,7 +100,7 @@ public final class HlsMediaSource extends BaseMediaSource
   /** Type for ID3 metadata in HLS streams. */
   public static final int METADATA_TYPE_ID3 = 1;
 
-  /** Type for ESMG metadata in HLS streams. */
+  /** Type for EMSG metadata in HLS streams. */
   public static final int METADATA_TYPE_EMSG = 3;
 
   /** Factory for {@link HlsMediaSource}s. */
@@ -108,7 +109,10 @@ public final class HlsMediaSource extends BaseMediaSource
 
     private final HlsDataSourceFactory hlsDataSourceFactory;
 
-    private HlsExtractorFactory extractorFactory;
+    @Nullable private HlsExtractorFactory extractorFactory;
+    @Nullable private SubtitleParser.Factory subtitleParserFactoryOverride;
+    private boolean parseSubtitlesDuringExtraction;
+    private @C.VideoCodecFlags int codecsToParseWithinGopSampleDependencies;
     private HlsPlaylistParserFactory playlistParserFactory;
     private HlsPlaylistTracker.Factory playlistTrackerFactory;
     private CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory;
@@ -131,7 +135,7 @@ public final class HlsMediaSource extends BaseMediaSource
      *   <li>{@link DefaultDrmSessionManagerProvider}
      *   <li>{@link DefaultHlsPlaylistParserFactory}
      *   <li>{@link DefaultHlsPlaylistTracker#FACTORY}
-     *   <li>{@link HlsExtractorFactory#DEFAULT}
+     *   <li>{@link DefaultHlsExtractorFactory}
      *   <li>{@link DefaultLoadErrorHandlingPolicy}
      *   <li>{@link DefaultCompositeSequenceableLoaderFactory}
      * </ul>
@@ -153,7 +157,7 @@ public final class HlsMediaSource extends BaseMediaSource
      *   <li>{@link DefaultDrmSessionManagerProvider}
      *   <li>{@link DefaultHlsPlaylistParserFactory}
      *   <li>{@link DefaultHlsPlaylistTracker#FACTORY}
-     *   <li>{@link HlsExtractorFactory#DEFAULT}
+     *   <li>{@link DefaultHlsExtractorFactory}
      *   <li>{@link DefaultLoadErrorHandlingPolicy}
      *   <li>{@link DefaultCompositeSequenceableLoaderFactory}
      * </ul>
@@ -166,7 +170,6 @@ public final class HlsMediaSource extends BaseMediaSource
       drmSessionManagerProvider = new DefaultDrmSessionManagerProvider();
       playlistParserFactory = new DefaultHlsPlaylistParserFactory();
       playlistTrackerFactory = DefaultHlsPlaylistTracker.FACTORY;
-      extractorFactory = HlsExtractorFactory.DEFAULT;
       loadErrorHandlingPolicy = new DefaultLoadErrorHandlingPolicy();
       compositeSequenceableLoaderFactory = new DefaultCompositeSequenceableLoaderFactory();
       metadataType = METADATA_TYPE_ID3;
@@ -177,7 +180,11 @@ public final class HlsMediaSource extends BaseMediaSource
 
     /**
      * Sets the factory for {@link Extractor}s for the segments. The default value is {@link
-     * HlsExtractorFactory#DEFAULT}.
+     * DefaultHlsExtractorFactory}.
+     *
+     * <p>Any values passed to {@link #setSubtitleParserFactory} or {@link
+     * #experimentalParseSubtitlesDuringExtraction} will be forwarded to the provided {@link
+     * HlsExtractorFactory} instance during {@link #createMediaSource}.
      *
      * @param extractorFactory An {@link HlsExtractorFactory} for {@link Extractor}s for the
      *     segments.
@@ -185,8 +192,7 @@ public final class HlsMediaSource extends BaseMediaSource
      */
     @CanIgnoreReturnValue
     public Factory setExtractorFactory(@Nullable HlsExtractorFactory extractorFactory) {
-      this.extractorFactory =
-          extractorFactory != null ? extractorFactory : HlsExtractorFactory.DEFAULT;
+      this.extractorFactory = extractorFactory;
       return this;
     }
 
@@ -205,7 +211,7 @@ public final class HlsMediaSource extends BaseMediaSource
     @CanIgnoreReturnValue
     @Override
     public Factory setSubtitleParserFactory(SubtitleParser.Factory subtitleParserFactory) {
-      extractorFactory.setSubtitleParserFactory(checkNotNull(subtitleParserFactory));
+      this.subtitleParserFactoryOverride = subtitleParserFactory;
       return this;
     }
 
@@ -214,7 +220,15 @@ public final class HlsMediaSource extends BaseMediaSource
     @CanIgnoreReturnValue
     public Factory experimentalParseSubtitlesDuringExtraction(
         boolean parseSubtitlesDuringExtraction) {
-      extractorFactory.experimentalParseSubtitlesDuringExtraction(parseSubtitlesDuringExtraction);
+      this.parseSubtitlesDuringExtraction = parseSubtitlesDuringExtraction;
+      return this;
+    }
+
+    @Override
+    @CanIgnoreReturnValue
+    public Factory experimentalSetCodecsToParseWithinGopSampleDependencies(
+        @C.VideoCodecFlags int codecsToParseWithinGopSampleDependencies) {
+      this.codecsToParseWithinGopSampleDependencies = codecsToParseWithinGopSampleDependencies;
       return this;
     }
 
@@ -387,6 +401,16 @@ public final class HlsMediaSource extends BaseMediaSource
     @Override
     public HlsMediaSource createMediaSource(MediaItem mediaItem) {
       checkNotNull(mediaItem.localConfiguration);
+      if (extractorFactory == null) {
+        extractorFactory = new DefaultHlsExtractorFactory();
+      }
+      if (subtitleParserFactoryOverride != null) {
+        extractorFactory.setSubtitleParserFactory(subtitleParserFactoryOverride);
+      }
+      extractorFactory.experimentalParseSubtitlesDuringExtraction(parseSubtitlesDuringExtraction);
+      extractorFactory.experimentalSetCodecsToParseWithinGopSampleDependencies(
+          codecsToParseWithinGopSampleDependencies);
+      HlsExtractorFactory extractorFactory = this.extractorFactory;
       HlsPlaylistParserFactory playlistParserFactory = this.playlistParserFactory;
       List<StreamKey> streamKeys = mediaItem.localConfiguration.streamKeys;
       if (!streamKeys.isEmpty()) {
@@ -408,7 +432,10 @@ public final class HlsMediaSource extends BaseMediaSource
           drmSessionManagerProvider.get(mediaItem),
           loadErrorHandlingPolicy,
           playlistTrackerFactory.createTracker(
-              hlsDataSourceFactory, loadErrorHandlingPolicy, playlistParserFactory),
+              hlsDataSourceFactory,
+              loadErrorHandlingPolicy,
+              playlistParserFactory,
+              cmcdConfiguration),
           elapsedRealTimeOffsetMs,
           allowChunklessPreparation,
           metadataType,
@@ -487,7 +514,7 @@ public final class HlsMediaSource extends BaseMediaSource
     return newConfiguration != null
         && newConfiguration.uri.equals(existingConfiguration.uri)
         && newConfiguration.streamKeys.equals(existingConfiguration.streamKeys)
-        && Util.areEqual(newConfiguration.drmConfiguration, existingConfiguration.drmConfiguration)
+        && Objects.equals(newConfiguration.drmConfiguration, existingConfiguration.drmConfiguration)
         && existingMediaItem.liveConfiguration.equals(mediaItem.liveConfiguration);
   }
 

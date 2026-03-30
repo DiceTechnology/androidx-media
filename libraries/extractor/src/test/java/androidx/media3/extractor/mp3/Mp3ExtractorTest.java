@@ -15,6 +15,8 @@
  */
 package androidx.media3.extractor.mp3;
 
+import static org.junit.Assume.assumeFalse;
+
 import androidx.media3.test.utils.ExtractorAsserts;
 import androidx.media3.test.utils.ExtractorAsserts.AssertionConfig;
 import com.google.common.collect.ImmutableList;
@@ -39,6 +41,36 @@ public final class Mp3ExtractorTest {
   public void mp3SampleWithXingHeader() throws Exception {
     ExtractorAsserts.assertBehavior(
         Mp3Extractor::new, "media/mp3/bear-vbr-xing-header.mp3", simulationConfig);
+  }
+
+  @Test
+  public void mp3SampleWithXingHeader_noTableOfContents() throws Exception {
+    ExtractorAsserts.assertBehavior(
+        Mp3Extractor::new, "media/mp3/bear-vbr-xing-header-no-toc.mp3", simulationConfig);
+  }
+
+  @Test
+  public void mp3SampleWithXingHeader_noTableOfContents_cbrSeeking() throws Exception {
+    String filename = "mp3/bear-vbr-xing-header-no-toc.mp3";
+    ExtractorAsserts.assertBehavior(
+        () -> new Mp3Extractor(Mp3Extractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING),
+        "media/" + filename,
+        new AssertionConfig.Builder()
+            .setDumpFilesPrefix("extractordumps/" + filename + ".cbr-seeking")
+            .build(),
+        simulationConfig);
+  }
+
+  @Test
+  public void mp3SampleWithXingHeader_noTableOfContents_cbrSeekingAlways() throws Exception {
+    String filename = "mp3/bear-vbr-xing-header-no-toc.mp3";
+    ExtractorAsserts.assertBehavior(
+        () -> new Mp3Extractor(Mp3Extractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING_ALWAYS),
+        "media/" + filename,
+        new AssertionConfig.Builder()
+            .setDumpFilesPrefix("extractordumps/" + filename + ".cbr-seeking-always")
+            .build(),
+        simulationConfig);
   }
 
   @Test
@@ -70,6 +102,19 @@ public final class Mp3ExtractorTest {
   }
 
   @Test
+  public void mp3SampleWithVbriHeader() throws Exception {
+    ExtractorAsserts.assertBehavior(
+        Mp3Extractor::new, "media/mp3/bear-vbr-vbri-header.mp3", simulationConfig);
+  }
+
+  // https://github.com/androidx/media/issues/1904
+  @Test
+  public void mp3SampleWithVbriHeaderWithTruncatedToC() throws Exception {
+    ExtractorAsserts.assertBehavior(
+        Mp3Extractor::new, "media/mp3/bear-vbr-vbri-header-truncated-toc.mp3", simulationConfig);
+  }
+
+  @Test
   public void mp3SampleWithCbrSeeker() throws Exception {
     ExtractorAsserts.assertBehavior(
         Mp3Extractor::new,
@@ -93,6 +138,18 @@ public final class Mp3ExtractorTest {
     ExtractorAsserts.assertBehavior(
         () -> new Mp3Extractor(Mp3Extractor.FLAG_ENABLE_INDEX_SEEKING),
         "media/mp3/bear-vbr-no-seek-table.mp3",
+        simulationConfig);
+  }
+
+  // https://github.com/androidx/media/issues/1563
+  @Test
+  public void mp3CbrSampleWithNoSeekTableAndTrailingGarbage() throws Exception {
+    assumeFalse(
+        "Skipping I/O error testing with unknown length due to b/362727473",
+        simulationConfig.simulateIOErrors && simulationConfig.simulateUnknownLength);
+    ExtractorAsserts.assertBehavior(
+        Mp3Extractor::new,
+        "media/mp3/bear-cbr-no-seek-table-trailing-garbage.mp3",
         simulationConfig);
   }
 

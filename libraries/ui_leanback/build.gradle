@@ -26,7 +26,7 @@ android {
 apply from: "$gradle.ext.androidxMediaSettingsDir/repackage.gradle"
 
 dependencies {
-    implementation project(modulePrefix + 'lib-common')
+    api project(modulePrefix + 'lib-common')
     implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
     implementation 'androidx.leanback:leanback:1.0.0'
     compileOnly 'org.jetbrains.kotlin:kotlin-annotations-jvm:' + kotlinAnnotationsVersion

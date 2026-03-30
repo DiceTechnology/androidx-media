@@ -67,16 +67,16 @@ dependencies {
     }
     api 'androidx.annotation:annotation-experimental:' + androidxAnnotationExperimentalVersion
     implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
+    // Workaround for 'duplicate class' error caused by incomplete version
+    // metadata in Kotlin std lib (https://issuetracker.google.com/278545487).
+    // This can be removed when one of the other deps here (probably
+    // androidx.annotation) depends on kotlin-stdlib:1.9.20.
+    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.0')
     compileOnly 'com.google.code.findbugs:jsr305:' + jsr305Version
     compileOnly 'com.google.errorprone:error_prone_annotations:' + errorProneVersion
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
     compileOnly 'org.jetbrains.kotlin:kotlin-annotations-jvm:' + kotlinAnnotationsVersion
-    androidTestImplementation 'androidx.test:runner:' + androidxTestRunnerVersion
-    androidTestImplementation 'com.linkedin.dexmaker:dexmaker:' + dexmakerVersion
-    androidTestImplementation 'com.linkedin.dexmaker:dexmaker-mockito:' + dexmakerVersion
-    androidTestImplementation(project(modulePrefix + 'test-utils')) {
-        exclude module: modulePrefix.substring(1) + 'library-core'
-    }
+
     testImplementation 'org.mockito:mockito-core:' + mockitoVersion
     testImplementation 'androidx.test:core:' + androidxTestCoreVersion
     testImplementation 'androidx.test.ext:junit:' + androidxTestJUnitVersion
