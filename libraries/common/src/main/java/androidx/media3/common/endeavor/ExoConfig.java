@@ -9,6 +9,7 @@ public class ExoConfig {
   // use L3 only if the widevineSecurityLevel set to "L3", otherwise use L1 (default)
   private String widevineSecurityLevel = null;
   private boolean obtainKeyIdsFromManifest = true;
+  private boolean hideMarkerForWatchedAd = true;
 
   private ExoConfig() {
   }
@@ -31,5 +32,13 @@ public class ExoConfig {
 
   public void setObtainKeyIdsFromManifest(boolean obtainKeyIdsFromManifest) {
     this.obtainKeyIdsFromManifest = obtainKeyIdsFromManifest;
+  }
+
+  public boolean isHideMarkerForWatchedAd() {
+    return hideMarkerForWatchedAd;
+  }
+
+  public void setHideMarkerForWatchedAd(boolean hideMarkerForWatchedAd) {
+    this.hideMarkerForWatchedAd = hideMarkerForWatchedAd;
   }
 }
