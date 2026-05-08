@@ -469,11 +469,15 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
     @Nullable Timeline contentTimeline = this.contentTimeline;
     if (adPlaybackState != null && contentTimeline != null) {
       // Workaround to ignore multiperiod csai exceptions
-      if (adPlaybackState.adGroupCount == 0 || contentTimeline.getPeriodCount() > 1) {
+      if (adPlaybackState.adGroupCount == 0) {
         refreshSourceInfo(contentTimeline);
       } else {
         adPlaybackState = adPlaybackState.withAdDurationsUs(getAdDurationsUs());
-        refreshSourceInfo(new SinglePeriodAdTimeline(contentTimeline, adPlaybackState));
+        if (contentTimeline.getPeriodCount() == 1) {
+          refreshSourceInfo(new SinglePeriodAdTimeline(contentTimeline, adPlaybackState));
+        } else {
+          refreshSourceInfo(new AdTimeline(contentTimeline, adPlaybackState));
+        }
       }
     }
   }
