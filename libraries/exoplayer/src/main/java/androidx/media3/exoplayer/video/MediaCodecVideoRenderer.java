@@ -2815,6 +2815,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
         case "XT1663":
         case "Z12_PRO":
         case "Z80":
+        case "gts210vewifi":
           return true;
         default:
           break; // Do nothing.
