@@ -134,6 +134,7 @@ import java.util.Objects;
   private final List<String> supportedMimeTypes;
   private final DataSpec adTagDataSpec;
   private final Object adsId;
+  private final Timeline.Window window;
   private final Timeline.Period period;
   private final Handler handler;
   private final ComponentListener componentListener;
@@ -254,6 +255,7 @@ import java.util.Objects;
     this.supportedMimeTypes = supportedMimeTypes;
     this.adTagDataSpec = adTagDataSpec;
     this.adsId = adsId;
+    window = new Timeline.Window();
     period = new Timeline.Period();
     handler = Util.createHandler(getImaLooper(), /* callback= */ null);
     componentListener = new ComponentListener();
@@ -481,7 +483,21 @@ import java.util.Objects;
     }
     Player player = this.player;
     this.timeline = timeline;
-    long contentDurationUs = timeline.getPeriod(player.getCurrentPeriodIndex(), period).durationUs;
+
+    long contentDurationUs = 0;
+    int windowIndex = player.getCurrentMediaItemIndex();
+    timeline.getWindow(windowIndex, window);
+    if (window.firstPeriodIndex == window.lastPeriodIndex) {
+      // may be TIME_UNSET for placeholder
+      contentDurationUs = timeline.getPeriod(window.firstPeriodIndex, period).durationUs;
+    } else {
+      // multi-period content
+      for (int i = window.firstPeriodIndex; i <= window.lastPeriodIndex; i++) {
+        long periodDurationUs = timeline.getPeriod(i, period).durationUs;
+        contentDurationUs += periodDurationUs != C.TIME_UNSET ? periodDurationUs : 0;
+      }
+    }
+
     contentDurationMs = Util.usToMs(contentDurationUs);
     if (contentDurationUs != adPlaybackState.contentDurationUs) {
       adPlaybackState = adPlaybackState.withContentDurationUs(contentDurationUs);

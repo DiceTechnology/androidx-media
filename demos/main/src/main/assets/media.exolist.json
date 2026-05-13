@@ -520,6 +520,16 @@
     "name": "IMA sample ad tags",
     "samples": [
       {
+        "name": "Diva test with CSAI pre-roll on multi-period Dash live stream",
+        "uri": "https://hclpkz.egress.pi78fd.mediapackagev2.ca-central-1.amazonaws.com/out/v1/r-dev/ch-02-dev-r-v2/dash-test-non-drm/index.mpd",
+        "ad_tag_uri": "https://mandates.somquery.sqrt-5041.de/v4/ad-pod/442c5dd6-79a9-42d6-840e-b30e5e951806?&block%5Bname%5D=precontent&block%5Bduration%5D=180&block%5Bindex%5D=1&iabContent%5Burl%5D=https%3A%2F%2Fwww.dyn.sport%2Fwatch%2F1_fc_saarbr%25c3%25bccken_tt_bv_borussia_09_dortmund_85911%3Fstartfromlive%3Dtrue&ids%5Bppid%5D=662130ee0a9910987d68b35b&inventory%5Bsite%5D=dyn&inventory%5Bbrand%5D=dyn&inventory%5Bformat%5D=basketball+champions+league&inventory%5Bcategory%5D=live&inventory%5Bcategory%5D=basketball&consent%5BgdprConsent%5D=CQT7KEAQT7KEAAFADADECDFsAP_gAEPgAAYgJepR8C5dTGFCOTJ2QPtEMIQF18ALAkAABgSAAmABABGA4AQGgmAwJAQABCACEAIAolQBAAAEHAAEAEAAAAABAABAAAAEAAAIIABEAAEAAAIIAAgKAIAAAACIAEAREAAAkAiAAZIsAEAAgAAAAkAAAAAAAAAAAAMABAAIABIAAQAAAgAAAAAAEAAAAAAAARgAAAAAAAAAAAAAII7JR8C5dTGFCODBWQPtEMIQV18ADAkAABASAAmABABCA4AQGkmAwJEAAACAAEAAAolQBAAAAGAAEAEAAAAABAABAAAAAAAAIIABEAAEAQAAAAAgKAIAAAACIAEAQEAAAgAiAAJIkAEAAAAAAAkAAAAAAAAAAAAMABAAIABAAAAAAggAAAAAAEAAAAAAAARgAEAA.f_wACHwAAAAA&iabContent%5Bid%5D=96645&iabContent%5Blivestream%5D=1&iabContent%5Btitle%5D=filou+oostende+-+ask+karditsas+bc&iabContent%5Bgenre%5D=sports&iabContent%5Bcat%5D=547&showroom=qa_all/test"
+      },
+      {
+        "name": "Diva test with CSAI pre-roll mid-roll and post-roll on multi-period Dash vod stream",
+        "uri": "https://dash.akamaized.net/dash264/TestCases/5a/nomor/1.mpd",
+        "ad_tag_uri": "https://pubads.g.doubleclick.net/gampad/ads?sz=640x480&iu=/124319096/external/ad_rule_samples&ciu_szs=300x250&ad_rule=1&impl=s&gdfp_req=1&env=vp&output=vmap&unviewed_position_start=1&cust_params=deployment%3Ddevsite%26sample_ar%3Dpremidpostpod&cmsid=496&vid=short_onecue&correlator="
+      },
+      {
         "name": "VMAP pre-roll single ad, mid-roll standard pods with 5 ads every 10 seconds for 1:40, post-roll single ad",
         "uri": "https://storage.googleapis.com/exoplayer-test-media-1/mkv/android-screens-lavf-56.36.100-aac-avc-main-1280x720.mkv",
         "ad_tag_uri": "https://pubads.g.doubleclick.net/gampad/ads?sz=640x480&iu=/124319096/external/ad_rule_samples&ciu_szs=300x250&ad_rule=1&impl=s&gdfp_req=1&env=vp&output=vmap&unviewed_position_start=1&cust_params=deployment%3Ddevsite%26sample_ar%3Dpremidpostlongpod&cmsid=496&vid=short_tencue&correlator="
