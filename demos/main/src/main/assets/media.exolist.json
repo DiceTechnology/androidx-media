@@ -939,6 +939,10 @@
     "name": "Subtitles",
     "samples": [
       {
+        "name": "DASH - malformed WebVTT (negative trun values)",
+        "uri": "https://sample-videos-zyrkp2nj.s3.eu-west-1.amazonaws.com/support-22097/manifest_crash.mpd"
+      },
+      {
         "name": "TTML positioning",
         "uri": "https://html5demos.com/assets/dizzy.mp4",
         "subtitle_uri": "https://storage.googleapis.com/exoplayer-test-media-1/ttml/netflix_ttml_sample.xml",

@@ -1360,15 +1360,26 @@ public class FragmentedMp4Extractor implements Extractor {
         track.type == C.TRACK_TYPE_VIDEO
             && (flags & FLAG_WORKAROUND_EVERY_VIDEO_FRAME_IS_SYNC_FRAME) != 0;
 
+    // Some streams contain malformed text (e.g. WebVTT) samples with negative durations or sizes.
+    // For text tracks we tolerate these by clamping to 0 (effectively ignoring the malformed cue)
+    // rather than failing and dropping the whole track. Other track types still fail loudly.
+    boolean tolerateNegativeSampleValues = track.type == C.TRACK_TYPE_TEXT;
+
     int trackRunEnd = trackRunStart + fragment.trunLength[index];
     long timescale = track.timescale;
     long cumulativeTime = fragment.nextFragmentDecodeTime;
     for (int i = trackRunStart; i < trackRunEnd; i++) {
       // Use trun values if present, otherwise tfhd, otherwise trex.
       int sampleDuration =
-          checkNonNegative(sampleDurationsPresent ? trun.readInt() : defaultSampleValues.duration);
+          checkNonNegativeOrClamp(
+              sampleDurationsPresent ? trun.readInt() : defaultSampleValues.duration,
+              tolerateNegativeSampleValues,
+              "sampleDuration");
       int sampleSize =
-          checkNonNegative(sampleSizesPresent ? trun.readInt() : defaultSampleValues.size);
+          checkNonNegativeOrClamp(
+              sampleSizesPresent ? trun.readInt() : defaultSampleValues.size,
+              tolerateNegativeSampleValues,
+              "sampleSize");
       int sampleFlags =
           sampleFlagsPresent
               ? trun.readInt()
@@ -1397,12 +1408,25 @@ public class FragmentedMp4Extractor implements Extractor {
     return trackRunEnd;
   }
 
-  private static int checkNonNegative(int value) throws ParserException {
-    if (value < 0) {
-      throw ParserException.createForMalformedContainer(
-          "Unexpected negative value: " + value, /* cause= */ null);
+  /**
+   * Validates that {@code value} is non-negative.
+   *
+   * <p>If {@code value} is negative and {@code tolerate} is {@code true}, a warning is logged and 0
+   * is returned (used for malformed text/subtitle samples, so the affected cue is effectively
+   * ignored instead of dropping the whole track). Otherwise a malformed-container {@link
+   * ParserException} is thrown.
+   */
+  private static int checkNonNegativeOrClamp(int value, boolean tolerate, String field)
+      throws ParserException {
+    if (value >= 0) {
+      return value;
     }
-    return value;
+    if (tolerate) {
+      Log.w(TAG, "Clamping malformed negative " + field + " (" + value + ") to 0.");
+      return 0;
+    }
+    throw ParserException.createForMalformedContainer(
+        "Unexpected negative value: " + value, /* cause= */ null);
   }
 
   private static void parseUuid(
