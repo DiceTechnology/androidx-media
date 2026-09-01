@@ -97,6 +97,12 @@ public final class EventMessage implements Metadata.Entry {
   @Override
   @Nullable
   public Format getWrappedMetadataFormat() {
+    if (messageData.length == 0) {
+      // An empty payload isn't actually decodable metadata (e.g. a manifest Event whose
+      // Signal/Binary payload is missing). Don't claim a format for it, so callers don't
+      // attempt to decode zero bytes.
+      return null;
+    }
     switch (schemeIdUri) {
       case ID3_SCHEME_ID_AOM:
       case ID3_SCHEME_ID_APPLE:
