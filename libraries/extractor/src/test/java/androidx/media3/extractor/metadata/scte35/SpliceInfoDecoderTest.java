@@ -309,6 +309,66 @@ public final class SpliceInfoDecoderTest {
   }
 
   @Test
+  public void decodeEmptySectionReturnsEmptyMetadata() {
+    // A DASH <Event> with a missing Signal/Binary child, or an HLS #EXT-X-DATERANGE with no
+    // SCTE35 attribute, produces a zero-length payload.
+    Metadata metadata = feedInputBuffer(new byte[0], /* timeUs= */ 0, /* subsampleOffset= */ 0);
+
+    assertThat(metadata.length()).isEqualTo(0);
+  }
+
+  @Test
+  public void decodeTruncatedHeaderReturnsEmptyMetadata() {
+    // 13 bytes: one short of the fixed splice_info_section header.
+    byte[] truncatedHeader =
+        new byte[] {
+          0, // table_id.
+          (byte) 0x80, // section_syntax_indicator, private_indicator, reserved, section_length(4).
+          0x14, // section_length(8).
+          0x00, // protocol_version.
+          0x00, // encrypted_packet, encryption_algorithm, pts_adjustment(1).
+          0x00,
+          0x00,
+          0x00,
+          0x00, // pts_adjustment(32).
+          0x00, // cw_index.
+          0x00, // tier(8).
+          0x00, // tier(4), splice_command_length(4).
+          0x05 // splice_command_length(8). splice_command_type is missing.
+        };
+
+    Metadata metadata = feedInputBuffer(truncatedHeader, /* timeUs= */ 0, /* subsampleOffset= */ 0);
+
+    assertThat(metadata.length()).isEqualTo(0);
+  }
+
+  @Test
+  public void decodeTruncatedCommandReturnsEmptyMetadata() {
+    // A complete header declaring a splice_insert, with the command body cut off entirely.
+    byte[] truncatedCommand =
+        new byte[] {
+          0, // table_id.
+          (byte) 0x80, // section_syntax_indicator, private_indicator, reserved, section_length(4).
+          0x19, // section_length(8).
+          0x00, // protocol_version.
+          0x00, // encrypted_packet, encryption_algorithm, pts_adjustment(1).
+          0x00,
+          0x00,
+          0x00,
+          0x00, // pts_adjustment(32).
+          0x00, // cw_index.
+          0x00, // tier(8).
+          0x00, // tier(4), splice_command_length(4).
+          0x0e, // splice_command_length(8).
+          0x05 // splice_command_type = splice_insert. Command body is missing.
+        };
+
+    Metadata metadata = feedInputBuffer(truncatedCommand, /* timeUs= */ 0, /* subsampleOffset= */ 0);
+
+    assertThat(metadata.length()).isEqualTo(0);
+  }
+
+  @Test
   public void decodeFailsIfPositionNonZero() {
     MetadataInputBuffer buffer = createMetadataInputBuffer(createByteArray(1, 2, 3));
     buffer.data.position(1);
